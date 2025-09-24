@@ -401,15 +401,18 @@ class AcademicDevisionDropdownForUserProfileViewSet(ModelViewSet):
     queryset = AcademicDevision.objects.filter(is_active=True).order_by('name')
     permission_classes = [IsAuthenticated]
     serializer_class = AcademicDevisionDropdownSerializer
+    http_method_names = ['GET',]
 
 class StateDropdownForUserProfileViewSet(ModelViewSet):
     queryset = State.objects.filter(is_active=True).order_by('name')
     permission_classes = [IsAuthenticated]
     serializer_class = StateDropdownSerializer
+    http_method_names = ['GET',]
 
 class ZoneDropdownForUserProfileViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ZoneDropdownSerializer
+    http_method_names = ['GET',]
 
     def get_queryset(self):
         # Get 'state_ids' query parameter (comma-separated)
