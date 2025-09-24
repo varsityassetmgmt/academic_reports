@@ -9,9 +9,11 @@ class ClassNameDropdownViewSet(ModelViewSet):
     queryset = ClassName.objects.filter(is_active=True).order_by('name')
     permission_classes = [IsAuthenticated]
     serializer_class = ClassNameDropdownSerializer
+    http_method_names = ['GET',]
 
 
 class OrientationDropdownViewSet(ModelViewSet):
     queryset = Orientation.objects.filter(is_active=True).order_by('name')
     permission_classes = [IsAuthenticated]
     serializer_class = OrientationDropdownSerializer
+    http_method_names = ['GET',]
