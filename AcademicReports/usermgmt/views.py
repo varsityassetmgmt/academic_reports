@@ -432,6 +432,7 @@ class ZoneDropdownForUserProfileViewSet(ModelViewSet):
 class BranchDropdownForUserProfileViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = BranchDropdownSerializer
+    http_method_names = ['GET',]
 
     def get_queryset(self):
         # Get query params
