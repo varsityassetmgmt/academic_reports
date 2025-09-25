@@ -17,7 +17,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from django.contrib.auth import update_session_auth_hash
-from branches.serializers import AcademicDevisionDropdownSerializer, StateDropdownSerializer, ZoneDropdownSerializer, BranchDropdownSerializer
+from branches.serializers import *
+from students.serializers import *
+from students.models import *
 
 
 #========================================= Login Views ===========================================
@@ -460,3 +462,16 @@ class BranchDropdownForUserProfileViewSet(ModelViewSet):
                 pass  # Ignore invalid input
 
         return queryset
+
+#============================================================= Class & Orientation Dropdowns for userprofile ==========================================
+class ClassNameDropdownForUserProfileViewSet(ModelViewSet):
+    queryset = ClassName.objects.filter(is_active=True).order_by('class_sequence')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ClassNameDropdownSerializer
+    http_method_names = ['get',]
+
+class OrientationDropdownForUserProfileViewSet(ModelViewSet):
+    queryset = Orientation.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrientationDropdownSerializer
+    http_method_names = ['get',]
