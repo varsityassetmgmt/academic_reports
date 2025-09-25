@@ -119,7 +119,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'bio', 'phone_number',
             'states', 'zones', 'branches',
             'must_change_password', 'username',
-            'academic_devisions',
+            'academic_devisions', 'classes', 'orientations',
         ]
 
     

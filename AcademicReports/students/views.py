@@ -6,14 +6,14 @@ from .models import ClassName, Orientation
 from .serializers import *
 # Create your views here.
 class ClassNameDropdownViewSet(ModelViewSet):
-    queryset = ClassName.objects.filter(is_active=True).order_by('name')
+    queryset = ClassName.objects.filter(is_active=True).order_by('class_sequence')
     permission_classes = [IsAuthenticated]
     serializer_class = ClassNameDropdownSerializer
-    http_method_names = ['GET',]
+    http_method_names = ['get',]
 
 
 class OrientationDropdownViewSet(ModelViewSet):
     queryset = Orientation.objects.filter(is_active=True).order_by('name')
     permission_classes = [IsAuthenticated]
     serializer_class = OrientationDropdownSerializer
-    http_method_names = ['GET',]
+    http_method_names = ['get',]
