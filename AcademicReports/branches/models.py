@@ -5,6 +5,7 @@ from students.models import ClassName, Orientation
 
 # Create your models here.
 class AcademicYear(models.Model):
+    academic_year_id = models.BigAutoField(primary_key=True)
     start_date = models.DateField(blank=True,null=True)
     end_date = models.DateField(blank=True,null=True)
     name = models.CharField(max_length=150,null=False,blank=False,unique=True)
@@ -15,6 +16,7 @@ class AcademicYear(models.Model):
         return self.name
     
 class AcademicDevision(models.Model):
+    academic_devision_id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length= 250, null=False,blank=False,unique=True)
     classes = models.ManyToManyField(ClassName,blank=True)
     description = models.TextField(null=True, blank=True)
@@ -34,6 +36,7 @@ class State(models.Model):
     
 #============================== ZONE =============================
 class Zone(models.Model):
+    zone_id = models.BigAutoField(primary_key=True, db_index=True)
     state = models.ForeignKey(State,related_name="zone_state",null=True, blank=True,on_delete=models.PROTECT)     
     name =  models.CharField(max_length=100,null=False, blank=False,unique = True)
     is_active = models.BooleanField(default=True)
@@ -43,6 +46,7 @@ class Zone(models.Model):
 
 #===================== Location ==================================
 class Branch(models.Model):
+    branch_id = models.BigAutoField(primary_key=True)
     state = models.ForeignKey(State,related_name="branch_state", null=False, blank=False, on_delete=models.PROTECT)
     zone = models.ForeignKey(Zone,related_name="branch_zone", null=False, blank=False, on_delete=models.PROTECT)
     name = models.CharField(max_length=250, null=False, blank=False, unique=True)
@@ -66,8 +70,8 @@ class Branch(models.Model):
         verbose_name = 'Branch'
         verbose_name_plural = 'Branches'
         indexes = [
-            models.Index(fields=['name'], name='branch_name_idx'),
-            models.Index(fields=['is_active'], name='branch_is_active_idx'),
             models.Index(fields=['state'], name='branch_state_idx'),
             models.Index(fields=['zone'], name='branch_zone_idx'),
+            models.Index(fields=['name'], name='branch_name_idx'),
+            models.Index(fields=['is_active'], name='branch_is_active_idx'),
         ]

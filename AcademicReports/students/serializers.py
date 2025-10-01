@@ -5,10 +5,10 @@ from .models import ClassName, Orientation
 class ClassNameDropdownSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClassName
-        fields = ['id', 'name']  
+        fields = ['class_name_id', 'name']  
 
 # ==================== Orientation ====================
 class OrientationDropdownSerializer(serializers.ModelSerializer):
     class Meta:
         model = Orientation
-        fields = ['id', 'name']  
+        fields = ['orientation_id', 'name']  

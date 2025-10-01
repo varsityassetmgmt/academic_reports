@@ -6,25 +6,25 @@ from .models import AcademicYear, AcademicDevision, State, Zone, Branch
 class AcademicDevisionDropdownSerializer(serializers.ModelSerializer):
     class Meta:
         model = AcademicDevision
-        fields = ['id', 'name']
+        fields = ['academic_devision_id', 'name']
 
 
 # ==================== State ====================
 class StateDropdownSerializer(serializers.ModelSerializer):
     class Meta:
         model = State
-        fields = ['id', 'name']
+        fields = ['state_id', 'name']
 
 
 # ==================== Zone ====================
 class ZoneDropdownSerializer(serializers.ModelSerializer):
     class Meta:
         model = Zone
-        fields = ['id', 'name']
+        fields = ['zone_id', 'name']
 
 
 # ==================== Branch ====================
 class BranchDropdownSerializer(serializers.ModelSerializer):
     class Meta:
         model = Branch
-        fields = ['id', 'name']
+        fields = ['branch_id', 'name']

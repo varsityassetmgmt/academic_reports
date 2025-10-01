@@ -17,7 +17,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from django.contrib.auth import update_session_auth_hash
-from branches.serializers import AcademicDevisionDropdownSerializer, StateDropdownSerializer, ZoneDropdownSerializer, BranchDropdownSerializer
+from branches.serializers import *
+from students.serializers import *
+from students.models import *
 
 
 #========================================= Login Views ===========================================
@@ -401,18 +403,18 @@ class AcademicDevisionDropdownForUserProfileViewSet(ModelViewSet):
     queryset = AcademicDevision.objects.filter(is_active=True).order_by('name')
     permission_classes = [IsAuthenticated]
     serializer_class = AcademicDevisionDropdownSerializer
-    http_method_names = ['GET',]
+    http_method_names = ['get',]
 
 class StateDropdownForUserProfileViewSet(ModelViewSet):
     queryset = State.objects.filter(is_active=True).order_by('name')
     permission_classes = [IsAuthenticated]
     serializer_class = StateDropdownSerializer
-    http_method_names = ['GET',]
+    http_method_names = ['get',]
 
 class ZoneDropdownForUserProfileViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ZoneDropdownSerializer
-    http_method_names = ['GET',]
+    http_method_names = ['get',]
 
     def get_queryset(self):
         # Get 'state_ids' query parameter (comma-separated)
@@ -423,7 +425,7 @@ class ZoneDropdownForUserProfileViewSet(ModelViewSet):
             try:
                 state_ids = [int(sid) for sid in state_ids_str.split(',') if sid.isdigit()]
                 if state_ids:
-                    queryset = queryset.exclude(state_id__in=state_ids)
+                    queryset = queryset.exclude(state__state_id__in=state_ids)
             except ValueError:
                 pass  # Ignore invalid input
 
@@ -432,7 +434,7 @@ class ZoneDropdownForUserProfileViewSet(ModelViewSet):
 class BranchDropdownForUserProfileViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = BranchDropdownSerializer
-    http_method_names = ['GET',]
+    http_method_names = ['get',]
 
     def get_queryset(self):
         # Get query params
@@ -446,7 +448,7 @@ class BranchDropdownForUserProfileViewSet(ModelViewSet):
             try:
                 state_ids = [int(sid) for sid in state_ids_str.split(',') if sid.isdigit()]
                 if state_ids:
-                    queryset = queryset.exclude(state_id__in=state_ids)
+                    queryset = queryset.exclude(state__state_id__in=state_ids)
             except ValueError:
                 pass  # Ignore invalid input
 
@@ -455,8 +457,21 @@ class BranchDropdownForUserProfileViewSet(ModelViewSet):
             try:
                 zone_ids = [int(zid) for zid in zone_ids_str.split(',') if zid.isdigit()]
                 if zone_ids:
-                    queryset = queryset.exclude(zone_id__in=zone_ids)
+                    queryset = queryset.exclude(zone__zone_id__in=zone_ids)
             except ValueError:
                 pass  # Ignore invalid input
 
         return queryset
+
+#============================================================= Class & Orientation Dropdowns for userprofile ==========================================
+class ClassNameDropdownForUserProfileViewSet(ModelViewSet):
+    queryset = ClassName.objects.filter(is_active=True).order_by('class_sequence')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ClassNameDropdownSerializer
+    http_method_names = ['get',]
+
+class OrientationDropdownForUserProfileViewSet(ModelViewSet):
+    queryset = Orientation.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrientationDropdownSerializer
+    http_method_names = ['get',]
