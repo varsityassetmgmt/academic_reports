@@ -25,6 +25,7 @@ class AcademicDevision(models.Model):
     
 #============================ State =================================
 class State(models.Model):
+    state_id = models.BigAutoField(primary_key=True, db_index=True)
     name =  models.CharField(max_length=250,null=False, blank=False,unique = True)
     is_active = models.BooleanField(default=True)
 
