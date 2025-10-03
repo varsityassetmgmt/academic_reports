@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ClassName, Orientation
+from branches.models import ClassName, Orientation
 
 # ==================== ClassName ====================
 class ClassNameDropdownSerializer(serializers.ModelSerializer):

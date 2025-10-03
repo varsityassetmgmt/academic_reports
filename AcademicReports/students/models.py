@@ -1,8 +1,11 @@
 from django.db import models
+# from exams.models import *
+# from branches.models import *
+# from reports.models import *
+# from users.models import *
 
-# Create your models here.
+
 class ClassName(models.Model):
-    class_name_id = models.BigAutoField(primary_key=True)
     varna_class_id  = models.CharField(max_length=250,null=True,blank=True,unique=True)
     name = models.CharField(max_length=250,null=False,blank=False,unique=True)    
     description = models.TextField(null=True, blank=True)
@@ -17,7 +20,6 @@ class ClassName(models.Model):
         verbose_name_plural = 'Classes'
 
 class Orientation(models.Model):
-    orientation_id = models.BigAutoField(primary_key=True, db_index=True)
     varna_orientation_id  = models.CharField(max_length=250,null=True,blank=True,unique=True)
     name = models.CharField(max_length=250,null=False,blank=False,unique=True)
     short_code  = models.CharField(max_length=100,null=False,blank=False)
@@ -26,7 +28,7 @@ class Orientation(models.Model):
  
     def __str__(self):
         return self.name
-    
+
 
 class Gender(models.Model):
     gender_id = models.BigAutoField(primary_key=True)
@@ -59,7 +61,7 @@ class Student(models.Model):
     branch = models.ForeignKey("branches.Branch", on_delete=models.PROTECT, null=True, blank=True, related_name='student_branch')
     orientation = models.ForeignKey(Orientation, on_delete=models.PROTECT, null=True, blank=True, related_name='student_orientation')
     student_class = models.ForeignKey(ClassName, on_delete=models.PROTECT, null=True, blank=True, related_name='student_class_name')    
-    #section = models.ForeignKey(Section, on_delete=models.PROTECT, null=True, blank=True, related_name='student_section')
+    section = models.ForeignKey("branches.Section", on_delete=models.PROTECT, null=True, blank=True, related_name='student_section')
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
@@ -72,3 +74,4 @@ class Student(models.Model):
             models.Index(fields=['is_active'], name='student_is_active_idx'),
             models.Index(fields=['branch'], name='student_branch_idx'),
         ]
+        
