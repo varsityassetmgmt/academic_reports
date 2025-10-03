@@ -1,4 +1,5 @@
- 
+
+
 from django.db import models
 from django.core.exceptions import ValidationError
 
@@ -6,12 +7,14 @@ from django.core.exceptions import ValidationError
 class Subject(models.Model):
     subject_id = models.BigAutoField(primary_key=True, db_index=True)
     name = models.CharField(max_length=250,null=False,blank=False,unique=True)
+    academic_devisions = models.ManyToManyField("branches.AcademicDevision",blank=True, related_name='subject_academic_devisions')
     class_names = models.ManyToManyField("students.ClassName",blank=True, related_name='subject_classes')
     is_active = models.BooleanField(default=True)
     description = models.TextField(null=True,blank=True)
+    display_name = models.CharField(max_length=250,null=True,blank=True)
+
     def __str__(self):
         return self.name
-    #
     
     
 class SubjectSkill(models.Model):
@@ -20,10 +23,17 @@ class SubjectSkill(models.Model):
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = ("subject", "name")
-
+        constraints = [
+            models.UniqueConstraint(
+                fields=["subject", "name"],
+                name="unique_subject_skill_name"
+            )
+        ]
     def __str__(self):
         return f"{self.subject.name} - {self.name}"
+    
+
+
 class ExamType(models.Model):
     exam_type_id = models.BigAutoField(primary_key=True, db_index=True)
     name = models.CharField(max_length=250,null=False,blank=False,unique=True)
@@ -41,10 +51,26 @@ class Exam(models.Model):
     name = models.CharField(max_length=250,null=False,blank=False,unique=True)
     start_date = models.DateField()
     end_date = models.DateField()
+
+    states = models.ManyToManyField("branches.State",blank=True, related_name='exams_states')
+    zones = models.ManyToManyField("branches.Zone",blank=True, related_name='exams_zones')
+    branches = models.ManyToManyField("branches.Branch",blank=True, related_name='exams_branches')
+
     orientations = models.ManyToManyField("students.Orientation", blank=True, related_name='exams_orientations')
+
+    academic_devisions = models.ManyToManyField("branches.AcademicDevision",blank=True, related_name='exam_academic_devisions')
     student_classes = models.ManyToManyField("students.ClassName",blank=True, related_name='exams_classes')
     is_visible = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "academic_year", "exam_type"],
+                name="unique_exam_per_year_type"
+            )
+        ]
+
     def __str__(self):
         return f"{self.name} ({self.exam_type.name})"
 
@@ -52,21 +78,62 @@ class ExamInstance(models.Model):
     exam_instance_id = models.BigAutoField(primary_key=True)
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='exam_instance_exam')
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='exam_instance_subject')    
+
+    # Flags to indicate what kind of results this exam has
+    has_external_marks = models.BooleanField(default=False)
     has_internal_marks = models.BooleanField(default=False)
-    date = models.DateField()                               # this is for Halltickets Genaration
-    exam_start_time = models.TimeField()                    # this is for Halltickets Genaration
-    exam_end_time = models.TimeField()                      # this is for Halltickets Genaration
+    has_subject_skills = models.BooleanField(default=False)
+   
+    # Hall ticket related
+    date = models.DateField()                              
+    exam_start_time = models.TimeField()                   
+    exam_end_time = models.TimeField()                 
+
     maximum_marks_external = models.IntegerField(blank=True,null=True)
+    cut_off_marks_external = models.IntegerField(blank=True, null=True)
+
     maximum_marks_internal = models.IntegerField(blank=True,null=True)
+    cut_off_marks_internal = models.IntegerField(blank=True, null=True)
+
+    # Link only selected skills for this exam
+    subject_skills = models.ManyToManyField("SubjectSkill", blank=True, related_name="exam_instances")
+
     is_optional = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-    
+
+    # result_types = models.ManyToManyField("ResultType", related_name="exam_instances")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["exam", "subject"],
+                name="unique_exam_subject_instance"
+            )
+        ]
+
+    # def clean(self):
+    #     # date within exam bounds
+    #     # if self.date and not (self.exam.start_date <= self.date <= self.exam.end_date):
+    #     #     raise ValidationError("ExamInstance date must be within the parent Exam start_date and end_date.")
+
+    #     # subject_skills belong to subject
+    #     if self.pk:
+    #         skills_qs = self.subject_skills.all()
+    #     else:
+    #         # in forms, m2m not available until saved — skip the skills check on unsaved instance
+    #         skills_qs = None
+
+    #     if skills_qs is not None:
+    #         invalid = skills_qs.exclude(subject=self.subject).exists()
+    #         if invalid:
+    #             raise ValidationError("All subject_skills must belong to the same subject as this ExamInstance.")
+#
     def __str__(self):
         return f"({self.exam.name} - {self.subject.name})"
 
 class ExamAttendanceStatus(models.Model):
     name = models.CharField(max_length=250,null=False,blank=False,unique=True)   
-    short_code = models.CharField(max_length=100,null=False,blank=False) 
+    short_code = models.CharField(max_length=100, unique=True)
     description = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
@@ -111,7 +178,11 @@ class ExamResult(models.Model):
     external_marks = models.IntegerField(null=True, blank=True)     
     internal_marks = models.IntegerField(null=True, blank=True)     
     marks_obtained = models.IntegerField(null=True, blank=True)  # Total marks 
-    percentage = models.IntegerField(null=True, blank=True)  # percentage 
+    # percentage = models.IntegerField(null=True, blank=True)  # percentage 
+    percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    
+    # grade = models.CharField(max_length=5, null=True, blank=True)
+
     class_rank = models.IntegerField(null=True, blank=True)  # Class rank
     section_rank = models.IntegerField(null=True, blank=True)  # Section rank
     zone_rank = models.IntegerField(null=True, blank=True)  # New field for zone rank
@@ -120,24 +191,56 @@ class ExamResult(models.Model):
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = ('student', 'exam_instance')
+        constraints = [
+        models.UniqueConstraint(
+            fields=["student", "exam_instance"],
+            name="unique_student_exam_instance"
+            )
+        ]
+        # unique_together = ('student', 'exam_instance')
         indexes = [
             models.Index(fields=['student']),
             models.Index(fields=['exam_instance']),
             models.Index(fields=['marks_obtained']),  # Add this line to index marks_obtained
         ]
+    
+    def save(self, *args, **kwargs):
+        total_max = (self.exam_instance.maximum_marks_external or 0) + (self.exam_instance.maximum_marks_internal or 0)
+        obtained = (self.external_marks or 0) + (self.internal_marks or 0)
+        self.marks_obtained = obtained
+        if total_max > 0:
+            self.percentage = (obtained / total_max) * 100
+        super().save(*args, **kwargs)
+
 
   
     def __str__(self):
         return f"{self.student} - {self.exam_instance.subject.name}"
 
+class ExamSkillResult(models.Model):
+    exam_result = models.ForeignKey(ExamResult, on_delete=models.CASCADE, related_name="skill_results")
+    skill = models.ForeignKey(SubjectSkill, on_delete=models.CASCADE, related_name="skill_results")
+    value = models.CharField(max_length=150)  
+    # e.g. "A", "B", "C" or "Yes"/"No" or "Marks"
+
+    def __str__(self):
+        return f"{self.exam_result.student} - {self.skill.name}: {self.value}"
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["exam_result", "skill"],
+                name="unique_examresult_skill"
+            )
+        ]
 
 class StudentExamSummary(models.Model):
     student = models.ForeignKey("students.Student", on_delete=models.CASCADE, related_name='exam_summary_student')
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='exam_summary_exam')
     
     total_subjects_marks = models.IntegerField(default=0)  # Total marks across all subjects
-    percentage = models.IntegerField(null=True, blank=True)  # percentage
+    percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    
     overall_grade = models.CharField(max_length=3, null=True, blank=True)  # Overall grade (A+, A, B, etc.)
     overall_remarks = models.CharField(max_length=100, null=True, blank=True)  # Overall remarks (Very Good, Good, etc.)
 
@@ -149,14 +252,22 @@ class StudentExamSummary(models.Model):
     all_india_rank = models.IntegerField(null=True, blank=True)
     is_active = models.BooleanField(default= True)
 
+    # class Meta:
+    #     unique_together = ('student', 'exam')
+
     class Meta:
-        unique_together = ('student', 'exam')
-        
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "exam"],
+                name="unique_student_exam_summary"
+            )
+        ]
+
         indexes = [
             models.Index(fields=['student']),
             models.Index(fields=['exam']),
             models.Index(fields=['total_subjects_marks']),  # Add index for total_subject_marks
         ]
-
+    
     def __str__(self):
         return f"Summary for {self.student} in {self.exam.name}"
