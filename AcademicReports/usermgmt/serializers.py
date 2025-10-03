@@ -111,14 +111,16 @@ class UserSerializer(serializers.ModelSerializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     username= serializers.CharField(source='user.username', read_only=True)
+    photo = serializers.ImageField(allow_null=True, required=False)  # Adding the photo field
 
     class Meta:
         model = UserProfile
         fields = [
             'id', 'user_id',
-            'bio', 'phone_number',
+            'bio', 'phone_number', 'photo',
             'states', 'zones', 'branches',
             'must_change_password', 'username',
+            'academic_devisions', 'classes', 'orientations',
         ]
 
     

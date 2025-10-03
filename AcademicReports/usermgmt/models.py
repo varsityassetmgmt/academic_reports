@@ -4,16 +4,18 @@ from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
 from django.dispatch import receiver
 from django.db.models.signals import post_save, pre_save
+import uuid
 # Create your models here.
 
 from branches.models import State, Zone, Branch, AcademicDevision
+from .fields import *
 
-# def user_profile_images(instance, filename):
-#     return 'pics/user_profile/photos/{}.webp'.format(uuid.uuid4().hex)
+def user_profile_images(instance, filename):
+    return 'pics/user_profile/photos/{}.webp'.format(uuid.uuid4().hex)
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, null=False, blank=False, on_delete=models.PROTECT)
-    # photo = WEBPField(upload_to=user_profile_images, null=True, blank=True)
+    photo = WEBPField(upload_to=user_profile_images, null=True, blank=True)
     bio = models.TextField(null=True, blank=True)
     phone_regex = RegexValidator(regex=r'^\+?1?\d{10,15}$', message="Phone number must be entered in the format: '+919999999999'. Up to 15 digits allowed.")
     phone_number = models.CharField(validators=[phone_regex], max_length=15, null=True, blank=True)
@@ -24,8 +26,8 @@ class UserProfile(models.Model):
     must_change_password = models.BooleanField(default=True)
 
     academic_devisions = models.ManyToManyField(AcademicDevision, related_name='user_academic_division', blank=True)
-
-
+    classes =  models.ManyToManyField("students.ClassName", related_name="user_classes", blank=True)
+    orientations = models.ManyToManyField("students.Orientation", related_name="user_orientations", blank=True)
     
     def __str__(self):
         return self.user.username
@@ -42,13 +44,13 @@ class UserProfile(models.Model):
         self.full_clean()  # this will call clean()
         super().save(*args, **kwargs)
 
-    # @property
-    # def imageURL(self):
-    #     try:
-    #         url = self.photo.url
-    #     except ValueError:
-    #         url = ''
-    #     return url
+    @property
+    def imageURL(self):
+        try:
+            url = self.photo.url
+        except ValueError:
+            url = ''
+        return url
 
 @receiver(post_save, sender=User) 
 def create_or_update_user_profile(sender, instance, created, **kwargs): 

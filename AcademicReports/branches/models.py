@@ -1,10 +1,12 @@
 from django.db import models
+from django.contrib.auth.models import User ,Group
 from django.utils import timezone
+from django.db.models import Index
+from students.models import *
 
-from students.models import ClassName, Orientation
 
-# Create your models here.
 class AcademicYear(models.Model):
+    academic_year_id = models.BigAutoField(primary_key=True)
     start_date = models.DateField(blank=True,null=True)
     end_date = models.DateField(blank=True,null=True)
     name = models.CharField(max_length=150,null=False,blank=False,unique=True)
@@ -13,8 +15,21 @@ class AcademicYear(models.Model):
     description = models.TextField(null=True,blank=True)
     def __str__(self):
         return self.name
-    
+
+ 
+
+
+class Section(models.Model):
+    section_id = models.BigAutoField(primary_key=True, db_index=True)
+    name = models.CharField(max_length=250,null=False,blank=False,unique=True)
+    is_active = models.BooleanField(default=True)
+    description = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
 class AcademicDevision(models.Model):
+    academic_devision_id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length= 250, null=False,blank=False,unique=True)
     classes = models.ManyToManyField(ClassName,blank=True)
     description = models.TextField(null=True, blank=True)
@@ -22,17 +37,23 @@ class AcademicDevision(models.Model):
 
     def __str__(self):
         return self.name
-    
 #============================ State =================================
+
 class State(models.Model):
+    state_id = models.BigAutoField(primary_key=True, db_index=True)
     name =  models.CharField(max_length=250,null=False, blank=False,unique = True)
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
     
+   
+
+#
 #============================== ZONE =============================
+
 class Zone(models.Model):
+    zone_id = models.BigAutoField(primary_key=True, db_index=True)
     state = models.ForeignKey(State,related_name="zone_state",null=True, blank=True,on_delete=models.PROTECT)     
     name =  models.CharField(max_length=100,null=False, blank=False,unique = True)
     is_active = models.BooleanField(default=True)
@@ -41,7 +62,9 @@ class Zone(models.Model):
         return self.name
 
 #===================== Location ==================================
+
 class Branch(models.Model):
+    branch_id = models.BigAutoField(primary_key=True)
     state = models.ForeignKey(State,related_name="branch_state", null=False, blank=False, on_delete=models.PROTECT)
     zone = models.ForeignKey(Zone,related_name="branch_zone", null=False, blank=False, on_delete=models.PROTECT)
     name = models.CharField(max_length=250, null=False, blank=False, unique=True)
@@ -70,3 +93,4 @@ class Branch(models.Model):
             models.Index(fields=['state'], name='branch_state_idx'),
             models.Index(fields=['zone'], name='branch_zone_idx'),
         ]
+        ordering = ['-branch_id']

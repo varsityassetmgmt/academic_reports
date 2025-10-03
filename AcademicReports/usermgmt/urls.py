@@ -12,6 +12,8 @@ router.register(r'academic_divisions_dropdown_for_user_profile', AcademicDevisio
 router.register(r'state_dropdown_for_user_profile', StateDropdownForUserProfileViewSet, basename='state_dropdown_for_user_profile')
 router.register(r'zones_dropdown_for_user_profile', ZoneDropdownForUserProfileViewSet, basename='zones_dropdown_for_user_profile')
 router.register(r'branches_dropdown_for_user_profile', BranchDropdownForUserProfileViewSet, basename='branches_dropdown_for_user_profile')
+router.register(r'class_names_dropdown_for_user_proflie', ClassNameDropdownForUserProfileViewSet, basename='class_names_dropdown_for_user_proflie')
+router.register(r'orientation_dropdown_for_user_profile', OrientationDropdownForUserProfileViewSet, basename='orientation_dropdown_for_user_profile')
 
 urlpatterns = [
     path('login/', CustomTokenObtainPairView.as_view(), name="login"),
