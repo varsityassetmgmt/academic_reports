@@ -78,17 +78,31 @@ class ExamInstance(models.Model):
     exam_instance_id = models.BigAutoField(primary_key=True)
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='exam_instance_exam')
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='exam_instance_subject')    
+
+    # Flags to indicate what kind of results this exam has
+    has_external_marks = models.BooleanField(default=False)
     has_internal_marks = models.BooleanField(default=False)
-    date = models.DateField()                               # this is for Halltickets Genaration
-    exam_start_time = models.TimeField()                    # this is for Halltickets Genaration
-    exam_end_time = models.TimeField()                      # this is for Halltickets Genaration
+    has_subject_skills = models.BooleanField(default=False)
+   
+    # Hall ticket related
+    date = models.DateField()                              
+    exam_start_time = models.TimeField()                   
+    exam_end_time = models.TimeField()                 
+
     maximum_marks_external = models.IntegerField(blank=True,null=True)
+    cut_off_marks_external = models.IntegerField(blank=True, null=True)
+
     maximum_marks_internal = models.IntegerField(blank=True,null=True)
+    cut_off_marks_internal = models.IntegerField(blank=True, null=True)
+
+    # Link only selected skills for this exam
+    subject_skills = models.ManyToManyField("SubjectSkill", blank=True, related_name="exam_instances")
+
     is_optional = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
     # result_types = models.ManyToManyField("ResultType", related_name="exam_instances")
-    
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -97,6 +111,22 @@ class ExamInstance(models.Model):
             )
         ]
 
+    # def clean(self):
+    #     # date within exam bounds
+    #     # if self.date and not (self.exam.start_date <= self.date <= self.exam.end_date):
+    #     #     raise ValidationError("ExamInstance date must be within the parent Exam start_date and end_date.")
+
+    #     # subject_skills belong to subject
+    #     if self.pk:
+    #         skills_qs = self.subject_skills.all()
+    #     else:
+    #         # in forms, m2m not available until saved — skip the skills check on unsaved instance
+    #         skills_qs = None
+
+    #     if skills_qs is not None:
+    #         invalid = skills_qs.exclude(subject=self.subject).exists()
+    #         if invalid:
+    #             raise ValidationError("All subject_skills must belong to the same subject as this ExamInstance.")
 
     def __str__(self):
         return f"({self.exam.name} - {self.subject.name})"
