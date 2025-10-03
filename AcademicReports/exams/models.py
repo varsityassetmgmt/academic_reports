@@ -127,7 +127,7 @@ class ExamInstance(models.Model):
     #         invalid = skills_qs.exclude(subject=self.subject).exists()
     #         if invalid:
     #             raise ValidationError("All subject_skills must belong to the same subject as this ExamInstance.")
-
+#
     def __str__(self):
         return f"({self.exam.name} - {self.subject.name})"
 
