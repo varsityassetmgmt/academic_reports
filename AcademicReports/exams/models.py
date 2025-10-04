@@ -132,6 +132,7 @@ class ExamInstance(models.Model):
         return f"({self.exam.name} - {self.subject.name})"
 
 class ExamAttendanceStatus(models.Model):
+    exam_attendance_status_id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=250,null=False,blank=False,unique=True)   
     short_code = models.CharField(max_length=100, unique=True)
     description = models.TextField(null=True, blank=True)
@@ -142,6 +143,7 @@ class ExamAttendanceStatus(models.Model):
 
 
 class GradeBoundary(models.Model):
+    grade_boundary_id = models.BigAutoField(primary_key=True)
     exam_type = models.ForeignKey(ExamType, on_delete=models.CASCADE, related_name="grade_bound_exam_type")
     orientation = models.ForeignKey("students.Orientation", on_delete=models.CASCADE, related_name="grade_bound_orientation")
     grade = models.CharField(max_length=10)  # e.g., 'A+', 'A', etc.
@@ -172,6 +174,7 @@ class GradeBoundary(models.Model):
 
 
 class ExamResult(models.Model):
+    exam_result_id = models.BigAutoField(primary_key=True)
     student = models.ForeignKey("students.Student", on_delete=models.CASCADE, related_name='exam_results_student')    
     exam_instance = models.ForeignKey(ExamInstance, on_delete=models.CASCADE, related_name='exam_results_exam_instance')
     exam_attendance = models.ForeignKey(ExamAttendanceStatus, on_delete=models.CASCADE, related_name='exam_results_attendance')
@@ -218,6 +221,7 @@ class ExamResult(models.Model):
         return f"{self.student} - {self.exam_instance.subject.name}"
 
 class ExamSkillResult(models.Model):
+    examp_skill_result_id = models.BigAutoField(primary_key=True)
     exam_result = models.ForeignKey(ExamResult, on_delete=models.CASCADE, related_name="skill_results")
     skill = models.ForeignKey(SubjectSkill, on_delete=models.CASCADE, related_name="skill_results")
     value = models.CharField(max_length=150)  
@@ -235,6 +239,7 @@ class ExamSkillResult(models.Model):
         ]
 
 class StudentExamSummary(models.Model):
+    students_exam_summary_id = models.BigAutoField(primary_key=True)
     student = models.ForeignKey("students.Student", on_delete=models.CASCADE, related_name='exam_summary_student')
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='exam_summary_exam')
     
