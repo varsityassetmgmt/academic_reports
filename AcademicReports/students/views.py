@@ -16,8 +16,20 @@ class ClassNameDropdownViewSet(ModelViewSet):
     serializer_class = ClassNameDropdownSerializer
     http_method_names = ['get',]
 
+class ClassNameDropdownForExamViewSet(ModelViewSet):
+    queryset = ClassName.objects.filter(is_active=True).order_by('class_sequence')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ClassNameDropdownSerializer
+    http_method_names = ['get',]
+
 
 class OrientationDropdownViewSet(ModelViewSet):
+    queryset = Orientation.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrientationDropdownSerializer
+    http_method_names = ['get',]
+
+class OrientationDropdownForExamViewSet(ModelViewSet):
     queryset = Orientation.objects.filter(is_active=True).order_by('name')
     permission_classes = [IsAuthenticated]
     serializer_class = OrientationDropdownSerializer

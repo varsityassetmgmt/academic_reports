@@ -8,7 +8,7 @@ from .models import (
 # ==================== Subject Admin ====================
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
-    list_display = ('name', 'display_name', 'is_active')
+    list_display = ('subject_id','name', 'display_name', 'is_active')
     list_filter = ('is_active', 'academic_devisions', 'class_names')
     search_fields = ('name', 'description', 'display_name')
     filter_horizontal = ('academic_devisions', 'class_names')
@@ -18,7 +18,7 @@ class SubjectAdmin(admin.ModelAdmin):
 # ==================== SubjectSkill Admin ====================
 @admin.register(SubjectSkill)
 class SubjectSkillAdmin(admin.ModelAdmin):
-    list_display = ('subject', 'name', 'is_active')
+    list_display = ('id','subject', 'name', 'is_active')
     list_filter = ('is_active', 'subject')
     search_fields = ('name', 'subject__name')
     ordering = ('subject', 'name')
@@ -27,7 +27,7 @@ class SubjectSkillAdmin(admin.ModelAdmin):
 # ==================== ExamType Admin ====================
 @admin.register(ExamType)
 class ExamTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'is_active')
+    list_display = ('exam_type_id','name', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('name', 'description')
     ordering = ('name',)
@@ -36,7 +36,7 @@ class ExamTypeAdmin(admin.ModelAdmin):
 # ==================== Exam Admin ====================
 @admin.register(Exam)
 class ExamAdmin(admin.ModelAdmin):
-    list_display = ('name', 'exam_type', 'academic_year', 'start_date', 'end_date', 'is_visible', 'is_active')
+    list_display = ('exam_id','name', 'exam_type', 'academic_year', 'start_date', 'end_date', 'is_visible', 'is_active')
     list_filter = (
         'exam_type', 'academic_year', 'states', 'zones', 'branches',
         'orientations', 'academic_devisions', 'student_classes',
@@ -50,7 +50,7 @@ class ExamAdmin(admin.ModelAdmin):
 # ==================== ExamInstance Admin ====================
 @admin.register(ExamInstance)
 class ExamInstanceAdmin(admin.ModelAdmin):
-    list_display = (
+    list_display = ('exam_instance_id',
         'exam', 'subject', 'date', 'exam_start_time', 'exam_end_time',
         'has_external_marks', 'has_internal_marks', 'has_subject_skills',
         'is_optional', 'is_active'
@@ -64,7 +64,7 @@ class ExamInstanceAdmin(admin.ModelAdmin):
 # ==================== ExamAttendanceStatus Admin ====================
 @admin.register(ExamAttendanceStatus)
 class ExamAttendanceStatusAdmin(admin.ModelAdmin):
-    list_display = ('name', 'short_code', 'is_active')
+    list_display = ('exam_attendance_status_id','name', 'short_code', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('name', 'short_code', 'description')
     ordering = ('name',)
@@ -73,7 +73,7 @@ class ExamAttendanceStatusAdmin(admin.ModelAdmin):
 # ==================== GradeBoundary Admin ====================
 @admin.register(GradeBoundary)
 class GradeBoundaryAdmin(admin.ModelAdmin):
-    list_display = ('grade', 'exam_type', 'orientation', 'min_percentage', 'max_percentage', 'is_active')
+    list_display = ('grade_boundary_id','grade', 'exam_type', 'orientation', 'min_percentage', 'max_percentage', 'is_active')
     list_filter = ('exam_type', 'orientation', 'is_active')
     search_fields = ('grade', 'exam_type__name', 'orientation__name')
     ordering = ('-min_percentage',)
@@ -82,7 +82,7 @@ class GradeBoundaryAdmin(admin.ModelAdmin):
 # ==================== ExamResult Admin ====================
 @admin.register(ExamResult)
 class ExamResultAdmin(admin.ModelAdmin):
-    list_display = (
+    list_display = ('exam_result_id',
         'student', 'exam_instance', 'exam_attendance',
         'external_marks', 'internal_marks', 'marks_obtained', 'percentage',
         'class_rank', 'section_rank', 'zone_rank', 'state_rank', 'all_india_rank',
@@ -96,7 +96,7 @@ class ExamResultAdmin(admin.ModelAdmin):
 # ==================== ExamSkillResult Admin ====================
 @admin.register(ExamSkillResult)
 class ExamSkillResultAdmin(admin.ModelAdmin):
-    list_display = ('exam_result', 'skill', 'grade')
+    list_display = ('examp_skill_result_id','exam_result', 'skill', 'grade')
     list_filter = ('skill',)
     search_fields = ('exam_result__student__name', 'exam_result__student__SCS_Number', 'skill__name')
     ordering = ('exam_result', 'skill')
@@ -105,7 +105,7 @@ class ExamSkillResultAdmin(admin.ModelAdmin):
 # ==================== StudentExamSummary Admin ====================
 @admin.register(StudentExamSummary)
 class StudentExamSummaryAdmin(admin.ModelAdmin):
-    list_display = (
+    list_display = ('students_exam_summary_id',
         'student', 'exam', 'total_subjects_marks', 'percentage',
         'overall_grade', 'overall_remarks',
         'section_rank', 'class_rank', 'zone_rank', 'state_rank', 'all_india_rank',

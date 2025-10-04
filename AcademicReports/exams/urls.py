@@ -10,6 +10,17 @@ router.register(r'exam_dropdown', ExamDropdownViewSet, basename='exam_dropdown')
 router.register(r'examinstance_dropdown', ExamInstanceDropdownViewSet, basename='examinstance_dropdown')
 router.register(r'examattendancestatus_dropdown', ExamAttendanceStatusDropdownViewSet, basename='examattendancestatus_dropdown')
 
+router.register(r'subject', SubjectViewSet, basename='subject')
+router.register(r'subjectskill', SubjectSkillViewSet, basename='subjectskill')
+router.register(r'exam_type', ExamTypeViewSet, basename='exam_type')
+
+router.register(r'exam', ExamViewSet, basename='exam')
+router.register(r'exam_instance', ExamInstanceViewSet, basename='exam_instance')
+
+router.register(r'subject_dropdown_for_exam_instance', SubjectDropdownForExamInstanceViewSet, basename='subject_dropdown_for_exam_instance')
+router.register(r'subjectskill_dropdown_for_exam_instance', SubjectSkillDropdownForExamInstanceViewSet, basename='subjectskill_dropdown_for_exam_instance')
+
+
 urlpatterns = [
 
     
