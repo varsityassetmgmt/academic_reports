@@ -5,7 +5,7 @@ from .models import ClassName, Orientation, Gender, AdmissionStatus, Student
 # ==================== ClassName Admin ====================
 @admin.register(ClassName)
 class ClassNameAdmin(admin.ModelAdmin):
-    list_display = ('name', 'class_sequence', 'varna_class_id', 'is_active')
+    list_display = ('class_name_id', 'name', 'class_sequence', 'varna_class_id', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('name', 'description', 'varna_class_id')
     ordering = ('class_sequence', 'name')
@@ -14,7 +14,7 @@ class ClassNameAdmin(admin.ModelAdmin):
 # ==================== Orientation Admin ====================
 @admin.register(Orientation)
 class OrientationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'short_code', 'varna_orientation_id', 'is_active')
+    list_display = ('orientation_id','name', 'short_code', 'varna_orientation_id', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('name', 'short_code', 'description', 'varna_orientation_id')
     ordering = ('name',)
@@ -23,7 +23,7 @@ class OrientationAdmin(admin.ModelAdmin):
 # ==================== Gender Admin ====================
 @admin.register(Gender)
 class GenderAdmin(admin.ModelAdmin):
-    list_display = ('name', 'varna_gender_id', 'is_active')
+    list_display = ('gender_id','name', 'varna_gender_id', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('name', 'varna_gender_id')
     ordering = ('name',)
@@ -32,7 +32,7 @@ class GenderAdmin(admin.ModelAdmin):
 # ==================== AdmissionStatus Admin ====================
 @admin.register(AdmissionStatus)
 class AdmissionStatusAdmin(admin.ModelAdmin):
-    list_display = ('admission_status', 'short_code', 'is_active')
+    list_display = ('admission_status_id','admission_status', 'short_code', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('admission_status', 'short_code')
     ordering = ('admission_status',)
@@ -41,7 +41,7 @@ class AdmissionStatusAdmin(admin.ModelAdmin):
 # ==================== Student Admin ====================
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = (
+    list_display = ('student_id',
         'SCS_Number', 'name', 'academic_year', 'branch', 'zone', 'state',
         'student_class', 'section', 'gender', 'admission_status',
         'orientation', 'is_active'
