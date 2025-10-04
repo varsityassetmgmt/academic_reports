@@ -13,6 +13,11 @@ class Subject(models.Model):
     description = models.TextField(null=True,blank=True)
     display_name = models.CharField(max_length=250,null=True,blank=True)
 
+    class Meta:
+        indexes = [
+                    models.Index(fields=["is_active"]),
+                ]
+
     def __str__(self):
         return self.name
     
@@ -29,6 +34,11 @@ class SubjectSkill(models.Model):
                 name="unique_subject_skill_name"
             )
         ]
+        indexes = [
+                    models.Index(fields=["subject"]),
+                    models.Index(fields=["is_active"]),
+                ]
+
     def __str__(self):
         return f"{self.subject.name} - {self.name}"
     
@@ -39,6 +49,9 @@ class ExamType(models.Model):
     name = models.CharField(max_length=250,null=False,blank=False,unique=True)
     is_active = models.BooleanField(default=True)
     description = models.TextField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["is_active"])]
 
     def __str__(self):
         return self.name
@@ -70,6 +83,14 @@ class Exam(models.Model):
                 name="unique_exam_per_year_type"
             )
         ]
+        indexes = [
+                    models.Index(fields=["academic_year"]),
+                    models.Index(fields=["exam_type"]),
+                    models.Index(fields=["academic_year", "exam_type"]),
+                    models.Index(fields=["is_visible"]),
+                    models.Index(fields=["is_active"]),                    
+                    models.Index(fields=["start_date", "end_date"]),  # range queries
+                ]
 
     def __str__(self):
         return f"{self.name} ({self.exam_type.name})"
@@ -110,6 +131,15 @@ class ExamInstance(models.Model):
                 name="unique_exam_subject_instance"
             )
         ]
+        indexes = [
+                    models.Index(fields=["exam"]),
+                    models.Index(fields=["subject"]),
+                    models.Index(fields=["date"]),
+                    models.Index(fields=["is_active"]),
+                    models.Index(fields=["has_external_marks"]),
+                    models.Index(fields=["has_internal_marks"]),
+                    models.Index(fields=["has_subject_skills"]),
+                ]
 
     # def clean(self):
     #     # date within exam bounds
@@ -155,6 +185,10 @@ class GradeBoundary(models.Model):
     class Meta:
         ordering = ['-min_percentage']  # Highest to lowest for easier matching
         unique_together = ('exam_type', 'orientation', 'grade')  # Ensure uniqueness for each combination
+        # indexes = [
+        #             models.Index(fields=["exam_type", "orientation"]),
+        #             models.Index(fields=["min_percentage", "max_percentage"]),
+        #         ]
 
     def __str__(self):
         return f"{self.grade} ({self.exam_type.name} - {self.orientation.name})"
@@ -205,7 +239,18 @@ class ExamResult(models.Model):
             models.Index(fields=['student']),
             models.Index(fields=['exam_instance']),
             models.Index(fields=['marks_obtained']),  # Add this line to index marks_obtained
+            models.Index(fields=["exam_instance", "marks_obtained"]),  # for ranks
+            models.Index(fields=["percentage"]),
+            models.Index(fields=["class_rank"]),
+            models.Index(fields=["section_rank"]),
+            models.Index(fields=["zone_rank"]),
+            models.Index(fields=["state_rank"]),
+            models.Index(fields=["all_india_rank"]),
+   
+
         ]
+
+
     
     def save(self, *args, **kwargs):
         total_max = (self.exam_instance.maximum_marks_external or 0) + (self.exam_instance.maximum_marks_internal or 0)
@@ -219,14 +264,48 @@ class ExamResult(models.Model):
   
     def __str__(self):
         return f"{self.student} - {self.exam_instance.subject.name}"
+    
+# class SkillResultValue(models.Model):
+#     id = models.BigAutoField(primary_key=True)
+#     name = models.CharField(max_length=50, unique=True)
+#     description = models.CharField(max_length=200, blank=True, null=True)
+
+#     def __str__(self):
+#         return self.name
+
+class SkillGrade(models.Model):
+    """
+    Master table for skill grading (Co-Scholastic).
+    Example:
+    A+ → Outstanding
+    A  → Excellent
+    B+ → Good
+    B  → Average
+    C  → Satisfactory
+    """
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=5, unique=True)  # e.g., A+, A, B+, B, C
+    description = models.CharField(max_length=150, blank=True, null=True)  # e.g., Outstanding, Excellent
+    point = models.PositiveSmallIntegerField(default=0)  # e.g., 5, 4, 3, etc.
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-point"]
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["point"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} - {self.description or ''}".strip()
+
 
 class ExamSkillResult(models.Model):
     examp_skill_result_id = models.BigAutoField(primary_key=True)
     exam_result = models.ForeignKey(ExamResult, on_delete=models.CASCADE, related_name="skill_results")
     skill = models.ForeignKey(SubjectSkill, on_delete=models.CASCADE, related_name="skill_results")
-    value = models.CharField(max_length=150)  
-    # e.g. "A", "B", "C" or "Yes"/"No" or "Marks"
-
+    grade = models.ForeignKey(SkillGrade,on_delete=models.PROTECT,null=True,blank = True, related_name="exam_skill_results")
+    # custom_value = models.CharField(max_length=100, blank=True, null=True)
     def __str__(self):
         return f"{self.exam_result.student} - {self.skill.name}: {self.value}"
     
@@ -237,6 +316,11 @@ class ExamSkillResult(models.Model):
                 name="unique_examresult_skill"
             )
         ]
+        indexes = [
+                    models.Index(fields=["exam_result"]),
+                    models.Index(fields=["skill"]),
+                    models.Index(fields=["grade"]),
+                ]
 
 class StudentExamSummary(models.Model):
     students_exam_summary_id = models.BigAutoField(primary_key=True)
@@ -272,6 +356,13 @@ class StudentExamSummary(models.Model):
             models.Index(fields=['student']),
             models.Index(fields=['exam']),
             models.Index(fields=['total_subjects_marks']),  # Add index for total_subject_marks
+            models.Index(fields=["percentage"]),
+            models.Index(fields=["class_rank"]),
+            models.Index(fields=["section_rank"]),
+            models.Index(fields=["zone_rank"]),
+            models.Index(fields=["state_rank"]),
+            models.Index(fields=["all_india_rank"]),
+            models.Index(fields=['is_active']),     
         ]
     
     def __str__(self):
