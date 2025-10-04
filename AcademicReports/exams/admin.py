@@ -96,7 +96,7 @@ class ExamResultAdmin(admin.ModelAdmin):
 # ==================== ExamSkillResult Admin ====================
 @admin.register(ExamSkillResult)
 class ExamSkillResultAdmin(admin.ModelAdmin):
-    list_display = ('exam_result', 'skill', 'value')
+    list_display = ('exam_result', 'skill', 'grade')
     list_filter = ('skill',)
     search_fields = ('exam_result__student__name', 'exam_result__student__SCS_Number', 'skill__name')
     ordering = ('exam_result', 'skill')
