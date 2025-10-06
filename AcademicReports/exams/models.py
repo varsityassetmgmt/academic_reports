@@ -73,7 +73,8 @@ class Exam(models.Model):
 
     academic_devisions = models.ManyToManyField("branches.AcademicDevision",blank=True, related_name='exam_academic_devisions')
     student_classes = models.ManyToManyField("students.ClassName",blank=True, related_name='exams_classes')
-    is_visible = models.BooleanField(default=True)
+    is_visible = models.BooleanField(default=False) # Enable this to make the exam visible for marks entry.
+    is_progress_card_visible = models.BooleanField(default=False)  # Enable this to allow progress card download for this exam
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -88,8 +89,10 @@ class Exam(models.Model):
                     models.Index(fields=["exam_type"]),
                     models.Index(fields=["academic_year", "exam_type"]),
                     models.Index(fields=["is_visible"]),
+                    models.Index(fields=["is_progress_card_visible"]),
                     models.Index(fields=["is_active"]),                    
                     models.Index(fields=["start_date", "end_date"]),  # range queries
+                    # models.Index(fields=["academic_year", "exam_type", "is_active"], name="idx_exam_year_type_active"),
                 ]
 
     def __str__(self):
@@ -141,7 +144,7 @@ class ExamInstance(models.Model):
                     models.Index(fields=["has_internal_marks"]),
                     models.Index(fields=["has_subject_skills"]),
                     models.Index(fields=["has_subject_co_scholastic_grade"]),
-
+                    models.Index(fields=["exam", "subject", "is_active"]),
                 ]
 
     def __str__(self):
@@ -303,6 +306,11 @@ class ExamResult(models.Model):
             models.Index(fields=["zone_rank"]),
             models.Index(fields=["state_rank"]),
             models.Index(fields=["all_india_rank"]),
+            models.Index(fields=["exam_instance", "student"], name="idx_examresult_exam_student"),
+            models.Index(fields=["exam_instance", "is_active"], name="idx_examresult_exam_active"),
+            models.Index(fields=["student", "is_active"], name="idx_examresult_student_active"),
+            models.Index(fields=["exam_instance", "percentage"], name="idx_examresult_exam_percentage"),
+
    
 
         ]
@@ -312,7 +320,7 @@ class ExamResult(models.Model):
     def save(self, *args, **kwargs):
         total_max = (self.exam_instance.maximum_marks_external or 0) + (self.exam_instance.maximum_marks_internal or 0)
         obtained = (self.external_marks or 0) + (self.internal_marks or 0)
-        self.marks_obtained = obtained
+        self.total_marks = obtained
         if total_max > 0:
             self.percentage = (obtained / total_max) * 100
         super().save(*args, **kwargs)
@@ -356,6 +364,7 @@ class ExamSkillResult(models.Model):
                     models.Index(fields=["exam_result"]),
                     models.Index(fields=["skill"]),
                     models.Index(fields=["co_scholastic_grade"]),
+                    models.Index(fields=["exam_result", "skill", "co_scholastic_grade"]),
                 ]
     def __str__(self):
         return f"{self.exam_result.student} - {self.skill.name}"
