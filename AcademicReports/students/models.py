@@ -1,10 +1,4 @@
 from django.db import models
-# from exams.models import *
-# from branches.models import *
-# from reports.models import *
-# from users.models import *
-
-
 class ClassName(models.Model):
     class_name_id = models.BigAutoField(primary_key=True)
     varna_class_id  = models.CharField(max_length=250,null=True,blank=True,unique=True)
@@ -31,6 +25,19 @@ class Orientation(models.Model):
     def __str__(self):
         return self.name
 
+class BranchOrientations(models.Model):
+    academic_year = models.ForeignKey('branches.AcademicYear', related_name="branch_orientations_acyear", null=True, blank=True, on_delete=models.PROTECT) 
+    branch = models.ForeignKey('branches.Branch', related_name='branch_orientations', on_delete=models.PROTECT)
+    orientations = models.ManyToManyField(Orientation,blank=True,related_name='branch_orientations')     
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['academic_year', 'branch'], name='unique_branch_ac_year')
+        ]
+
+    def __str__(self):
+        return self.branch.name
 
 class Gender(models.Model):
     gender_id = models.BigAutoField(primary_key=True)
@@ -49,18 +56,6 @@ class AdmissionStatus(models.Model):
 
     def __str__(self):
         return self.admission_status
-
-# class Section(models.Model):
-#     section_id = models.BigAutoField(primary_key=True, db_index=True)
-#     name = models.CharField(max_length=250,null=False,blank=False,unique=True)
-#     is_active = models.BooleanField(default=True)
-#     description = models.TextField(null=True, blank=True)
-
-#     def __str__(self):
-#         return self.name
-
- 
-
 
 
 class Section(models.Model):
@@ -89,14 +84,6 @@ class Section(models.Model):
    
     def __str__(self):
         return f"{self.name}"
-    
-    
-    # def save(self, *args, **kwargs):
-    #     try:
-    #         self.external_name = f"{self.name} ({self.building_category.short_code})"
-    #     except AttributeError:            
-    #         self.external_name = self.name     
-    #     super().save(*args, **kwargs)
 
     
     
