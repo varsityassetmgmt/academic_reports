@@ -49,6 +49,56 @@ class AdmissionStatus(models.Model):
 
     def __str__(self):
         return self.admission_status
+
+# class Section(models.Model):
+#     section_id = models.BigAutoField(primary_key=True, db_index=True)
+#     name = models.CharField(max_length=250,null=False,blank=False,unique=True)
+#     is_active = models.BooleanField(default=True)
+#     description = models.TextField(null=True, blank=True)
+
+#     def __str__(self):
+#         return self.name
+
+ 
+
+
+
+class Section(models.Model):
+    section_id = models.BigAutoField(primary_key=True)
+    academic_year = models.ForeignKey("branches.AcademicYear", related_name="class_academic_year", null=True, blank=True, on_delete=models.PROTECT) 
+    building = models.ForeignKey("branches.Branch", related_name="section_building", null=True, blank=True, on_delete=models.PROTECT) 
+    class_name = models.ForeignKey(ClassName, related_name="section_class_name", null=True, blank=True, on_delete=models.PROTECT) 
+    orientation = models.ForeignKey('students.Orientation', related_name="section_orientation", null=True, blank=True, on_delete=models.SET_NULL) 
+    name = models.CharField(max_length=250, null=False, blank=False)
+    external_name = models.CharField(max_length=250, null=True, blank=True)
+    external_id = models.CharField(max_length=250, null=True, blank=True)
+    strength = models.IntegerField(null=True, blank=True)
+    has_students = models.BooleanField(default = False)
+    number_of_students = models.IntegerField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)  
+ 
+    class Meta:         
+        indexes = [
+            models.Index(fields=["building"]),
+            models.Index(fields=["class_name"]),
+            models.Index(fields=["orientation"]),
+            models.Index(fields=["academic_year"]),
+            models.Index(fields=["is_active"]),
+        ]
+        
+   
+    def __str__(self):
+        return f"{self.name}"
+    
+    
+    # def save(self, *args, **kwargs):
+    #     try:
+    #         self.external_name = f"{self.name} ({self.building_category.short_code})"
+    #     except AttributeError:            
+    #         self.external_name = self.name     
+    #     super().save(*args, **kwargs)
+
+    
     
 class Student(models.Model):   
     student_id = models.BigAutoField(primary_key=True, db_index=True)
@@ -63,7 +113,7 @@ class Student(models.Model):
     branch = models.ForeignKey("branches.Branch", on_delete=models.PROTECT, null=True, blank=True, related_name='student_branch')
     orientation = models.ForeignKey(Orientation, on_delete=models.PROTECT, null=True, blank=True, related_name='student_orientation')
     student_class = models.ForeignKey(ClassName, on_delete=models.PROTECT, null=True, blank=True, related_name='student_class_name')    
-    section = models.ForeignKey("branches.Section", on_delete=models.PROTECT, null=True, blank=True, related_name='student_section')
+    section = models.ForeignKey(Section, on_delete=models.PROTECT, null=True, blank=True, related_name='student_section')
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
