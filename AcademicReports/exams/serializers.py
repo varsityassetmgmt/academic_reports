@@ -27,6 +27,9 @@ class ExamTypeSerializer(serializers.ModelSerializer):
 
 # ==================== Exam ====================
 class ExamSerializer(serializers.ModelSerializer):
+    academic_year_name = serializers.CharField(source='academic_year.name', read_only=True)
+    exam_type_name = serializers.CharField(source='exam_type.name', read_only=True)
+
     class Meta:
         model = Exam
         fields = '__all__'
@@ -34,10 +37,26 @@ class ExamSerializer(serializers.ModelSerializer):
 
 # ==================== ExamInstance ====================
 class ExamInstanceSerializer(serializers.ModelSerializer):
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    subject_skill_names = serializers.SerializerMethodField()
+
     class Meta:
         model = ExamInstance
         fields = '__all__'
 
+    def get_subject_skill_names(self, obj):
+        # Get all related subject skill names and join with comma
+        return ', '.join(obj.subject_skills.values_list('name', flat=True))
+
+
+# ==================== Exam Skill Instance ====================
+class ExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
+    subject_name = serializers.CharField(source='exam_instance.subject.name', read_only=True)
+    subject_skill_name = serializers.CharField(source='subject_skill.name', read_only=True)
+
+    class Meta:
+        model = ExamSubjectSkillInstance
+        fields = '__all__'
 
 # ==================== ExamAttendanceStatus ====================
 class ExamAttendanceStatusSerializer(serializers.ModelSerializer):
