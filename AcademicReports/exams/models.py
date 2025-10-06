@@ -104,6 +104,7 @@ class ExamInstance(models.Model):
     has_external_marks = models.BooleanField(default=False)
     has_internal_marks = models.BooleanField(default=False)
     has_subject_skills = models.BooleanField(default=False)
+    has_subject_co_scholastic_grade = models.BooleanField(default=False)
    
     # Hall ticket related
     date = models.DateField()                              
@@ -139,27 +140,48 @@ class ExamInstance(models.Model):
                     models.Index(fields=["has_external_marks"]),
                     models.Index(fields=["has_internal_marks"]),
                     models.Index(fields=["has_subject_skills"]),
+                    models.Index(fields=["has_subject_co_scholastic_grade"]),
+
                 ]
 
-    # def clean(self):
-    #     # date within exam bounds
-    #     # if self.date and not (self.exam.start_date <= self.date <= self.exam.end_date):
-    #     #     raise ValidationError("ExamInstance date must be within the parent Exam start_date and end_date.")
-
-    #     # subject_skills belong to subject
-    #     if self.pk:
-    #         skills_qs = self.subject_skills.all()
-    #     else:
-    #         # in forms, m2m not available until saved — skip the skills check on unsaved instance
-    #         skills_qs = None
-
-    #     if skills_qs is not None:
-    #         invalid = skills_qs.exclude(subject=self.subject).exists()
-    #         if invalid:
-    #             raise ValidationError("All subject_skills must belong to the same subject as this ExamInstance.")
-#
     def __str__(self):
         return f"({self.exam.name} - {self.subject.name})"
+
+
+class ExamSubjectSkillInstance(models.Model):
+    exam_instance = models.ForeignKey(ExamInstance, on_delete=models.CASCADE, related_name='exam_subject_skills_instance_exam_instance')
+    subject_skill = models.ForeignKey(SubjectSkill, on_delete=models.CASCADE, related_name="exam_subject_skill_instance_subject_skill")
+
+    # Flags to indicate what kind of results this exam has
+    has_external_marks = models.BooleanField(default=False)
+    has_internal_marks = models.BooleanField(default=False)
+    has_subject_co_scholastic_grade = models.BooleanField(default=True)
+
+    maximum_marks_external = models.IntegerField(blank=True,null=True)
+    cut_off_marks_external = models.IntegerField(blank=True, null=True)
+
+    maximum_marks_internal = models.IntegerField(blank=True,null=True)
+    cut_off_marks_internal = models.IntegerField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
+    # result_types = models.ManyToManyField("ResultType", related_name="exam_instances")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["exam_instance", "subject_skill"],
+                name="unique_exam_subject_skill_instance"
+            )
+        ]
+        indexes = [
+                    models.Index(fields=["exam_instance"]),
+                    models.Index(fields=["subject_skill"]),
+                    models.Index(fields=["is_active"]),
+                    models.Index(fields=["has_external_marks"]),
+                    models.Index(fields=["has_internal_marks"]),
+                    models.Index(fields=["has_subject_co_scholastic_grade"]),
+                ]
+
 
 class ExamAttendanceStatus(models.Model):
     exam_attendance_status_id = models.BigAutoField(primary_key=True)
@@ -207,24 +229,57 @@ class GradeBoundary(models.Model):
         ).first()
 
 
+class CoScholasticGrade(models.Model):
+    """
+    Master table for skill grading (Co-Scholastic).
+    Example:
+    A+ → Outstanding
+    A  → Excellent
+    B+ → Good
+    B  → Average
+    C  → Satisfactory
+    """
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=5, unique=True)  # e.g., A+, A, B+, B, C
+    description = models.CharField(max_length=150, blank=True, null=True)  # e.g., Outstanding, Excellent
+    point = models.PositiveSmallIntegerField(default=0)  # e.g., 5, 4, 3, etc.
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-point"]
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["point"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} - {self.description or ''}".strip()
+
 class ExamResult(models.Model):
     exam_result_id = models.BigAutoField(primary_key=True)
     student = models.ForeignKey("students.Student", on_delete=models.CASCADE, related_name='exam_results_student')    
     exam_instance = models.ForeignKey(ExamInstance, on_delete=models.CASCADE, related_name='exam_results_exam_instance')
     exam_attendance = models.ForeignKey(ExamAttendanceStatus, on_delete=models.CASCADE, related_name='exam_results_attendance')
-    external_marks = models.IntegerField(null=True, blank=True)     
-    internal_marks = models.IntegerField(null=True, blank=True)     
-    marks_obtained = models.IntegerField(null=True, blank=True)  # Total marks 
-    # percentage = models.IntegerField(null=True, blank=True)  # percentage 
-    percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    
-    # grade = models.CharField(max_length=5, null=True, blank=True)
 
+    # --- Academic Marks ---
+    external_marks = models.IntegerField(null=True, blank=True)
+    internal_marks = models.IntegerField(null=True, blank=True)
+    total_marks = models.IntegerField(null=True, blank=True)  # total = external + internal
+
+    co_scholastic_grade = models.ForeignKey(CoScholasticGrade,on_delete=models.PROTECT,null=True,blank = True, related_name="exam_result_co_scholastic_grade")
+    percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+
+    skill_external_marks = models.IntegerField(null=True, blank=True)
+    skill_internal_marks = models.IntegerField(null=True, blank=True)
+    skill_total_marks = models.IntegerField(null=True, blank=True)
+
+    # --- Ranks ---
     class_rank = models.IntegerField(null=True, blank=True)  # Class rank
     section_rank = models.IntegerField(null=True, blank=True)  # Section rank
     zone_rank = models.IntegerField(null=True, blank=True)  # New field for zone rank
     state_rank = models.IntegerField(null=True, blank=True)  # New field for state rank
     all_india_rank = models.IntegerField(null=True, blank=True)  # New field for all India rank
+
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -238,8 +293,10 @@ class ExamResult(models.Model):
         indexes = [
             models.Index(fields=['student']),
             models.Index(fields=['exam_instance']),
-            models.Index(fields=['marks_obtained']),  # Add this line to index marks_obtained
-            models.Index(fields=["exam_instance", "marks_obtained"]),  # for ranks
+            models.Index(fields=['external_marks']),            
+            models.Index(fields=['total_marks']),  # Add this line to index marks_obtained
+            models.Index(fields=["exam_instance", "external_marks"]),  # for ranks
+            models.Index(fields=["exam_instance", "total_marks"]),  # for ranks
             models.Index(fields=["percentage"]),
             models.Index(fields=["class_rank"]),
             models.Index(fields=["section_rank"]),
@@ -273,39 +330,18 @@ class ExamResult(models.Model):
 #     def __str__(self):
 #         return self.name
 
-class SkillGrade(models.Model):
-    """
-    Master table for skill grading (Co-Scholastic).
-    Example:
-    A+ → Outstanding
-    A  → Excellent
-    B+ → Good
-    B  → Average
-    C  → Satisfactory
-    """
-    id = models.BigAutoField(primary_key=True)
-    name = models.CharField(max_length=5, unique=True)  # e.g., A+, A, B+, B, C
-    description = models.CharField(max_length=150, blank=True, null=True)  # e.g., Outstanding, Excellent
-    point = models.PositiveSmallIntegerField(default=0)  # e.g., 5, 4, 3, etc.
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        ordering = ["-point"]
-        indexes = [
-            models.Index(fields=["name"]),
-            models.Index(fields=["point"]),
-        ]
-
-    def __str__(self):
-        return f"{self.name} - {self.description or ''}".strip()
-
 
 class ExamSkillResult(models.Model):
     examp_skill_result_id = models.BigAutoField(primary_key=True)
     exam_result = models.ForeignKey(ExamResult, on_delete=models.CASCADE, related_name="skill_results")
     skill = models.ForeignKey(SubjectSkill, on_delete=models.CASCADE, related_name="skill_results")
-    grade = models.ForeignKey(SkillGrade,on_delete=models.PROTECT,null=True,blank = True, related_name="exam_skill_results")
+    co_scholastic_grade = models.ForeignKey(CoScholasticGrade,on_delete=models.PROTECT,null=True,blank = True, related_name="exam_skill_results")
     # custom_value = models.CharField(max_length=100, blank=True, null=True)
+
+    external_marks = models.IntegerField(null=True, blank=True)     
+    internal_marks = models.IntegerField(null=True, blank=True)     
+    marks_obtained = models.IntegerField(null=True, blank=True)  # Total marks 
+
     def __str__(self):
         return f"{self.exam_result.student} - {self.skill.name}: {self.value}"
     
@@ -319,9 +355,11 @@ class ExamSkillResult(models.Model):
         indexes = [
                     models.Index(fields=["exam_result"]),
                     models.Index(fields=["skill"]),
-                    models.Index(fields=["grade"]),
+                    models.Index(fields=["co_scholastic_grade"]),
                 ]
-
+    def __str__(self):
+        return f"{self.exam_result.student} - {self.skill.name}"
+    
 class StudentExamSummary(models.Model):
     students_exam_summary_id = models.BigAutoField(primary_key=True)
     student = models.ForeignKey("students.Student", on_delete=models.CASCADE, related_name='exam_summary_student')

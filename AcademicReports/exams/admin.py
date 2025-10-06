@@ -84,7 +84,7 @@ class GradeBoundaryAdmin(admin.ModelAdmin):
 class ExamResultAdmin(admin.ModelAdmin):
     list_display = ('exam_result_id',
         'student', 'exam_instance', 'exam_attendance',
-        'external_marks', 'internal_marks', 'marks_obtained', 'percentage',
+        'external_marks', 'internal_marks', 'total_marks', 'percentage',
         'class_rank', 'section_rank', 'zone_rank', 'state_rank', 'all_india_rank',
         'is_active'
     )
@@ -96,7 +96,7 @@ class ExamResultAdmin(admin.ModelAdmin):
 # ==================== ExamSkillResult Admin ====================
 @admin.register(ExamSkillResult)
 class ExamSkillResultAdmin(admin.ModelAdmin):
-    list_display = ('examp_skill_result_id','exam_result', 'skill', 'grade')
+    list_display = ('examp_skill_result_id','exam_result', 'skill', 'co_scholastic_grade')
     list_filter = ('skill',)
     search_fields = ('exam_result__student__name', 'exam_result__student__SCS_Number', 'skill__name')
     ordering = ('exam_result', 'skill')

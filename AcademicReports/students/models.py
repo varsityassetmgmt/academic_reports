@@ -61,7 +61,7 @@ class AdmissionStatus(models.Model):
 class Section(models.Model):
     section_id = models.BigAutoField(primary_key=True)
     academic_year = models.ForeignKey("branches.AcademicYear", related_name="class_academic_year", null=True, blank=True, on_delete=models.PROTECT) 
-    building = models.ForeignKey("branches.Branch", related_name="section_building", null=True, blank=True, on_delete=models.PROTECT) 
+    branch = models.ForeignKey("branches.Branch", related_name="section_branch", null=True, blank=True, on_delete=models.PROTECT) 
     class_name = models.ForeignKey(ClassName, related_name="section_class_name", null=True, blank=True, on_delete=models.PROTECT) 
     orientation = models.ForeignKey('students.Orientation', related_name="section_orientation", null=True, blank=True, on_delete=models.SET_NULL) 
     name = models.CharField(max_length=250, null=False, blank=False)
@@ -74,7 +74,7 @@ class Section(models.Model):
  
     class Meta:         
         indexes = [
-            models.Index(fields=["building"]),
+            models.Index(fields=["branch"]),
             models.Index(fields=["class_name"]),
             models.Index(fields=["orientation"]),
             models.Index(fields=["academic_year"]),
