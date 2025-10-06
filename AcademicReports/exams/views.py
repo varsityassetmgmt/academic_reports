@@ -150,7 +150,6 @@ class ExamViewSet(ModelViewSet):
     ordering = ['-start_date', 'is_visible']
     pagination_class = CustomPagination
 
-
     def get_queryset(self):
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
@@ -161,6 +160,16 @@ class ExamViewSet(ModelViewSet):
             is_active=True
         ).order_by('-start_date')
         return exams
+
+    def perform_create(self, serializer):
+        """
+        Automatically assign the current academic year when creating a new exam.
+        """
+        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+        if not current_academic_year:
+            raise NotFound("Current academic year not found.")
+
+        serializer.save(academic_year=current_academic_year)
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
