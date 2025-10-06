@@ -176,20 +176,26 @@ class ExamViewSet(ModelViewSet):
 
 # ==================== ExamInstance ====================
 class ExamInstanceViewSet(ModelViewSet):
-    # queryset = ExamInstance.objects.filter(is_active=True).order_by('date')
     serializer_class = ExamInstanceSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['exam__name', 'subject__name']
     pagination_class = CustomPagination
 
-    def get_queryset(self):    
-        exam_id = self.request.query_params.get('exam_id')
-        if not exam_id:
-            raise NotFound("Exam ID is Required.")
+    def get_queryset(self):
+        # Only require exam_id for GET (list) requests
+        if self.action == 'list':
+            exam_id = self.request.query_params.get('exam_id')
+            if not exam_id:
+                raise NotFound("Exam ID is required for listing exam instances.")
+            
+            return ExamInstance.objects.filter(
+                exam__exam_id=exam_id,
+                is_active=True
+            ).order_by('date')
         
-        exam_instances=ExamInstance.objects.filter(exam__exam_id=exam_id, is_active=True).order_by('date')
-        return exam_instances
+        # For other actions (retrieve, create, update)
+        return ExamInstance.objects.filter(is_active=True).order_by('date')
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
