@@ -425,7 +425,7 @@ class ZoneDropdownForUserProfileViewSet(ModelViewSet):
             try:
                 state_ids = [int(sid) for sid in state_ids_str.split(',') if sid.isdigit()]
                 if state_ids:
-                    queryset = queryset.exclude(state__state_id__in=state_ids)
+                    queryset = queryset.filter(state__state_id__in=state_ids)
             except ValueError:
                 pass  # Ignore invalid input
 
@@ -448,7 +448,7 @@ class BranchDropdownForUserProfileViewSet(ModelViewSet):
             try:
                 state_ids = [int(sid) for sid in state_ids_str.split(',') if sid.isdigit()]
                 if state_ids:
-                    queryset = queryset.exclude(state__state_id__in=state_ids)
+                    queryset = queryset.filter(state__state_id__in=state_ids)
             except ValueError:
                 pass  # Ignore invalid input
 
@@ -457,7 +457,7 @@ class BranchDropdownForUserProfileViewSet(ModelViewSet):
             try:
                 zone_ids = [int(zid) for zid in zone_ids_str.split(',') if zid.isdigit()]
                 if zone_ids:
-                    queryset = queryset.exclude(zone__zone_id__in=zone_ids)
+                    queryset = queryset.filter(zone__zone_id__in=zone_ids)
             except ValueError:
                 pass  # Ignore invalid input
 
