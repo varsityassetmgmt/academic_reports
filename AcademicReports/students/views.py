@@ -16,11 +16,26 @@ class ClassNameDropdownViewSet(ModelViewSet):
     serializer_class = ClassNameDropdownSerializer
     http_method_names = ['get',]
 
+# ==================== ClassNameDropdownForExamViewSet ====================
 class ClassNameDropdownForExamViewSet(ModelViewSet):
-    queryset = ClassName.objects.filter(is_active=True).order_by('class_sequence')
-    permission_classes = [IsAuthenticated]
     serializer_class = ClassNameDropdownSerializer
-    http_method_names = ['get',]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+    filter_backends = [DjangoFilterBackend]
+
+    def get_queryset(self):
+        queryset = ClassName.objects.filter(is_active=True).order_by('class_sequence')
+
+        # Optional filter: academic_division_id
+        academic_division_id = self.request.query_params.get('academic_division_id')
+        if academic_division_id:
+            try:
+                division = AcademicDevision.objects.get(pk=academic_division_id)
+                queryset = division.classes.filter(is_active=True).order_by('class_sequence')
+            except AcademicDevision.DoesNotExist:
+                queryset = ClassName.objects.none()  # Return empty if invalid ID
+
+        return queryset
 
 
 class OrientationDropdownViewSet(ModelViewSet):
