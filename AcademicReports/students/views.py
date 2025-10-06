@@ -26,14 +26,30 @@ class ClassNameDropdownForExamViewSet(ModelViewSet):
     def get_queryset(self):
         queryset = ClassName.objects.filter(is_active=True).order_by('class_sequence')
 
-        # Optional filter: academic_division_id
+        # Optional filters:
+        # - Single:  ?academic_division_id=3
+        # - Multiple: ?academic_division_ids=1,2,3
         academic_division_id = self.request.query_params.get('academic_division_id')
-        if academic_division_id:
+        academic_division_ids = self.request.query_params.get('academic_division_ids')
+
+        # Handle multiple academic division IDs
+        if academic_division_ids:
+            ids = [int(x) for x in academic_division_ids.split(',') if x.isdigit()]
+            if ids:
+                queryset = ClassName.objects.filter(
+                    is_active=True,
+                    academicdevision__in=ids  # reverse M2M lookup
+                ).distinct().order_by('class_sequence')
+            else:
+                queryset = ClassName.objects.none()
+
+        # Handle single academic division ID (for backward compatibility)
+        elif academic_division_id:
             try:
                 division = AcademicDevision.objects.get(pk=academic_division_id)
                 queryset = division.classes.filter(is_active=True).order_by('class_sequence')
             except AcademicDevision.DoesNotExist:
-                queryset = ClassName.objects.none()  # Return empty if invalid ID
+                queryset = ClassName.objects.none()
 
         return queryset
 
