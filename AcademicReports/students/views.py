@@ -73,52 +73,36 @@ class OrientationDropdownForExamViewSet(ModelViewSet):
         if not current_academic_year:
             raise NotFound("Current academic year not found.")
 
-        # Collect all branch IDs from filters
-        branch_ids = set()
-
         state_ids = self.request.query_params.get('state_ids')
         zone_ids = self.request.query_params.get('zone_ids')
-        direct_branch_ids = self.request.query_params.get('branch_ids')
+        branch_ids = self.request.query_params.get('branch_ids')
 
-        # If none of the filters provided → return empty queryset
-        if not (state_ids or zone_ids or direct_branch_ids):
-            return Orientation.objects.none()
+        # Hierarchical branch selection
+        branches = Branch.objects.none()
 
-        # Filter by states
-        if state_ids:
-            state_ids = [int(x) for x in state_ids.split(',') if x.isdigit()]
-            if state_ids:
-                branch_ids.update(
-                    Branch.objects.filter(state__state_id__in=state_ids, is_active=True)
-                    .values_list('branch_id', flat=True)
-                )
+        if branch_ids:
+            branch_ids = [int(x) for x in branch_ids.split(',') if x.isdigit()]
+            if branch_ids:
+                branches = Branch.objects.filter(branch_id__in=branch_ids, is_active=True)
 
-        # Filter by zones
-        if zone_ids:
+        elif zone_ids:
             zone_ids = [int(x) for x in zone_ids.split(',') if x.isdigit()]
             if zone_ids:
-                branch_ids.update(
-                    Branch.objects.filter(zone__zone_id__in=zone_ids, is_active=True)
-                    .values_list('branch_id', flat=True)
-                )
+                branches = Branch.objects.filter(zone__zone_id__in=zone_ids, is_active=True)
 
-        # Filter by explicit branch IDs
-        if direct_branch_ids:
-            direct_branch_ids = [int(x) for x in direct_branch_ids.split(',') if x.isdigit()]
-            branch_ids.update(direct_branch_ids)
+        elif state_ids:
+            state_ids = [int(x) for x in state_ids.split(',') if x.isdigit()]
+            if state_ids:
+                branches = Branch.objects.filter(state__state_id__in=state_ids, is_active=True)
 
-        # If no filters provided → return all active orientations
-        if not (state_ids or zone_ids or direct_branch_ids):
-            return queryset
-
-        # If filters provided but no branches found → return empty queryset
-        if not branch_ids:
+        # If no filters provided or no branches found → return empty queryset
+        if not branches.exists():
             return Orientation.objects.none()
 
-        # If any branches found, filter orientations linked to them
+        # Get orientations linked to the selected branches for current academic year
         orientation_ids = (
             BranchOrientations.objects.filter(
-                branch__branch_id__in=branch_ids,
+                branch__in=branches,
                 academic_year=current_academic_year,
                 is_active=True
             )
