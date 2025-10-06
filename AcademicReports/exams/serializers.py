@@ -11,6 +11,8 @@ class SubjectSerializer(serializers.ModelSerializer):
 
 # ==================== SubjectSkill ====================
 class SubjectSkillSerializer(serializers.ModelSerializer):
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+
     class Meta:
         model = SubjectSkill
         fields = '__all__'
