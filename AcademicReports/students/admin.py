@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ClassName, Orientation, Gender, AdmissionStatus, Student
+from .models import *
 
 
 # ==================== ClassName Admin ====================
@@ -56,3 +56,16 @@ class StudentAdmin(admin.ModelAdmin):
         'academic_year', 'state', 'zone', 'branch',
         'student_class', 'section', 'gender', 'admission_status', 'orientation'
     )
+
+@admin.register(BranchOrientations)
+class BranchOrientationsAdmin(admin.ModelAdmin):
+    list_display = ('id', 'branch', 'academic_year', 'get_orientations', 'is_active')
+    list_filter = ('academic_year', 'branch__state', 'branch__zone', 'is_active')
+    search_fields = ('branch__name', 'academic_year__name', 'orientations__name')
+    filter_horizontal = ('orientations',)
+    ordering = ('branch__name',)
+
+    def get_orientations(self, obj):
+        """Display orientations as comma-separated values."""
+        return ", ".join(o.name for o in obj.orientations.all())
+    get_orientations.short_description = 'Orientations'

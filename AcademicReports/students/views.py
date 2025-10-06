@@ -80,6 +80,10 @@ class OrientationDropdownForExamViewSet(ModelViewSet):
         zone_ids = self.request.query_params.get('zone_ids')
         direct_branch_ids = self.request.query_params.get('branch_ids')
 
+        # If none of the filters provided → return empty queryset
+        if not (state_ids or zone_ids or direct_branch_ids):
+            return Orientation.objects.none()
+
         # Filter by states
         if state_ids:
             state_ids = [int(x) for x in state_ids.split(',') if x.isdigit()]
@@ -128,7 +132,6 @@ class OrientationDropdownForExamViewSet(ModelViewSet):
             queryset = Orientation.objects.none()
 
         return queryset
-
 
 # ========================== Student ViewSet ==========================
 class StudentViewSet(ModelViewSet):
