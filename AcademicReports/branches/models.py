@@ -19,15 +19,6 @@ class AcademicYear(models.Model):
  
 
 
-class Section(models.Model):
-    section_id = models.BigAutoField(primary_key=True, db_index=True)
-    name = models.CharField(max_length=250,null=False,blank=False,unique=True)
-    is_active = models.BooleanField(default=True)
-    description = models.TextField(null=True, blank=True)
-
-    def __str__(self):
-        return self.name
-
 class AcademicDevision(models.Model):
     academic_devision_id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length= 250, null=False,blank=False,unique=True)
