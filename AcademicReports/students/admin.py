@@ -69,3 +69,59 @@ class BranchOrientationsAdmin(admin.ModelAdmin):
         """Display orientations as comma-separated values."""
         return ", ".join(o.name for o in obj.orientations.all())
     get_orientations.short_description = 'Orientations'
+
+@admin.register(Section)
+class SectionAdmin(admin.ModelAdmin):
+    # Columns displayed in the list view
+    list_display = (
+        'name',
+        'external_name',
+        'class_name',
+        'orientation',
+        'branch',
+        'academic_year',
+        'strength',
+        'has_students',
+        'is_active',
+    )
+
+    # Clickable fields
+    list_display_links = ('name', 'external_name')
+
+    # Filters on the right sidebar
+    list_filter = (
+        'academic_year',
+        'branch',
+        'class_name',
+        'orientation',
+        'is_active',
+    )
+
+    # Searchable fields
+    search_fields = (
+        'name',
+        'external_name',
+        'external_id',
+    )
+
+    # Default ordering
+    ordering = ('branch', 'class_name', 'name')
+
+    # Allow inline editing for quick updates
+    list_editable = ('is_active', 'has_students',)
+
+    # Optional: Add field grouping for clarity
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'external_name', 'external_id')
+        }),
+        ('Relationships', {
+            'fields': ('academic_year', 'branch', 'class_name', 'orientation')
+        }),
+        ('Statistics', {
+            'fields': ('strength', 'has_students')
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+    )
