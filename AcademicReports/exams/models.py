@@ -468,8 +468,6 @@ class ExamResultStatus(models.Model):
     def __str__(self):
         return self.name
 
-
-
 class BranchWiseExamResultStatus(models.Model):
     academic_year = models.ForeignKey("branches.AcademicYear",null=True, blank=True, on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
     branch = models.ForeignKey("branches.Branch", on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
