@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
-
+from branches.models import AcademicYear
 
 class Subject(models.Model):
     subject_id = models.BigAutoField(primary_key=True, db_index=True)
@@ -119,6 +119,13 @@ class Exam(models.Model):
                     models.Index(fields=["start_date", "end_date"]),  # range queries
                     # models.Index(fields=["academic_year", "exam_type", "is_active"], name="idx_exam_year_type_active"),
                 ]
+
+    def save(self, *args, **kwargs):
+        if not self.academic_year:
+            current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True, is_active=True).first()
+            if current_academic_year:
+                self.academic_year = current_academic_year
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.exam_type.name})"
@@ -516,6 +523,14 @@ class BranchWiseExamResultStatus(models.Model):
         ]
         verbose_name = "Branch Wise Exam Result Status"
         verbose_name_plural = "Branch Wise Exams Result Status"
+    
+    def save(self, *args, **kwargs):
+        if not self.academic_year:
+            current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True, is_active=True).first()
+            if current_academic_year:
+                self.academic_year = current_academic_year
+        super().save(*args, **kwargs)
+
 
     def __str__(self):
         return f"{self.exam.name} - {self.branch.name} ({self.academic_year.name})"
@@ -562,6 +577,15 @@ class SectionWiseExamResultStatus(models.Model):
         ]
         verbose_name = "Section Exam Results Status"
         verbose_name_plural = "Section Exams Result Status"
+   
+    def save(self, *args, **kwargs):
+        if not self.academic_year:
+            current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True, is_active=True).first()
+            if current_academic_year:
+                self.academic_year = current_academic_year
+        super().save(*args, **kwargs)
 
+
+        
     def __str__(self):
         return f"{self.exam.name} - {self.section.name} ({self.branch.name} - {self.academic_year.name})"
