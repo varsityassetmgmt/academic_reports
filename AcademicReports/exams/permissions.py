@@ -187,3 +187,20 @@ class CanChangeStudentExamSummary(BasePermission):
 class CanDeleteStudentExamSummary(BasePermission):
     def has_permission(self, request, view):
         return request.user.has_perm('exams.delete_studentexamsummary')
+
+# ==================== BranchWiseExamResultStatus Permissions =====================
+class CanViewBranchWiseExamResultStatus(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.view_branchwiseexamresultstatus')
+
+class CanAddBranchWiseExamResultStatus(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.add_branchwiseexamresultstatus')
+
+class CanChangeBranchWiseExamResultStatus(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.change_branchwiseexamresultstatus')
+
+class CanDeleteBranchWiseExamResultStatus(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.delete_branchwiseexamresultstatus')

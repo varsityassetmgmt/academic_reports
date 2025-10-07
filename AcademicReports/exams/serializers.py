@@ -65,6 +65,7 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
         subject = data.get('subject')
         start_time = data.get('exam_start_time')
         end_time = data.get('exam_end_time')
+        subject_skills = data.get('subject_skills', [])
 
         if start_time and end_time and end_time <= start_time:
             raise serializers.ValidationError("Exam end time must be later than start time.")
@@ -76,6 +77,13 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
             if exam_classes.exists() and subject_classes.exists():
                 if not any(cls in subject_classes for cls in exam_classes):
                     raise serializers.ValidationError("Selected subject does not belong to any of the exam's classes.")
+                
+        for skill in subject_skills:
+            if skill.subject != subject:
+                raise serializers.ValidationError(
+                    f"Skill '{skill.name}' does not belong to the selected subject '{subject.name}'."
+                )
+            
         return data
 
 
@@ -208,3 +216,38 @@ class ExamAttendanceStatusDropdownSerializer(serializers.ModelSerializer):
 
     def get_label(self, obj):
         return str(obj)
+
+# ---------------- ExamAttendanceStatus ----------------
+class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
+    academic_year_name = serializers.CharField(source='academic_year.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
+    exam_name = serializers.CharField(source='exam.name', read_only=True)
+    status_name = serializers.CharField(source='status.name', read_only=True)
+    finalized_by_username = serializers.CharField(source='finalized_by.username', read_only=True)
+
+    class Meta:
+        model = BranchWiseExamResultStatus
+        fields = [
+            'id',
+            'academic_year',
+            'academic_year_name',
+            'branch',
+            'branch_name',
+            'exam',
+            'exam_name',
+            'status',
+            'status_name',
+            'finalized_by',
+            'finalized_by_username',
+            'finalized_at',
+            'is_progress_card_downloaded',
+            'marks_completion_percentage',
+            'marks_entry_expiry_datetime',
+            'total_sections',
+            'number_of_sections_completed',
+            'number_of_sections_pending',
+            'progress_card_pending_sections',
+            'is_visible',
+            'updated_at'
+        ]
+        read_only_fields = ['updated_at', 'academic_year_name', 'branch_name', 'exam_name', 'status_name', 'finalized_by_username']
