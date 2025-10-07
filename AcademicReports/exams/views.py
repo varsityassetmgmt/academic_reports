@@ -27,7 +27,7 @@ class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
 
 # ---------------- SubjectSkill ----------------
 class SubjectSkillDropdownViewSet(ModelViewSet):
-    queryset = SubjectSkill.objects.filter(is_active=True).order_by('name')
+    queryset = SubjectSkill.objects.filter(is_active=True).order_by('subject')
     permission_classes = [IsAuthenticated]
     serializer_class = SubjectSkillDropdownSerializer
     http_method_names = ['get']
@@ -35,7 +35,7 @@ class SubjectSkillDropdownViewSet(ModelViewSet):
     filterset_fields = ['subject']
 
 class SubjectSkillDropdownForExamInstanceViewSet(ModelViewSet):
-    queryset = SubjectSkill.objects.filter(is_active=True).order_by('name')
+    queryset = SubjectSkill.objects.filter(is_active=True).order_by('subject')
     permission_classes = [IsAuthenticated]
     serializer_class = SubjectSkillDropdownSerializer
     http_method_names = ['get']
