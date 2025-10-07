@@ -65,6 +65,7 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
         subject = data.get('subject')
         start_time = data.get('exam_start_time')
         end_time = data.get('exam_end_time')
+        subject_skills = data.get('subject_skills', [])
 
         if start_time and end_time and end_time <= start_time:
             raise serializers.ValidationError("Exam end time must be later than start time.")
@@ -76,6 +77,13 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
             if exam_classes.exists() and subject_classes.exists():
                 if not any(cls in subject_classes for cls in exam_classes):
                     raise serializers.ValidationError("Selected subject does not belong to any of the exam's classes.")
+                
+        for skill in subject_skills:
+            if skill.subject != subject:
+                raise serializers.ValidationError(
+                    f"Skill '{skill.name}' does not belong to the selected subject '{subject.name}'."
+                )
+            
         return data
 
 

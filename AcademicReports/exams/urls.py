@@ -15,7 +15,7 @@ router.register(r'subjectskill', SubjectSkillViewSet, basename='subjectskill')
 router.register(r'exam_type', ExamTypeViewSet, basename='exam_type')
 
 router.register(r'exam', ExamViewSet, basename='exam')
-router.register(r'exam_instance', ExamInstanceViewSet, basename='exam_instance')
+# router.register(r'exam_instance', ExamInstanceViewSet, basename='exam_instance')
 router.register(r'exam_subject_skill_instance', ExamSubjectSkillInstanceViewSet, basename='exam_subject_skill_instance')
 router.register(r'branch_wise_exam_result_status', BranchWiseExamResultStatusViewSet, basename='branch_wise_exam_result_status')
 
@@ -24,6 +24,9 @@ router.register(r'subjectskill_dropdown_for_exam_instance', SubjectSkillDropdown
 
 
 urlpatterns = [
+
+    path('exam_instance/<int:exam_id>/', ExamInstanceViewSet.as_view({'get': 'list','post': 'create'}), name='examinstance-list'),
+    path('exam_instance/<int:exam_id>/<int:pk>/', ExamInstanceViewSet.as_view({'get': 'retrieve','put': 'update'}), name='examinstance-list'),
 
     
 ]+ router.urls

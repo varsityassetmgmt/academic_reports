@@ -216,30 +216,41 @@ class ExamInstanceViewSet(ModelViewSet):
     serializer_class = ExamInstanceSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['exam__name', 'subject__name']
+    search_fields = ['subject__name']
     pagination_class = CustomPagination
+    lookup_field = 'pk'  # for retrieve/update
+    lookup_url_kwarg = 'pk'
+
+    def get_exam_id(self):
+        """
+        Get exam_id from URL kwargs
+        """
+        exam_id = self.kwargs.get('exam_id')
+        if not exam_id:
+            raise ValidationError({"exam_id": "This field is required in the URL."})
+        return exam_id
 
     def get_queryset(self):
-        # Only require exam_id for GET (list) requests
-        if self.action == 'list':
-            exam_id = self.request.query_params.get('exam_id')
-            if not exam_id:
-                raise NotFound("Exam ID is required for listing exam instances.")
-            
-            return ExamInstance.objects.filter(
-                exam__exam_id=exam_id,
-                is_active=True
-            ).order_by('date')
-        
-        # For other actions (retrieve, create, update)
-        return ExamInstance.objects.filter(is_active=True).order_by('date')
-    
+        exam_id = self.get_exam_id()
+        return ExamInstance.objects.filter(
+            exam__exam_id=exam_id,
+            is_active=True
+        ).order_by('date')
+
     def perform_create(self, serializer):
-        if serializer.is_valid():
-            serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        exam_id = self.get_exam_id()
+        serializer.save(
+            exam_id=exam_id,
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
+
     def perform_update(self, serializer):
-        if serializer.is_valid():
-            serializer.save(updated_by=self.request.user)
+        exam_id = self.get_exam_id()
+        serializer.save(
+            exam_id=exam_id,
+            updated_by=self.request.user
+        )
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -251,6 +262,46 @@ class ExamInstanceViewSet(ModelViewSet):
         else:
             permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
+
+# class ExamInstanceViewSet(ModelViewSet):
+#     serializer_class = ExamInstanceSerializer
+#     http_method_names = ['get', 'post', 'put']
+#     filter_backends = [DjangoFilterBackend, SearchFilter]
+#     search_fields = ['exam__name', 'subject__name']
+#     pagination_class = CustomPagination
+
+#     def get_queryset(self):
+#         # Only require exam_id for GET (list) requests
+#         if self.action == 'list':
+#             exam_id = self.request.query_params.get('exam_id')
+#             if not exam_id:
+#                 raise NotFound("Exam ID is required for listing exam instances.")
+            
+#             return ExamInstance.objects.filter(
+#                 exam__exam_id=exam_id,
+#                 is_active=True
+#             ).order_by('date')
+        
+#         # For other actions (retrieve, create, update)
+#         return ExamInstance.objects.filter(is_active=True).order_by('date')
+    
+#     def perform_create(self, serializer):
+#         if serializer.is_valid():
+#             serializer.save(created_by=self.request.user, updated_by=self.request.user)
+#     def perform_update(self, serializer):
+#         if serializer.is_valid():
+#             serializer.save(updated_by=self.request.user)
+
+#     def get_permissions(self):
+#         if self.action in ['list', 'retrieve']:
+#             permission_classes = [CanViewExamInstance]
+#         elif self.action == 'create':
+#             permission_classes = [CanAddExamInstance]
+#         elif self.action in ['update', 'partial_update']:
+#             permission_classes = [CanChangeExamInstance]
+#         else:
+#             permission_classes = [permissions.AllowAny]
+#         return [permission() for permission in permission_classes]
 
 # ==================== ExamSubjectSkillInstance ====================
 class ExamSubjectSkillInstanceViewSet(ModelViewSet):
