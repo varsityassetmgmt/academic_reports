@@ -2,6 +2,9 @@
 
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.db import models
+from django.conf import settings
+from django.utils import timezone
 
 
 class Subject(models.Model):
@@ -12,6 +15,11 @@ class Subject(models.Model):
     is_active = models.BooleanField(default=True)
     description = models.TextField(null=True,blank=True)
     display_name = models.CharField(max_length=250,null=True,blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True,null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='subject_created_by',on_delete=models.SET_NULL)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='subject_updated_by',on_delete=models.SET_NULL)
 
     class Meta:
         indexes = [
@@ -26,6 +34,11 @@ class SubjectSkill(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name="skills")
     name = models.CharField(max_length=255)  # Example: Fluency, Application, Basic Concepts
     is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True,null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='subject_skill_created_by',on_delete=models.SET_NULL)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='subject_skill_updated_by',on_delete=models.SET_NULL)
 
     class Meta:
         constraints = [
@@ -49,6 +62,11 @@ class ExamType(models.Model):
     name = models.CharField(max_length=250,null=False,blank=False,unique=True)
     is_active = models.BooleanField(default=True)
     description = models.TextField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True,null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='exam_type_created_by',on_delete=models.SET_NULL)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='exam_type_updated_by',on_delete=models.SET_NULL)
 
     class Meta:
         indexes = [models.Index(fields=["is_active"])]
@@ -76,6 +94,11 @@ class Exam(models.Model):
     is_visible = models.BooleanField(default=False) # Enable this to make the exam visible for marks entry.
     is_progress_card_visible = models.BooleanField(default=False)  # Enable this to allow progress card download for this exam
     is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True,null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='exam_created_by',on_delete=models.SET_NULL)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='exam_updated_by',on_delete=models.SET_NULL)
 
     class Meta:
         constraints = [
@@ -126,6 +149,11 @@ class ExamInstance(models.Model):
     is_optional = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
+    created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True,null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='exam_instance_created_by',on_delete=models.SET_NULL)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='exam_instance_updated_by',on_delete=models.SET_NULL)
+
     # result_types = models.ManyToManyField("ResultType", related_name="exam_instances")
 
     class Meta:
@@ -166,6 +194,11 @@ class ExamSubjectSkillInstance(models.Model):
     maximum_marks_internal = models.IntegerField(blank=True,null=True)
     cut_off_marks_internal = models.IntegerField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True,null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='exam_subject_skill_instance_created_by',on_delete=models.SET_NULL)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='exam_subject_skill_instance_updated_by',on_delete=models.SET_NULL)
 
     # result_types = models.ManyToManyField("ResultType", related_name="exam_instances")
 
@@ -247,6 +280,11 @@ class CoScholasticGrade(models.Model):
     description = models.CharField(max_length=150, blank=True, null=True)  # e.g., Outstanding, Excellent
     point = models.PositiveSmallIntegerField(default=0)  # e.g., 5, 4, 3, etc.
     is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True,null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='co_scholatic_grade_created_by',on_delete=models.SET_NULL)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='co_scholatic_grade_updated_by',on_delete=models.SET_NULL)
 
     class Meta:
         ordering = ["-point"]
