@@ -95,6 +95,8 @@ class Exam(models.Model):
     is_progress_card_visible = models.BooleanField(default=False)  # Enable this to allow progress card download for this exam
     is_active = models.BooleanField(default=True)
 
+    marks_entry_expiry_datetime = models.DateTimeField(null=True,blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True,null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='exam_created_by',on_delete=models.SET_NULL)
@@ -349,11 +351,7 @@ class ExamResult(models.Model):
             models.Index(fields=["student", "is_active"], name="idx_examresult_student_active"),
             models.Index(fields=["exam_instance", "percentage"], name="idx_examresult_exam_percentage"),
 
-   
-
         ]
-
-
     
     def save(self, *args, **kwargs):
         total_max = (self.exam_instance.maximum_marks_external or 0) + (self.exam_instance.maximum_marks_internal or 0)
@@ -452,3 +450,117 @@ class StudentExamSummary(models.Model):
     
     def __str__(self):
         return f"Summary for {self.student} in {self.exam.name}"
+
+
+class ExamResultStatus(models.Model):
+    """
+    Stores master statuses like:
+    NOT_STARTED, IN_PROGRESS, COMPLETED, VERIFIED, FINALIZED
+    """
+    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["display_order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+
+class BranchWiseExamResultStatus(models.Model):
+    academic_year = models.ForeignKey("branches.AcademicYear", on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
+    branch = models.ForeignKey("branches.Branch", on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
+    exam = models.ForeignKey(Exam, on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
+    status = models.ForeignKey(ExamResultStatus, on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
+
+    finalized_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="finalized_branch_exam_result_status")
+    finalized_at = models.DateTimeField(null=True, blank=True)
+
+    is_progress_card_downloaded = models.BooleanField(default=False)
+    marks_completion_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    # Marks entry expiry deadline
+    marks_entry_expiry_datetime = models.DateTimeField(null=True,blank=True)
+
+    # 👇 Section tracking fields
+    total_sections = models.PositiveIntegerField(default=0)
+    number_of_sections_completed = models.PositiveIntegerField(default=0)
+    number_of_sections_pending = models.PositiveIntegerField(default=0)
+    progress_card_pending_sections = models.PositiveIntegerField(default=0)  # 👈 new field
+
+    is_visible = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    
+
+    class Meta:
+        constraints = [
+                models.UniqueConstraint(
+                    fields=["academic_year", "branch", "exam"],
+                    name="unique_branch_wise_exam_result_status"
+                )
+            ]
+        indexes = [
+            models.Index(fields=["academic_year"]),
+            models.Index(fields=["branch"]),
+            models.Index(fields=["exam"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["is_visible"]),
+            models.Index(fields=["marks_entry_expiry_datetime"]),
+            models.Index(fields=["is_active"]),
+            
+        ]
+        verbose_name = "Branch Wise Exam Result Status"
+        verbose_name_plural = "Branch Wise Exams Result Status"
+
+    def __str__(self):
+        return f"{self.exam.name} - {self.branch.name} ({self.academic_year.name})"
+
+
+
+class SectionWiseExamResultStatus(models.Model):
+    
+    academic_year = models.ForeignKey("branches.AcademicYear",on_delete=models.PROTECT,related_name="section_exam_result_status")
+    branch = models.ForeignKey("branches.Branch",on_delete=models.PROTECT,related_name="section_exam_result_status")
+    section = models.ForeignKey("students.Section",on_delete=models.PROTECT,related_name="section_exam_result_status")
+    exam = models.ForeignKey(Exam,on_delete=models.PROTECT,related_name="section_exam_result_status")
+    status = models.ForeignKey(ExamResultStatus,on_delete=models.PROTECT,related_name="section_exam_result_status")
+    finalized_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="finalized_section_exam_result_status")
+    finalized_at = models.DateTimeField(null=True, blank=True)
+
+    # Marks completion
+    marks_completion_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    marks_entry_expiry_datetime = models.DateTimeField(null=True, blank=True)
+    is_progress_card_downloaded = models.BooleanField(default=False)
+
+    # Visibility & timestamps
+    is_visible = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("academic_year", "branch", "section", "exam")
+        constraints = [
+                models.UniqueConstraint(
+                    fields=["academic_year", "branch", "section", "exam"],
+                    name="unique_section_wise_exam_result_status"
+                )
+            ]
+        indexes = [
+            models.Index(fields=["academic_year"]),
+            models.Index(fields=["branch"]),
+            models.Index(fields=["section"]),
+            models.Index(fields=["exam"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["is_visible"]),
+            models.Index(fields=["marks_entry_expiry_datetime"]),
+            models.Index(fields=["is_active"]),
+        ]
+        verbose_name = "Section Exam Results Status"
+        verbose_name_plural = "Section Exams Result Status"
+
+    def __str__(self):
+        return f"{self.exam.name} - {self.section.name} ({self.branch.name} - {self.academic_year.name})"
