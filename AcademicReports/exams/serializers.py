@@ -127,7 +127,7 @@ class ExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamSubjectSkillInstance
         fields = '__all__'
-        read_only_fields = ('created_by', 'updated_by')
+        read_only_fields = ('created_by', 'updated_by', 'subject_skill', 'exam_instance')
 
     def create(self, validated_data):
         user = self.context['request'].user
