@@ -78,7 +78,7 @@ class ExamType(models.Model):
 class Exam(models.Model):
     exam_id = models.BigAutoField(primary_key=True)
     exam_type = models.ForeignKey(ExamType, on_delete=models.CASCADE, related_name='exams_exam_type')
-    academic_year = models.ForeignKey("branches.AcademicYear",on_delete=models.CASCADE, related_name='exams_academic_year')
+    academic_year = models.ForeignKey("branches.AcademicYear",null=True, blank=True,on_delete=models.CASCADE, related_name='exams_academic_year')
     name = models.CharField(max_length=250,null=False,blank=False,unique=True)
     start_date = models.DateField()
     end_date = models.DateField()
@@ -471,7 +471,7 @@ class ExamResultStatus(models.Model):
 
 
 class BranchWiseExamResultStatus(models.Model):
-    academic_year = models.ForeignKey("branches.AcademicYear", on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
+    academic_year = models.ForeignKey("branches.AcademicYear",null=True, blank=True, on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
     branch = models.ForeignKey("branches.Branch", on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
     exam = models.ForeignKey(Exam, on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
     status = models.ForeignKey(ExamResultStatus, on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
@@ -489,6 +489,7 @@ class BranchWiseExamResultStatus(models.Model):
     number_of_sections_completed = models.PositiveIntegerField(default=0)
     number_of_sections_pending = models.PositiveIntegerField(default=0)
     progress_card_pending_sections = models.PositiveIntegerField(default=0)  # 👈 new field
+ 
 
     is_visible = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -523,7 +524,7 @@ class BranchWiseExamResultStatus(models.Model):
 
 class SectionWiseExamResultStatus(models.Model):
     
-    academic_year = models.ForeignKey("branches.AcademicYear",on_delete=models.PROTECT,related_name="section_exam_result_status")
+    academic_year = models.ForeignKey("branches.AcademicYear",null=True, blank=True, on_delete=models.PROTECT,related_name="section_exam_result_status")
     branch = models.ForeignKey("branches.Branch",on_delete=models.PROTECT,related_name="section_exam_result_status")
     section = models.ForeignKey("students.Section",on_delete=models.PROTECT,related_name="section_exam_result_status")
     exam = models.ForeignKey(Exam,on_delete=models.PROTECT,related_name="section_exam_result_status")
