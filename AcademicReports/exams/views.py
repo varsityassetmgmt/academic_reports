@@ -85,6 +85,13 @@ class SubjectViewSet(ModelViewSet):
     filterset_fields = ['academic_devisions', 'class_names', ]
     pagination_class = CustomPagination
 
+    def perform_create(self, serializer):
+        if serializer.is_valid():
+            serializer.save(created_by=self.request.user, updated_by=self.request.user)
+    def perform_update(self, serializer):
+        if serializer.is_valid():
+            serializer.save(updated_by=self.request.user)
+
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             permission_classes = [CanViewSubject]
@@ -107,6 +114,13 @@ class SubjectSkillViewSet(ModelViewSet):
     filterset_fields = ['subject']
     pagination_class = CustomPagination
 
+    def perform_create(self, serializer):
+        if serializer.is_valid():
+            serializer.save(created_by=self.request.user, updated_by=self.request.user)
+    def perform_update(self, serializer):
+        if serializer.is_valid():
+            serializer.save(updated_by=self.request.user)
+
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             permission_classes = [CanViewSubjectSkill]
@@ -127,6 +141,13 @@ class ExamTypeViewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name', 'description']
     pagination_class = CustomPagination
+
+    def perform_create(self, serializer):
+        if serializer.is_valid():
+            serializer.save(created_by=self.request.user, updated_by=self.request.user)
+    def perform_update(self, serializer):
+        if serializer.is_valid():
+            serializer.save(updated_by=self.request.user)
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -171,6 +192,13 @@ class ExamViewSet(ModelViewSet):
 
         serializer.save(academic_year=current_academic_year)
 
+    def perform_create(self, serializer):
+        if serializer.is_valid():
+            serializer.save(created_by=self.request.user, updated_by=self.request.user)
+    def perform_update(self, serializer):
+        if serializer.is_valid():
+            serializer.save(updated_by=self.request.user)
+
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             permission_classes = [CanViewExam]
@@ -205,6 +233,13 @@ class ExamInstanceViewSet(ModelViewSet):
         
         # For other actions (retrieve, create, update)
         return ExamInstance.objects.filter(is_active=True).order_by('date')
+    
+    def perform_create(self, serializer):
+        if serializer.is_valid():
+            serializer.save(created_by=self.request.user, updated_by=self.request.user)
+    def perform_update(self, serializer):
+        if serializer.is_valid():
+            serializer.save(updated_by=self.request.user)
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -253,6 +288,13 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
 
         # For other actions (retrieve, create, update)
         return ExamSubjectSkillInstance.objects.filter(is_active=True).order_by('subject_skill__subject__name')
+    
+    def perform_create(self, serializer):
+        if serializer.is_valid():
+            serializer.save(created_by=self.request.user, updated_by=self.request.user)
+    def perform_update(self, serializer):
+        if serializer.is_valid():
+            serializer.save(updated_by=self.request.user)
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:

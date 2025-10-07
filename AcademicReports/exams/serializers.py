@@ -7,20 +7,8 @@ class SubjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subject
         fields = '__all__'
-        read_only_fields = ('created_by', 'updated_by')
+        read_only_fields = ('created_by', 'updated_by', 'is')
 
-    def create(self, validated_data):
-        user = self.context['request'].user
-        subject = Subject.objects.create(created_by=user, **validated_data)
-        return subject
-
-    def update(self, instance, validated_data):
-        user = self.context['request'].user
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.updated_by = user
-        instance.save()
-        return instance
 
 # ==================== SubjectSkill ====================
 class SubjectSkillSerializer(serializers.ModelSerializer):
@@ -29,67 +17,34 @@ class SubjectSkillSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubjectSkill
         fields = '__all__'
-        read_only_fields = ('created_by', 'updated_by')
-
-    def create(self, validated_data):
-        user = self.context['request'].user
-        subject = Subject.objects.create(created_by=user, **validated_data)
-        return subject
-
-    def update(self, instance, validated_data):
-        user = self.context['request'].user
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.updated_by = user
-        instance.save()
-        return instance
+        read_only_fields = ('created_by', 'updated_by', 'is_active')
  
-
-
 # ==================== ExamType ====================
 class ExamTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamType
         fields = '__all__'
-        read_only_fields = ('created_by', 'updated_by')
-
-    def create(self, validated_data):
-        user = self.context['request'].user
-        subject = Subject.objects.create(created_by=user, **validated_data)
-        return subject
-
-    def update(self, instance, validated_data):
-        user = self.context['request'].user
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.updated_by = user
-        instance.save()
-        return instance
-
+        read_only_fields = ('created_by', 'updated_by', 'is_active')
 
 # ==================== Exam ====================
 class ExamSerializer(serializers.ModelSerializer):
     academic_year_name = serializers.CharField(source='academic_year.name', read_only=True)
     exam_type_name = serializers.CharField(source='exam_type.name', read_only=True)
+    marks_entry_expiry_datetime_display = serializers.DateTimeField(source='marks_entry_expiry_datetime', format="%Y-%m-%d %H:%M:%S", read_only = True )
 
     class Meta:
         model = Exam
         fields = '__all__'
-        read_only_fields = ('created_by', 'updated_by')
+        read_only_fields = ('created_by', 'updated_by', 'is_active')
 
-    def create(self, validated_data):
-        user = self.context['request'].user
-        subject = Subject.objects.create(created_by=user, **validated_data)
-        return subject
+    def validate(self, data):
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
 
-    def update(self, instance, validated_data):
-        user = self.context['request'].user
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.updated_by = user
-        instance.save()
-        return instance
+        if start_date and end_date and end_date <= start_date:
+            raise serializers.ValidationError("End date cannot be earlier than start date.")
 
+        return data
 
 # ==================== ExamInstance ====================
 class ExamInstanceSerializer(serializers.ModelSerializer):
@@ -99,24 +54,29 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamInstance
         fields = '__all__'
-        read_only_fields = ('created_by', 'updated_by')
+        read_only_fields = ('created_by', 'updated_by', 'is_active')
 
     def get_subject_skill_names(self, obj):
         # Get all related subject skill names and join with comma
         return ', '.join(obj.subject_skills.values_list('name', flat=True))
     
-    def create(self, validated_data):
-        user = self.context['request'].user
-        subject = Subject.objects.create(created_by=user, **validated_data)
-        return subject
+    def validate(self, data):
+        exam = data.get('exam')
+        subject = data.get('subject')
+        start_time = data.get('exam_start_time')
+        end_time = data.get('exam_end_time')
 
-    def update(self, instance, validated_data):
-        user = self.context['request'].user
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.updated_by = user
-        instance.save()
-        return instance
+        if start_time and end_time and end_time <= start_time:
+            raise serializers.ValidationError("Exam end time must be later than start time.")
+
+        # Optional: ensure subject belongs to same academic division / class as exam
+        if exam and subject:
+            exam_classes = exam.student_classes.all()
+            subject_classes = subject.class_names.all()
+            if exam_classes.exists() and subject_classes.exists():
+                if not any(cls in subject_classes for cls in exam_classes):
+                    raise serializers.ValidationError("Selected subject does not belong to any of the exam's classes.")
+        return data
 
 
 # ==================== Exam Skill Instance ====================
@@ -127,26 +87,24 @@ class ExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamSubjectSkillInstance
         fields = '__all__'
-        read_only_fields = ('created_by', 'updated_by', 'subject_skill', 'exam_instance')
+        read_only_fields = ('created_by', 'updated_by', 'subject_skill', 'exam_instance', 'is_active')
 
-    def create(self, validated_data):
-        user = self.context['request'].user
-        subject = Subject.objects.create(created_by=user, **validated_data)
-        return subject
+    def validate(self, data):
+        exam_instance = data.get('exam_instance')
+        subject_skill = data.get('subject_skill')
 
-    def update(self, instance, validated_data):
-        user = self.context['request'].user
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.updated_by = user
-        instance.save()
-        return instance
+        if exam_instance and subject_skill:
+            # Check that skill actually belongs to the same subject as the exam instance
+            if subject_skill.subject != exam_instance.subject:
+                raise serializers.ValidationError("Selected skill does not belong to the exam's subject.")
+        return data
 
 # ==================== ExamAttendanceStatus ====================
 class ExamAttendanceStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamAttendanceStatus
         fields = '__all__'
+        read_only_fields = ('is_active')
 
 
 # ==================== GradeBoundary ====================
@@ -154,6 +112,7 @@ class GradeBoundarySerializer(serializers.ModelSerializer):
     class Meta:
         model = GradeBoundary
         fields = '__all__'
+        read_only_fields = ('is_active')
 
 
 # ==================== ExamResult ====================
@@ -161,6 +120,7 @@ class ExamResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamResult
         fields = '__all__'
+        read_only_fields = ('is_active')
 
 
 # ==================== ExamSkillResult ====================
@@ -168,6 +128,7 @@ class ExamSkillResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamSkillResult
         fields = '__all__'
+        read_only_fields = ('is_active')
 
 
 # ==================== StudentExamSummary ====================
@@ -175,6 +136,7 @@ class StudentExamSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentExamSummary
         fields = '__all__'
+        read_only_fields = ('is_active')
 
 # ---------------- Subject ----------------
 class SubjectDropdownSerializer(serializers.ModelSerializer):
