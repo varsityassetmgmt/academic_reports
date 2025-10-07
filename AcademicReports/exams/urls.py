@@ -16,6 +16,7 @@ router.register(r'exam_type', ExamTypeViewSet, basename='exam_type')
 
 router.register(r'exam', ExamViewSet, basename='exam')
 router.register(r'exam_instance', ExamInstanceViewSet, basename='exam_instance')
+router.register(r'exam_subject_skill_instance', ExamSubjectSkillInstanceViewSet, basename='exam_subject_skill_instance')
 
 router.register(r'subject_dropdown_for_exam_instance', SubjectDropdownForExamInstanceViewSet, basename='subject_dropdown_for_exam_instance')
 router.register(r'subjectskill_dropdown_for_exam_instance', SubjectSkillDropdownForExamInstanceViewSet, basename='subjectskill_dropdown_for_exam_instance')
