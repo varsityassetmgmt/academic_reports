@@ -1,4 +1,7 @@
 from django.db import models
+
+
+
 class ClassName(models.Model):
     class_name_id = models.BigAutoField(primary_key=True)
     varna_class_id  = models.CharField(max_length=250,null=True,blank=True,unique=True)
@@ -69,7 +72,6 @@ class Section(models.Model):
     external_id = models.CharField(max_length=250, null=True, blank=True)
     strength = models.IntegerField(null=True, blank=True)
     has_students = models.BooleanField(default = False)
-    # number_of_students = models.IntegerField(null=True, blank=True)
     is_active = models.BooleanField(default=True)  
  
     class Meta:         
