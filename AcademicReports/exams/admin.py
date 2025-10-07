@@ -106,27 +106,25 @@ class StudentExamSummaryAdmin(admin.ModelAdmin):
     autocomplete_fields = ('student', 'exam')
 
 
-# ===================== Exam Result Status =====================
-@admin.register(ExamResultStatus)
-class ExamResultStatusAdmin(admin.ModelAdmin):
-    list_display = ('code', 'name', 'display_order')
-    search_fields = ('code', 'name')
-    list_filter = ()
+# # ===================== Exam Result Status =====================
+# @admin.register(ExamResultStatus)
+# class ExamResultStatusAdmin(admin.ModelAdmin):
+#     list_display = ('name', 'display_order')
 
 
-# ===================== Branch Wise Exam Result Status =====================
-@admin.register(BranchWiseExamResultStatus)
-class BranchWiseExamResultStatusAdmin(admin.ModelAdmin):
-    list_display = ('academic_year', 'branch', 'exam', 'status', 'marks_completion_percentage', 'is_active')
-    search_fields = ('branch__name', 'exam__name', 'academic_year__name')
-    list_filter = ('is_active', 'is_visible')
-    autocomplete_fields = ('academic_year', 'branch', 'exam', 'status', 'finalized_by')
+# # ===================== Branch Wise Exam Result Status =====================
+# @admin.register(BranchWiseExamResultStatus)
+# class BranchWiseExamResultStatusAdmin(admin.ModelAdmin):
+#     list_display = ('academic_year', 'branch', 'exam', 'status', 'marks_completion_percentage', 'is_active')
+#     search_fields = ('branch__name', 'exam__name', 'academic_year__name')
+#     list_filter = ('is_active', 'is_visible')
+#     autocomplete_fields = ('academic_year', 'branch', 'exam', 'status', 'finalized_by')
 
 
-# ===================== Section Wise Exam Result Status =====================
-@admin.register(SectionWiseExamResultStatus)
-class SectionWiseExamResultStatusAdmin(admin.ModelAdmin):
-    list_display = ('academic_year', 'branch', 'section', 'exam', 'status', 'marks_completion_percentage', 'is_active')
-    search_fields = ('branch__name', 'section__name', 'exam__name', 'academic_year__name')
-    list_filter = ('is_active', 'is_visible')
-    autocomplete_fields = ('academic_year', 'branch', 'section', 'exam', 'status', 'finalized_by')
+# # ===================== Section Wise Exam Result Status =====================
+# @admin.register(SectionWiseExamResultStatus)
+# class SectionWiseExamResultStatusAdmin(admin.ModelAdmin):
+#     list_display = ('academic_year', 'branch', 'section', 'exam', 'status', 'marks_completion_percentage', 'is_active')
+#     search_fields = ('branch__name', 'section__name', 'exam__name', 'academic_year__name')
+#     list_filter = ('is_active', 'is_visible')
+#     autocomplete_fields = ('academic_year', 'branch', 'section', 'exam', 'status', 'finalized_by')
