@@ -85,9 +85,18 @@ class CanChangeExamInstance(BasePermission):
     def has_permission(self, request, view):
         return request.user.has_perm('exams.change_examinstance')
 
-class CanDeleteExamInstance(BasePermission):
+# ==================== ExamSubjectSkillInstance Permissions =====================
+class CanViewExamSubjectSkillInstance(BasePermission):
     def has_permission(self, request, view):
-        return request.user.has_perm('exams.delete_examinstance')
+        return request.user.has_perm('exams.view_examsubjectskillinstance')
+
+class CanAddExamSubjectSkillInstance(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.add_examsubjectskillinstance')
+
+class CanChangeExamSubjectSkillInstance(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.change_examsubjectskillinstance')
 
 
 # ==================== ExamAttendanceStatus Permissions =====================

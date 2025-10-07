@@ -227,10 +227,6 @@ class GradeBoundaryAdmin(admin.ModelAdmin):
     ordering = ('-min_percentage',)
 
 
-from django.contrib import admin
-from .models import ExamResult
-
-
 # ==================== ExamResult Admin ====================
 @admin.register(ExamResult)
 class ExamResultAdmin(admin.ModelAdmin):
