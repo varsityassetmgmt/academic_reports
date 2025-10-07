@@ -6,6 +6,7 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from branches.models import AcademicYear
+from django.core.validators import MinValueValidator
 
 class Subject(models.Model):
     subject_id = models.BigAutoField(primary_key=True, db_index=True)
@@ -34,7 +35,6 @@ class SubjectSkill(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name="skills")
     name = models.CharField(max_length=255)  # Example: Fluency, Application, Basic Concepts
     is_active = models.BooleanField(default=True)
-
     created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True,null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='subject_skill_created_by',on_delete=models.SET_NULL)
@@ -79,7 +79,7 @@ class Exam(models.Model):
     exam_id = models.BigAutoField(primary_key=True)
     exam_type = models.ForeignKey(ExamType, on_delete=models.CASCADE, related_name='exams_exam_type')
     academic_year = models.ForeignKey("branches.AcademicYear",null=True, blank=True,on_delete=models.CASCADE, related_name='exams_academic_year')
-    name = models.CharField(max_length=250,null=False,blank=False,unique=True)
+    name = models.CharField(max_length=250,null=False,blank=False)
     start_date = models.DateField()
     end_date = models.DateField()
 
@@ -132,7 +132,7 @@ class Exam(models.Model):
 
 class ExamInstance(models.Model):
     exam_instance_id = models.BigAutoField(primary_key=True)
-    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='exam_instance_exam')
+    exam = models.ForeignKey(Exam,null=True,blank=True, on_delete=models.CASCADE, related_name='exam_instance_exam')
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='exam_instance_subject')    
 
     # Flags to indicate what kind of results this exam has
@@ -147,10 +147,10 @@ class ExamInstance(models.Model):
     exam_end_time = models.TimeField()                 
 
     maximum_marks_external = models.IntegerField(blank=True,null=True)
-    cut_off_marks_external = models.IntegerField(blank=True, null=True)
+    cut_off_marks_external = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True,validators=[MinValueValidator(0)])  
 
     maximum_marks_internal = models.IntegerField(blank=True,null=True)
-    cut_off_marks_internal = models.IntegerField(blank=True, null=True)
+    cut_off_marks_internal = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True,validators=[MinValueValidator(0)])  
 
     # Link only selected skills for this exam
     subject_skills = models.ManyToManyField("SubjectSkill", blank=True, related_name="exam_instances")
@@ -198,10 +198,10 @@ class ExamSubjectSkillInstance(models.Model):
     has_subject_co_scholastic_grade = models.BooleanField(default=True)
 
     maximum_marks_external = models.IntegerField(blank=True,null=True)
-    cut_off_marks_external = models.IntegerField(blank=True, null=True)
+    cut_off_marks_external = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True,validators=[MinValueValidator(0)])  
 
     maximum_marks_internal = models.IntegerField(blank=True,null=True)
-    cut_off_marks_internal = models.IntegerField(blank=True, null=True)
+    cut_off_marks_internal = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True,validators=[MinValueValidator(0)])  
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
@@ -312,16 +312,17 @@ class ExamResult(models.Model):
     exam_attendance = models.ForeignKey(ExamAttendanceStatus, on_delete=models.CASCADE, related_name='exam_results_attendance')
 
     # --- Academic Marks ---
-    external_marks = models.IntegerField(null=True, blank=True)
-    internal_marks = models.IntegerField(null=True, blank=True)
-    total_marks = models.IntegerField(null=True, blank=True)  # total = external + internal
+    external_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True)  
+    internal_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True)  
+    total_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True)  
+    
 
     co_scholastic_grade = models.ForeignKey(CoScholasticGrade,on_delete=models.PROTECT,null=True,blank = True, related_name="exam_result_co_scholastic_grade")
     percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
 
-    skill_external_marks = models.IntegerField(null=True, blank=True)
-    skill_internal_marks = models.IntegerField(null=True, blank=True)
-    skill_total_marks = models.IntegerField(null=True, blank=True)
+    skill_external_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True)  
+    skill_internal_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True) 
+    skill_total_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True) 
 
     # --- Ranks ---
     class_rank = models.IntegerField(null=True, blank=True)  # Class rank
@@ -389,10 +390,9 @@ class ExamSkillResult(models.Model):
     co_scholastic_grade = models.ForeignKey(CoScholasticGrade,on_delete=models.PROTECT,null=True,blank = True, related_name="exam_skill_results")
     # custom_value = models.CharField(max_length=100, blank=True, null=True)
 
-    external_marks = models.IntegerField(null=True, blank=True)     
-    internal_marks = models.IntegerField(null=True, blank=True)     
-    marks_obtained = models.IntegerField(null=True, blank=True)  # Total marks 
-
+    external_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True) 
+    internal_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True)  
+    marks_obtained = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True) 
     def __str__(self):
         return f"{self.exam_result.student} - {self.skill.name}: {self.value}"
     
@@ -417,7 +417,7 @@ class StudentExamSummary(models.Model):
     student = models.ForeignKey("students.Student", on_delete=models.CASCADE, related_name='exam_summary_student')
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='exam_summary_exam')
     
-    total_subjects_marks = models.IntegerField(default=0)  # Total marks across all subjects
+    total_subjects_marks = models.DecimalField(max_digits=7,decimal_places=2,blank=True,null=True) 
     percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     
     overall_grade = models.CharField(max_length=3, null=True, blank=True)  # Overall grade (A+, A, B, etc.)
@@ -464,8 +464,8 @@ class ExamResultStatus(models.Model):
     Stores master statuses like:
     NOT_STARTED, IN_PROGRESS, COMPLETED, VERIFIED, FINALIZED
     """
-    code = models.CharField(max_length=50, unique=True)
-    name = models.CharField(max_length=100)
+    # code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=100,unique=True)
     description = models.TextField(blank=True, null=True)
     display_order = models.PositiveIntegerField(default=0)
 

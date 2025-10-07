@@ -1,7 +1,5 @@
 from django.db import models
 
-
-
 class ClassName(models.Model):
     class_name_id = models.BigAutoField(primary_key=True)
     varna_class_id  = models.CharField(max_length=250,null=True,blank=True,unique=True)
