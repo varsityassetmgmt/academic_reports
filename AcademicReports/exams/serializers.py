@@ -41,7 +41,7 @@ class ExamSerializer(serializers.ModelSerializer):
         start_date = data.get('start_date')
         end_date = data.get('end_date')
 
-        if start_date and end_date and end_date < start_date:
+        if start_date and end_date and end_date <= start_date:
             raise serializers.ValidationError("End date cannot be earlier than start date.")
 
         return data
