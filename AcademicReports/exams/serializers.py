@@ -7,7 +7,20 @@ class SubjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subject
         fields = '__all__'
+        read_only_fields = ('created_by', 'updated_by')
 
+    def create(self, validated_data):
+        user = self.context['request'].user
+        subject = Subject.objects.create(created_by=user, **validated_data)
+        return subject
+
+    def update(self, instance, validated_data):
+        user = self.context['request'].user
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.updated_by = user
+        instance.save()
+        return instance
 
 # ==================== SubjectSkill ====================
 class SubjectSkillSerializer(serializers.ModelSerializer):
@@ -16,6 +29,21 @@ class SubjectSkillSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubjectSkill
         fields = '__all__'
+        read_only_fields = ('created_by', 'updated_by')
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        subject = Subject.objects.create(created_by=user, **validated_data)
+        return subject
+
+    def update(self, instance, validated_data):
+        user = self.context['request'].user
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.updated_by = user
+        instance.save()
+        return instance
+ 
 
 
 # ==================== ExamType ====================
@@ -23,6 +51,20 @@ class ExamTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamType
         fields = '__all__'
+        read_only_fields = ('created_by', 'updated_by')
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        subject = Subject.objects.create(created_by=user, **validated_data)
+        return subject
+
+    def update(self, instance, validated_data):
+        user = self.context['request'].user
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.updated_by = user
+        instance.save()
+        return instance
 
 
 # ==================== Exam ====================
@@ -33,6 +75,20 @@ class ExamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Exam
         fields = '__all__'
+        read_only_fields = ('created_by', 'updated_by')
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        subject = Subject.objects.create(created_by=user, **validated_data)
+        return subject
+
+    def update(self, instance, validated_data):
+        user = self.context['request'].user
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.updated_by = user
+        instance.save()
+        return instance
 
 
 # ==================== ExamInstance ====================
@@ -43,10 +99,24 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamInstance
         fields = '__all__'
+        read_only_fields = ('created_by', 'updated_by')
 
     def get_subject_skill_names(self, obj):
         # Get all related subject skill names and join with comma
         return ', '.join(obj.subject_skills.values_list('name', flat=True))
+    
+    def create(self, validated_data):
+        user = self.context['request'].user
+        subject = Subject.objects.create(created_by=user, **validated_data)
+        return subject
+
+    def update(self, instance, validated_data):
+        user = self.context['request'].user
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.updated_by = user
+        instance.save()
+        return instance
 
 
 # ==================== Exam Skill Instance ====================
@@ -57,6 +127,20 @@ class ExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamSubjectSkillInstance
         fields = '__all__'
+        read_only_fields = ('created_by', 'updated_by', 'subject_skill', 'exam_instance')
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        subject = Subject.objects.create(created_by=user, **validated_data)
+        return subject
+
+    def update(self, instance, validated_data):
+        user = self.context['request'].user
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.updated_by = user
+        instance.save()
+        return instance
 
 # ==================== ExamAttendanceStatus ====================
 class ExamAttendanceStatusSerializer(serializers.ModelSerializer):

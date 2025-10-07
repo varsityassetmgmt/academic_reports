@@ -217,6 +217,53 @@ class ExamInstanceViewSet(ModelViewSet):
             permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
 
+# ==================== ExamSubjectSkillInstance ====================
+class ExamSubjectSkillInstanceViewSet(ModelViewSet):
+    serializer_class = ExamSubjectSkillInstanceSerializer
+    http_method_names = ['get', 'put']
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = [
+        'exam_instance__exam__name',
+        'subject_skill__subject__name',
+        'subject_skill__skill__name',
+    ]
+    filterset_fields = [
+        'exam_instance',
+        'subject_skill',
+        'has_external_marks',
+        'has_internal_marks',
+        'has_subject_co_scholastic_grade',
+        'is_active',
+    ]
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        """
+        Filter ExamSubjectSkillInstance based on exam_instance_id for list views.
+        """
+        if self.action == 'list':
+            exam_instance_id = self.request.query_params.get('exam_instance_id')
+            if not exam_instance_id:
+                raise NotFound("Exam Instance ID is required for listing exam subject skill instances.")
+
+            return ExamSubjectSkillInstance.objects.filter(
+                exam_instance__exam_instance_id=exam_instance_id,
+                is_active=True
+            ).order_by('subject_skill__subject__name')
+
+        # For other actions (retrieve, create, update)
+        return ExamSubjectSkillInstance.objects.filter(is_active=True).order_by('subject_skill__subject__name')
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [CanViewExamSubjectSkillInstance]
+        elif self.action == 'create':
+            permission_classes = [CanAddExamSubjectSkillInstance]
+        elif self.action in ['update', 'partial_update']:
+            permission_classes = [CanChangeExamSubjectSkillInstance]
+        else:
+            permission_classes = [permissions.AllowAny]
+        return [permission() for permission in permission_classes]
 
 # # ==================== ExamAttendanceStatus ====================
 # class ExamAttendanceStatusViewSet(ModelViewSet):
