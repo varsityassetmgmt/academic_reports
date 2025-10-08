@@ -417,7 +417,7 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
 class BranchWiseExamResultStatusViewSet(ModelViewSet):
     queryset = BranchWiseExamResultStatus.objects.filter(is_active=True).order_by('updated_at')
     serializer_class = BranchWiseExamResultStatusSerializer
-    http_method_names = ['get',]
+    http_method_names = ['get', 'put',]
     filter_backends = [DjangoFilterBackend, SearchFilter]
 
     # Only allow search by display fields, not FK filters
