@@ -35,7 +35,7 @@ class ExamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Exam
         fields = '__all__'
-        read_only_fields = ('created_by', 'updated_by', 'is_active', 'is_visible', 'is_progress_card_visible')
+        read_only_fields = ('created_by', 'updated_by', 'is_active', 'is_visible', 'is_progress_card_visible', 'exam_status')
 
     def validate(self, data):
         start_date = data.get('start_date')
@@ -265,7 +265,9 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'number_of_sections_completed',
             'number_of_sections_pending',
             'progress_card_pending_sections',
+            'is_visible',
             'updated_at',
+            'finalized_at',
         ]
 
 class SectionWiseExamResultStatusSerializer(serializers.ModelSerializer):
