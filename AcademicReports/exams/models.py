@@ -32,7 +32,7 @@ class Subject(models.Model):
     
     
 class SubjectSkill(models.Model):
-    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name="skills")
+    subject = models.ForeignKey(Subject, on_delete=models.PROTECT, related_name="skills")
     name = models.CharField(max_length=255)  # Example: Fluency, Application, Basic Concepts
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
@@ -74,14 +74,23 @@ class ExamType(models.Model):
     def __str__(self):
         return self.name
 
+class ExamStatus(models.Model):
+
+    name = models.CharField(max_length=200, unique=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
 
 class Exam(models.Model):
     exam_id = models.BigAutoField(primary_key=True)
-    exam_type = models.ForeignKey(ExamType, on_delete=models.CASCADE, related_name='exams_exam_type')
-    academic_year = models.ForeignKey("branches.AcademicYear",null=True, blank=True,on_delete=models.CASCADE, related_name='exams_academic_year')
+    exam_type = models.ForeignKey(ExamType, on_delete=models.PROTECT, related_name='exams_exam_type')
+    academic_year = models.ForeignKey("branches.AcademicYear",null=True, blank=True, on_delete=models.PROTECT, related_name='exams_academic_year')
     name = models.CharField(max_length=250,null=False,blank=False)
     start_date = models.DateField()
     end_date = models.DateField()
+    
+    exam_status = models.ForeignKey(ExamStatus,null=True,blank=True, on_delete=models.PROTECT)
 
     states = models.ManyToManyField("branches.State",blank=True, related_name='exams_states')
     zones = models.ManyToManyField("branches.Zone",blank=True, related_name='exams_zones')
@@ -132,8 +141,8 @@ class Exam(models.Model):
 
 class ExamInstance(models.Model):
     exam_instance_id = models.BigAutoField(primary_key=True)
-    exam = models.ForeignKey(Exam,null=True,blank=True, on_delete=models.CASCADE, related_name='exam_instance_exam')
-    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='exam_instance_subject')    
+    exam = models.ForeignKey(Exam,null=True,blank=True, on_delete=models.PROTECT, related_name='exam_instance_exam')
+    subject = models.ForeignKey(Subject, on_delete=models.PROTECT, related_name='exam_instance_subject')    
 
     # Flags to indicate what kind of results this exam has
     has_external_marks = models.BooleanField(default=False)
@@ -189,8 +198,8 @@ class ExamInstance(models.Model):
 
 
 class ExamSubjectSkillInstance(models.Model):
-    exam_instance = models.ForeignKey(ExamInstance, on_delete=models.CASCADE, related_name='exam_subject_skills_instance_exam_instance')
-    subject_skill = models.ForeignKey(SubjectSkill, on_delete=models.CASCADE, related_name="exam_subject_skill_instance_subject_skill")
+    exam_instance = models.ForeignKey(ExamInstance, on_delete=models.PROTECT, related_name='exam_subject_skills_instance_exam_instance')
+    subject_skill = models.ForeignKey(SubjectSkill, on_delete=models.PROTECT, related_name="exam_subject_skill_instance_subject_skill")
 
     # Flags to indicate what kind of results this exam has
     has_external_marks = models.BooleanField(default=False)
@@ -241,8 +250,8 @@ class ExamAttendanceStatus(models.Model):
 
 class GradeBoundary(models.Model):
     grade_boundary_id = models.BigAutoField(primary_key=True)
-    exam_type = models.ForeignKey(ExamType, on_delete=models.CASCADE, related_name="grade_bound_exam_type")
-    orientation = models.ForeignKey("students.Orientation", on_delete=models.CASCADE, related_name="grade_bound_orientation")
+    exam_type = models.ForeignKey(ExamType, on_delete=models.PROTECT, related_name="grade_bound_exam_type")
+    orientation = models.ForeignKey("students.Orientation", on_delete=models.PROTECT, related_name="grade_bound_orientation")
     grade = models.CharField(max_length=10)  # e.g., 'A+', 'A', etc.
     min_percentage = models.DecimalField(max_digits=5, decimal_places=2)  # e.g., 84.50
     max_percentage = models.DecimalField(max_digits=5, decimal_places=2)  # e.g., 100.00
@@ -307,9 +316,9 @@ class CoScholasticGrade(models.Model):
 
 class ExamResult(models.Model):
     exam_result_id = models.BigAutoField(primary_key=True)
-    student = models.ForeignKey("students.Student", on_delete=models.CASCADE, related_name='exam_results_student')    
-    exam_instance = models.ForeignKey(ExamInstance, on_delete=models.CASCADE, related_name='exam_results_exam_instance')
-    exam_attendance = models.ForeignKey(ExamAttendanceStatus, on_delete=models.CASCADE, related_name='exam_results_attendance')
+    student = models.ForeignKey("students.Student", on_delete=models.PROTECT, related_name='exam_results_student')    
+    exam_instance = models.ForeignKey(ExamInstance, on_delete=models.PROTECT, related_name='exam_results_exam_instance')
+    exam_attendance = models.ForeignKey(ExamAttendanceStatus, on_delete=models.PROTECT, related_name='exam_results_attendance')
 
     # --- Academic Marks ---
     external_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True)  
@@ -385,8 +394,8 @@ class ExamResult(models.Model):
 
 class ExamSkillResult(models.Model):
     examp_skill_result_id = models.BigAutoField(primary_key=True)
-    exam_result = models.ForeignKey(ExamResult, on_delete=models.CASCADE, related_name="skill_results")
-    skill = models.ForeignKey(SubjectSkill, on_delete=models.CASCADE, related_name="skill_results")
+    exam_result = models.ForeignKey(ExamResult, on_delete=models.PROTECT, related_name="skill_results")
+    skill = models.ForeignKey(SubjectSkill, on_delete=models.PROTECT, related_name="skill_results")
     co_scholastic_grade = models.ForeignKey(CoScholasticGrade,on_delete=models.PROTECT,null=True,blank = True, related_name="exam_skill_results")
     # custom_value = models.CharField(max_length=100, blank=True, null=True)
 
@@ -414,8 +423,8 @@ class ExamSkillResult(models.Model):
     
 class StudentExamSummary(models.Model):
     students_exam_summary_id = models.BigAutoField(primary_key=True)
-    student = models.ForeignKey("students.Student", on_delete=models.CASCADE, related_name='exam_summary_student')
-    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='exam_summary_exam')
+    student = models.ForeignKey("students.Student", on_delete=models.PROTECT, related_name='exam_summary_student')
+    exam = models.ForeignKey(Exam, on_delete=models.PROTECT, related_name='exam_summary_exam')
     
     total_subjects_marks = models.DecimalField(max_digits=7,decimal_places=2,blank=True,null=True) 
     percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
@@ -483,7 +492,7 @@ class BranchWiseExamResultStatus(models.Model):
     exam = models.ForeignKey(Exam, on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
     status = models.ForeignKey(ExamResultStatus, on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
 
-    finalized_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="finalized_branch_exam_result_status")
+    finalized_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="finalized_branch_exam_result_status")
     finalized_at = models.DateTimeField(null=True, blank=True)
 
     is_progress_card_downloaded = models.BooleanField(default=False)
@@ -544,7 +553,7 @@ class SectionWiseExamResultStatus(models.Model):
     section = models.ForeignKey("students.Section",on_delete=models.PROTECT,related_name="section_exam_result_status")
     exam = models.ForeignKey(Exam,on_delete=models.PROTECT,related_name="section_exam_result_status")
     status = models.ForeignKey(ExamResultStatus,on_delete=models.PROTECT,related_name="section_exam_result_status")
-    finalized_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="finalized_section_exam_result_status")
+    finalized_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,null=True,blank=True,related_name="finalized_section_exam_result_status")
     finalized_at = models.DateTimeField(null=True, blank=True)
 
     # Marks completion

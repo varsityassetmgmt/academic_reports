@@ -24,5 +24,9 @@ router.register(r'subjectskill_dropdown_for_exam_instance', SubjectSkillDropdown
 
 urlpatterns = [
 
+         # Make exam visible (and create branch statuses if missing)
+        path('exam/<int:pk>/make-visible/',ExamMakeVisibleAPIView.as_view(),name='exam-make-visible'),
+        # Make exam invisible (and hide all related branch statuses)
+        path('exam/<int:pk>/make-invisible/',ExamMakeInvisibleAPIView.as_view(),name='exam-make-invisible'),
     
 ]+ router.urls

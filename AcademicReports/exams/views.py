@@ -410,3 +410,108 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
 #         else:
 #             permission_classes = [permissions.AllowAny]
 #         return [permission() for permission in permission_classes]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#====================================================================================================================================================================
+#=========================================================        EXAMS OPERATIONS        ===========================================================================
+#====================================================================================================================================================================
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+from django.db import transaction
+from .models import Exam, BranchWiseExamResultStatus
+from exams.models import ExamResultStatus
+from exams.utils.exam_visibility import *
+
+
+class ExamMakeVisibleAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def put(self, request, pk):
+        try:
+            exam = Exam.objects.get(exam_id = pk)
+        except Exam.DoesNotExist:
+            return Response({"detail": "Exam not found"}, status=404)
+
+        result = set_exam_visibility(exam, user=request.user, visible=True)
+        status_code = 200 if result["success"] else 400
+        return Response(result, status=status_code)
+
+
+
+class ExamMakeInvisibleAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, pk):
+        try:
+            exam = Exam.objects.get(exam_id = pk)
+        except Exam.DoesNotExist:
+            return Response({"detail": "Exam not found"}, status=404)
+
+        result = set_exam_visibility(exam, user=request.user, visible=False)
+        return Response(result, status=200)
