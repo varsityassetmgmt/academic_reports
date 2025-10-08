@@ -28,20 +28,7 @@ urlpatterns = [
     path('exam_instance/<int:exam_id>/', ExamInstanceViewSet.as_view({'get': 'list','post': 'create'}), name='examinstance-list'),
     path('exam_instance/<int:exam_id>/<int:pk>/', ExamInstanceViewSet.as_view({'get': 'retrieve','put': 'update'}), name='examinstance-retrive'),
 
-    # List all skill instances for an exam_instance
-    path(
-        'exam_subject_skill_instance/<int:exam_instance_id>/',
-        ExamSubjectSkillInstanceViewSet.as_view({'get': 'list'}),
-        name='exam_subject_skill_instance_list'
-    ),
-
-    # Retrieve or update a single skill instance
-    path(
-        'exam_subject_skill_instance/<int:exam_instance_id>/<int:pk>/',
-        ExamSubjectSkillInstanceViewSet.as_view({'get': 'retrieve', 'put': 'update'}),
-        name='exam_subject_skill_instance_retrieve'
-    ),
-
-
+    path('exam_subject_skill_instance/<int:exam_instance_id>/',ExamSubjectSkillInstanceViewSet.as_view({'get': 'list'}),name='exam_subject_skill_instance_list'),
+    path('exam_subject_skill_instance/<int:exam_instance_id>/<int:pk>/',ExamSubjectSkillInstanceViewSet.as_view({'get': 'retrieve', 'put': 'update'}),name='exam_subject_skill_instance_retrieve'),
     
 ]+ router.urls

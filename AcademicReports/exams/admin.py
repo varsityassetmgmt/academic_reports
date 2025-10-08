@@ -106,25 +106,143 @@ class StudentExamSummaryAdmin(admin.ModelAdmin):
     autocomplete_fields = ('student', 'exam')
 
 
-# # ===================== Exam Result Status =====================
-# @admin.register(ExamResultStatus)
-# class ExamResultStatusAdmin(admin.ModelAdmin):
-#     list_display = ('name', 'display_order')
+from django.contrib import admin
+from .models import ExamResultStatus, BranchWiseExamResultStatus, SectionWiseExamResultStatus
 
 
-# # ===================== Branch Wise Exam Result Status =====================
-# @admin.register(BranchWiseExamResultStatus)
-# class BranchWiseExamResultStatusAdmin(admin.ModelAdmin):
-#     list_display = ('academic_year', 'branch', 'exam', 'status', 'marks_completion_percentage', 'is_active')
-#     search_fields = ('branch__name', 'exam__name', 'academic_year__name')
-#     list_filter = ('is_active', 'is_visible')
-#     autocomplete_fields = ('academic_year', 'branch', 'exam', 'status', 'finalized_by')
+# ==================== ExamResultStatus ====================
+@admin.register(ExamResultStatus)
+class ExamResultStatusAdmin(admin.ModelAdmin):
+    list_display = ("name", "description", "display_order")
+    search_fields = ("name", "description")
+    ordering = ("display_order", "name")
 
 
-# # ===================== Section Wise Exam Result Status =====================
-# @admin.register(SectionWiseExamResultStatus)
-# class SectionWiseExamResultStatusAdmin(admin.ModelAdmin):
-#     list_display = ('academic_year', 'branch', 'section', 'exam', 'status', 'marks_completion_percentage', 'is_active')
-#     search_fields = ('branch__name', 'section__name', 'exam__name', 'academic_year__name')
-#     list_filter = ('is_active', 'is_visible')
-#     autocomplete_fields = ('academic_year', 'branch', 'section', 'exam', 'status', 'finalized_by')
+# ==================== BranchWiseExamResultStatus ====================
+@admin.register(BranchWiseExamResultStatus)
+class BranchWiseExamResultStatusAdmin(admin.ModelAdmin):
+    list_display = (
+        "academic_year",
+        "branch",
+        "exam",
+        "status",
+        "marks_completion_percentage",
+        "is_progress_card_downloaded",
+        "is_visible",
+        "is_active",
+        "finalized_by",
+        "finalized_at",
+    )
+    list_filter = (
+        "academic_year",
+        "branch",
+        "exam",
+        "status",
+        "is_visible",
+        "is_active",
+    )
+    search_fields = (
+        "exam__name",
+        "branch__name",
+        "academic_year__name",
+        "status__name",
+    )
+    ordering = ("academic_year", "branch", "exam")
+
+    # ✅ Optimize foreign key lookups
+    autocomplete_fields = (
+        "academic_year",
+        "branch",
+        "exam",
+        "status",
+        "finalized_by",
+    )
+
+    readonly_fields = ("updated_at",)
+    fieldsets = (
+        ("Basic Information", {
+            "fields": ("academic_year", "branch", "exam", "status"),
+        }),
+        ("Progress & Completion", {
+            "fields": (
+                "marks_completion_percentage",
+                "marks_entry_expiry_datetime",
+                "is_progress_card_downloaded",
+                "total_sections",
+                "number_of_sections_completed",
+                "number_of_sections_pending",
+                "progress_card_pending_sections",
+            ),
+        }),
+        ("Finalization", {
+            "fields": ("finalized_by", "finalized_at"),
+        }),
+        ("Visibility & Status", {
+            "fields": ("is_visible", "is_active", "updated_at"),
+        }),
+    )
+
+
+# ==================== SectionWiseExamResultStatus ====================
+@admin.register(SectionWiseExamResultStatus)
+class SectionWiseExamResultStatusAdmin(admin.ModelAdmin):
+    list_display = (
+        "academic_year",
+        "branch",
+        "section",
+        "exam",
+        "status",
+        "marks_completion_percentage",
+        "is_progress_card_downloaded",
+        "is_visible",
+        "is_active",
+        "finalized_by",
+        "finalized_at",
+    )
+    list_filter = (
+        "academic_year",
+        "branch",
+        "section",
+        "exam",
+        "status",
+        "is_visible",
+        "is_active",
+    )
+    search_fields = (
+        "exam__name",
+        "section__name",
+        "branch__name",
+        "academic_year__name",
+        "status__name",
+    )
+    ordering = ("academic_year", "branch", "section", "exam")
+
+    # ✅ Optimize foreign key lookups
+    autocomplete_fields = (
+        "academic_year",
+        "branch",
+        "section",
+        "exam",
+        "status",
+        "finalized_by",
+    )
+
+    readonly_fields = ("updated_at",)
+    fieldsets = (
+        ("Basic Information", {
+            "fields": ("academic_year", "branch", "section", "exam", "status"),
+        }),
+        ("Progress & Completion", {
+            "fields": (
+                "marks_completion_percentage",
+                "marks_entry_expiry_datetime",
+                "is_progress_card_downloaded",
+            ),
+        }),
+        ("Finalization", {
+            "fields": ("finalized_by", "finalized_at"),
+        }),
+        ("Visibility & Status", {
+            "fields": ("is_visible", "is_active", "updated_at"),
+        }),
+    )

@@ -35,7 +35,7 @@ class ExamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Exam
         fields = '__all__'
-        read_only_fields = ('created_by', 'updated_by', 'is_active')
+        read_only_fields = ('created_by', 'updated_by', 'is_active', 'is_visible', 'is_progress_card_visible')
 
     def validate(self, data):
         start_date = data.get('start_date')
@@ -224,6 +224,7 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
     exam_name = serializers.CharField(source='exam.name', read_only=True)
     status_name = serializers.CharField(source='status.name', read_only=True)
     finalized_by_username = serializers.CharField(source='finalized_by.username', read_only=True)
+    marks_entry_expiry_datetime_display = serializers.DateTimeField(source='marks_entry_expiry_datetime', format="%Y-%m-%d %H:%M:%S", read_only = True )
 
     class Meta:
         model = BranchWiseExamResultStatus
@@ -243,11 +244,32 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'is_progress_card_downloaded',
             'marks_completion_percentage',
             'marks_entry_expiry_datetime',
+            'marks_entry_expiry_datetime_display',
             'total_sections',
             'number_of_sections_completed',
             'number_of_sections_pending',
             'progress_card_pending_sections',
             'is_visible',
-            'updated_at'
+            'updated_at',
         ]
-        read_only_fields = ['updated_at', 'academic_year_name', 'branch_name', 'exam_name', 'status_name', 'finalized_by_username']
+        read_only_fields = [
+            'id',
+            'academic_year',
+            'academic_year_name',
+            'branch',
+            'branch_name',
+            'exam',
+            'exam_name',
+            'status',
+            'status_name',
+            'finalized_by',
+            'finalized_by_username',
+            'finalized_at',
+            'is_progress_card_downloaded',
+            'marks_completion_percentage',
+            'total_sections',
+            'number_of_sections_completed',
+            'number_of_sections_pending',
+            'progress_card_pending_sections',
+            'updated_at',
+        ]
