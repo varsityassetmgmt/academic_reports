@@ -36,6 +36,8 @@ urlpatterns = [
 
     path('exam_subject_skill_instance/<int:exam_instance_id>/',ExamSubjectSkillInstanceViewSet.as_view({'get': 'list'}),name='exam_subject_skill_instance_list'),
     path('exam_subject_skill_instance/<int:exam_instance_id>/<int:pk>/',ExamSubjectSkillInstanceViewSet.as_view({'get': 'retrieve', 'put': 'update'}),name='exam_subject_skill_instance_retrieve'),
+
+    path('section_wise_exam_result_status/<int:branch_id>/<int:exam_id>/', SectionWiseExamResultStatusViewSet.as_view({'get': 'list'}),name='section_wise_exam_result_status')
  
     
 ]+ router.urls

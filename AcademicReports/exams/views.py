@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
+from usermgmt.models import UserProfile
 from .serializers import *
 from . models import *
 from django_filters.rest_framework import DjangoFilterBackend
@@ -415,19 +416,45 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
 
 
 class BranchWiseExamResultStatusViewSet(ModelViewSet):
-    queryset = BranchWiseExamResultStatus.objects.filter(is_active=True).order_by('updated_at')
     serializer_class = BranchWiseExamResultStatusSerializer
-    http_method_names = ['get', 'put',]
+    http_method_names = ['get', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-
-    # Only allow search by display fields, not FK filters
+    pagination_class = CustomPagination
     search_fields = [
         'academic_year__name',
         'branch__name',
         'exam__name',
         'status__name'
     ]
-    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # ✅ Efficient branching logic
+        if user.groups.filter(id=1).exists():  # Super admin or system user
+            branches = Branch.objects.filter(is_active=True)
+        else:
+            branches = (
+                UserProfile.objects.filter(user=user)
+                .values_list('branches', flat=True)
+                .distinct()
+            )
+
+        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+        if not current_academic_year:
+            raise NotFound("Current academic year not found.")
+
+        # ✅ Avoid returning inactive or invalid records
+        queryset = (
+            BranchWiseExamResultStatus.objects.filter(
+                is_active=True,
+                branch__in=branches,
+                academic_year=current_academic_year,
+            )
+            .select_related('academic_year', 'branch', 'exam', 'status')  # optimization
+            .order_by('-updated_at')
+        )
+        return queryset
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -436,6 +463,70 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
             permission_classes = [CanAddBranchWiseExamResultStatus]
         elif self.action in ['update', 'partial_update']:
             permission_classes = [CanChangeBranchWiseExamResultStatus]
+        else:
+            permission_classes = [permissions.AllowAny]
+        return [permission() for permission in permission_classes]
+
+class SectionWiseExamResultStatusViewSet(ModelViewSet):
+    """
+    Handles viewing and updating Section-wise Exam Result Status entries.
+    """
+    serializer_class = SectionWiseExamResultStatusSerializer
+    http_method_names = ['get']
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    pagination_class = CustomPagination
+
+    search_fields = [
+        'academic_year__name',
+        'branch__name',
+        'section__name',
+        'exam__name',
+        'status__name',
+    ]
+
+    def get_queryset(self):
+        """
+        Filters queryset by branch_id and exam_id passed in the URL.
+        """
+        branch_id = self.kwargs.get('branch_id')
+        exam_id = self.kwargs.get('exam_id')
+
+        if not branch_id:
+            raise ValidationError({'branch_id': "This field is required in the URL."})
+        if not exam_id:
+            raise ValidationError({'exam_id': "This field is required in the URL."})
+        
+        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+        if not current_academic_year:
+            raise NotFound("Current academic year not found.")
+        
+        queryset = (
+            SectionWiseExamResultStatus.objects.filter(
+                is_active=True,
+                branch__branch_id=branch_id,
+                exam__exam_id=exam_id,
+                academic_year=current_academic_year,
+            )
+            .select_related(
+                'academic_year',
+                'branch',
+                'section',
+                'exam',
+                'status',
+            )
+            .order_by('-updated_at')  # show most recent first
+        )
+
+        return queryset
+
+    def get_permissions(self):
+        """
+        Assigns permission classes based on the current action.
+        """
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [CanViewSectionWiseExamResultStatus]
+        elif self.action in ['update', 'partial_update']:
+            permission_classes = [CanChangeSectionWiseExamResultStatus]
         else:
             permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
