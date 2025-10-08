@@ -277,6 +277,7 @@ class SectionWiseExamResultStatusSerializer(serializers.ModelSerializer):
     status_name = serializers.CharField(source='status.name', read_only=True)
     finalized_by_username = serializers.CharField(source='finalized_by.username', read_only=True)
     finalized_at_display = serializers.DateTimeField(source='finalized_at', format="%Y-%m-%d %H:%M:%S", read_only = True )
+    marks_entry_expiry_datetime_display = serializers.DateTimeField(source='marks_entry_expiry_datetime', format="%Y-%m-%d %H:%M:%S", read_only = True )
 
     class Meta:
         model = SectionWiseExamResultStatus
@@ -296,6 +297,7 @@ class SectionWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'finalized_by_username',
             'marks_completion_percentage',
             'marks_entry_expiry_datetime',
+            'marks_entry_expiry_datetime_display',
             'is_progress_card_downloaded',
             'is_visible',
             'updated_at',
