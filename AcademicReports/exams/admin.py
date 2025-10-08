@@ -105,11 +105,6 @@ class StudentExamSummaryAdmin(admin.ModelAdmin):
     list_filter = ('is_active',)
     autocomplete_fields = ('student', 'exam')
 
-
-from django.contrib import admin
-from .models import ExamResultStatus, BranchWiseExamResultStatus, SectionWiseExamResultStatus
-
-
 # ==================== ExamResultStatus ====================
 @admin.register(ExamResultStatus)
 class ExamResultStatusAdmin(admin.ModelAdmin):

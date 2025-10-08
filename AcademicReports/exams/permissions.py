@@ -204,3 +204,20 @@ class CanChangeBranchWiseExamResultStatus(BasePermission):
 class CanDeleteBranchWiseExamResultStatus(BasePermission):
     def has_permission(self, request, view):
         return request.user.has_perm('exams.delete_branchwiseexamresultstatus')
+
+# ==================== SectionWiseExamResultStatus Permissions =====================
+class CanViewSectionWiseExamResultStatus(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.view_sectionwiseexamresultstatus')
+
+class CanAddSectionWiseExamResultStatus(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.add_sectionwiseexamresultstatus')
+
+class CanChangeSectionWiseExamResultStatus(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.change_sectionwiseexamresultstatus')
+
+class CanDeleteSectionWiseExamResultStatus(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.delete_sectionwiseexamresultstatus')

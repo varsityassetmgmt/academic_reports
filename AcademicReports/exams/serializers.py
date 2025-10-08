@@ -225,6 +225,7 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
     status_name = serializers.CharField(source='status.name', read_only=True)
     finalized_by_username = serializers.CharField(source='finalized_by.username', read_only=True)
     marks_entry_expiry_datetime_display = serializers.DateTimeField(source='marks_entry_expiry_datetime', format="%Y-%m-%d %H:%M:%S", read_only = True )
+    finalized_at_display = serializers.DateTimeField(source='finalized_at', format="%Y-%m-%d %H:%M:%S", read_only = True )
 
     class Meta:
         model = BranchWiseExamResultStatus
@@ -238,9 +239,9 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'exam_name',
             'status',
             'status_name',
-            'finalized_by',
-            'finalized_by_username',
             'finalized_at',
+            'finalized_at_display',
+            'finalized_by_username',
             'is_progress_card_downloaded',
             'marks_completion_percentage',
             'marks_entry_expiry_datetime',
@@ -255,16 +256,9 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id',
             'academic_year',
-            'academic_year_name',
             'branch',
-            'branch_name',
             'exam',
-            'exam_name',
             'status',
-            'status_name',
-            'finalized_by',
-            'finalized_by_username',
-            'finalized_at',
             'is_progress_card_downloaded',
             'marks_completion_percentage',
             'total_sections',
@@ -273,3 +267,37 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'progress_card_pending_sections',
             'updated_at',
         ]
+
+class SectionWiseExamResultStatusSerializer(serializers.ModelSerializer):
+    # Readable names for related fields
+    academic_year_name = serializers.CharField(source='academic_year.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
+    section_name = serializers.CharField(source='section.name', read_only=True)
+    exam_name = serializers.CharField(source='exam.name', read_only=True)
+    status_name = serializers.CharField(source='status.name', read_only=True)
+    finalized_by_username = serializers.CharField(source='finalized_by.username', read_only=True)
+    finalized_at_display = serializers.DateTimeField(source='finalized_at', format="%Y-%m-%d %H:%M:%S", read_only = True )
+
+    class Meta:
+        model = SectionWiseExamResultStatus
+        fields = [
+            'id',
+            'academic_year',
+            'academic_year_name',
+            'branch',
+            'branch_name',
+            'section',
+            'section_name',
+            'exam',
+            'exam_name',
+            'status_name',
+            'finalized_at',
+            'finalized_at_display',
+            'finalized_by_username',
+            'marks_completion_percentage',
+            'marks_entry_expiry_datetime',
+            'is_progress_card_downloaded',
+            'is_visible',
+            'updated_at',
+        ]
+        read_only_fields = fields
