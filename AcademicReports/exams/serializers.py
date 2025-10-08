@@ -230,17 +230,11 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
         model = BranchWiseExamResultStatus
         fields = [
             'id',
-            'academic_year',
             'academic_year_name',
-            'branch',
             'branch_name',
-            'exam',
             'exam_name',
-            'status',
             'status_name',
-            'finalized_by',
             'finalized_by_username',
-            'finalized_at',
             'is_progress_card_downloaded',
             'marks_completion_percentage',
             'marks_entry_expiry_datetime',
@@ -254,17 +248,6 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id',
-            'academic_year',
-            'academic_year_name',
-            'branch',
-            'branch_name',
-            'exam',
-            'exam_name',
-            'status',
-            'status_name',
-            'finalized_by',
-            'finalized_by_username',
-            'finalized_at',
             'is_progress_card_downloaded',
             'marks_completion_percentage',
             'total_sections',
@@ -273,3 +256,78 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'progress_card_pending_sections',
             'updated_at',
         ]
+
+class SectionWiseExamResultStatusSerializer(serializers.ModelSerializer):
+    # Readable names for related fields
+    academic_year_name = serializers.CharField(source='academic_year.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
+    section_name = serializers.CharField(source='section.name', read_only=True)
+    exam_name = serializers.CharField(source='exam.name', read_only=True)
+    status_name = serializers.CharField(source='status.name', read_only=True)
+    finalized_by_username = serializers.CharField(source='finalized_by.username', read_only=True)
+
+    class Meta:
+        model = SectionWiseExamResultStatus
+        fields = [
+            'id',
+            'academic_year_name',
+            'branch_name',
+            'section',
+            'section_name',
+            'exam',
+            'exam_name',
+            'status_name',
+            'finalized_at'
+            'finalized_by_username',
+            'marks_completion_percentage',
+            'marks_entry_expiry_datetime',
+            'is_progress_card_downloaded',
+            'is_visible',
+            'remarks',
+            'is_active',
+            'created_by',
+            'updated_by',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
+    # ✅ Custom validation
+    def validate(self, data):
+        academic_year = data.get('academic_year')
+        branch = data.get('branch')
+        section = data.get('section')
+        exam = data.get('exam')
+
+        # Auto-set academic year if missing
+        if not academic_year:
+            current_year = AcademicYear.objects.filter(
+                is_current_academic_year=True, is_active=True
+            ).first()
+            if current_year:
+                data['academic_year'] = current_year
+            else:
+                raise serializers.ValidationError("Current academic year not found or inactive.")
+
+        # Check integrity between branch and section
+        if section and branch and hasattr(section, 'branch') and section.branch != branch:
+            raise serializers.ValidationError({
+                "section": "Selected section does not belong to the given branch."
+            })
+
+        # Prevent duplicate entries (unique combo)
+        existing = SectionWiseExamResultStatus.objects.filter(
+            academic_year=data['academic_year'],
+            branch=branch,
+            section=section,
+            exam=exam,
+        )
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
+
+        if existing.exists():
+            raise serializers.ValidationError(
+                "A record with the same Academic Year, Branch, Section, and Exam already exists."
+            )
+
+        return data
