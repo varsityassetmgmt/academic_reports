@@ -25,10 +25,17 @@ router.register(r'subjectskill_dropdown_for_exam_instance', SubjectSkillDropdown
 
 urlpatterns = [
 
+ 
+         # Make exam visible (and create branch statuses if missing)
+        path('exam/<int:pk>/make-visible/',ExamMakeVisibleAPIView.as_view(),name='exam-make-visible'),
+        # Make exam invisible (and hide all related branch statuses)
+        path('exam/<int:pk>/make-invisible/',ExamMakeInvisibleAPIView.as_view(),name='exam-make-invisible'),
+ 
     path('exam_instance/<int:exam_id>/', ExamInstanceViewSet.as_view({'get': 'list','post': 'create'}), name='examinstance-list'),
     path('exam_instance/<int:exam_id>/<int:pk>/', ExamInstanceViewSet.as_view({'get': 'retrieve','put': 'update'}), name='examinstance-retrive'),
 
     path('exam_subject_skill_instance/<int:exam_instance_id>/',ExamSubjectSkillInstanceViewSet.as_view({'get': 'list'}),name='exam_subject_skill_instance_list'),
     path('exam_subject_skill_instance/<int:exam_instance_id>/<int:pk>/',ExamSubjectSkillInstanceViewSet.as_view({'get': 'retrieve', 'put': 'update'}),name='exam_subject_skill_instance_retrieve'),
+ 
     
 ]+ router.urls
