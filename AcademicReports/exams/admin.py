@@ -29,9 +29,9 @@ class ExamTypeAdmin(admin.ModelAdmin):
 # ===================== Exam =====================
 @admin.register(Exam)
 class ExamAdmin(admin.ModelAdmin):
-    list_display = ('name', 'exam_type', 'is_active', 'is_visible', 'is_progress_card_visible')
-    search_fields = ('name', 'exam_type__name')
-    list_filter = ('is_active', 'is_visible', 'is_progress_card_visible')
+    list_display = ('name', 'exam_type', 'is_active','exam_status', 'is_visible', 'is_progress_card_visible')
+    search_fields = ('name', 'exam_type__name', 'exam_status__name')
+    list_filter = ('is_active','exam_status', 'is_visible', 'is_progress_card_visible')
     filter_horizontal = ('states', 'zones', 'branches', 'orientations', 'academic_devisions', 'student_classes')
     autocomplete_fields = ('exam_type',)
 

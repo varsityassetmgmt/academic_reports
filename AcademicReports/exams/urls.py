@@ -19,11 +19,13 @@ router.register(r'exam', ExamViewSet, basename='exam')
 # router.register(r'exam_subject_skill_instance', ExamSubjectSkillInstanceViewSet, basename='exam_subject_skill_instance')
 router.register(r'branch_wise_exam_result_status', BranchWiseExamResultStatusViewSet, basename='branch_wise_exam_result_status')
 
-router.register(r'subject_dropdown_for_exam_instance', SubjectDropdownForExamInstanceViewSet, basename='subject_dropdown_for_exam_instance')
+# router.register(r'subject_dropdown_for_exam_instance', SubjectDropdownForExamInstanceViewSet, basename='subject_dropdown_for_exam_instance')
 router.register(r'subjectskill_dropdown_for_exam_instance', SubjectSkillDropdownForExamInstanceViewSet, basename='subjectskill_dropdown_for_exam_instance')
 
 
 urlpatterns = [
+
+    path('subject_dropdown_for_exam_instance/<int:exam_id>/', SubjectDropdownForExamInstanceViewSet.as_view({'get':'list'}), name='subject_dropdown_for_exam_instance'),
 
  
          # Make exam visible (and create branch statuses if missing)
