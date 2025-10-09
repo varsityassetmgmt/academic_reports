@@ -35,7 +35,7 @@ urlpatterns = [
         path("publish_the_exam/", PublishExamAPIView.as_view(), name="publish-exam"),
 
         path('section_wise_exam_result_status/<int:branch_id>/<int:exam_id>/', SectionWiseExamResultStatusViewSet.as_view({'get': 'list'}),name='section_wise_exam_result_status'),
-        path('update_section_wise_exam_result_status_view/<int:branch_id>/<int:exam_id>/', update_section_wise_exam_result_status_view, name='update_section_wise_exam_result_status_view'),
+        path('update_section_wise_exam_result_status_view/', update_section_wise_exam_result_status_view, name='update_section_wise_exam_result_status_view'),
 
         path('exam_instance/<int:exam_id>/', ExamInstanceViewSet.as_view({'get': 'list','post': 'create'}), name='examinstance-list'),
         path('exam_instance/<int:exam_id>/<int:pk>/', ExamInstanceViewSet.as_view({'get': 'retrieve','put': 'update'}), name='examinstance-retrive'),

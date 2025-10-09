@@ -32,7 +32,7 @@ class SubjectDropdownViewSet(ModelViewSet):
 #     def get_queryset(self):
 #         exam_id = self.kwargs.get('exam_id')
 #         if not exam_id:
-#             raise ValidationError({'exam_id': "This field is required in the URL."})
+#             return Response({'exam_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
         
 #         classes = Exam.objects.filter(exam_id=exam_id).values_list('student_classes', flat=True)
 #         subjects =Subject.objects.filter(class_names__in=classes).distinct()
@@ -51,12 +51,12 @@ class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
     def get_queryset(self):
         exam_id = self.kwargs.get('exam_id')
         if not exam_id:
-            raise ValidationError({'exam_id': "This field is required in the URL."})
+            return Response({'exam_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
 
         # ✅ Get the exam safely (avoids DoesNotExist errors)
         exam = Exam.objects.filter(exam_id=exam_id, is_active=True).prefetch_related('student_classes').first()
         if not exam:
-            raise ValidationError({'exam_id': f"Exam with ID {exam_id} not found or inactive."})
+            return Response({'exam_id': f"Exam with ID {exam_id} not found or inactive."}, status=status.HTTP_400_BAD_REQUEST)
 
         # ✅ Fetch all subjects linked to the exam's classes
         subjects = (
@@ -273,7 +273,7 @@ class ExamInstanceViewSet(ModelViewSet):
         """
         exam_id = self.kwargs.get('exam_id')
         if not exam_id:
-            raise ValidationError({"exam_id": "This field is required in the URL."})
+            return Response({"exam_id": "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
         return exam_id
 
     def get_queryset(self):
@@ -369,7 +369,7 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
         """
         exam_instance_id = self.kwargs.get('exam_instance_id')
         if not exam_instance_id:
-            raise ValidationError({"exam_instance_id": "This field is required in the URL."})
+            return Response({"exam_instance_id": "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
         return exam_instance_id
 
     def get_queryset(self):
@@ -537,9 +537,9 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         exam_id = self.kwargs.get('exam_id')
 
         if not branch_id:
-            raise ValidationError({'branch_id': "This field is required in the URL."})
+            return Response({'branch_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
         if not exam_id:
-            raise ValidationError({'exam_id': "This field is required in the URL."})
+            return Response({'exam_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
         
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
@@ -578,46 +578,35 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def update_section_wise_exam_result_status_view(request, branch_id, exam_id):
+def update_section_wise_exam_result_status_view(request):
     """
     Syncs section-wise exam result status from branch-wise exam result status
-    for a given branch and exam. 
+    for a given branch and exam.
     - Updates existing records.
     - Creates missing SectionWiseExamResultStatus records if not found.
     """
-    if not branch_id:
-        raise ValidationError({'branch_id': "This field is required in the URL."})
-    if not exam_id:
-        raise ValidationError({'exam_id': "This field is required in the URL."})
-
-    # ✅ Get current academic year
-    current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
-    if not current_academic_year:
-        raise NotFound("Current academic year not found.")
+    branch_wise_exam_result_status_id = request.query_params.get('branch_wise_exam_result_status_id')
+    if not branch_wise_exam_result_status_id:
+        return Response({'branch_wise_exam_result_status_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
 
     # ✅ Get branch-wise record
-    branch_status = BranchWiseExamResultStatus.objects.select_related('branch', 'exam').filter(
-        branch__branch_id=branch_id,
-        exam__exam_id=exam_id,
-        is_active=True,
-        academic_year=current_academic_year
+    branch_status = BranchWiseExamResultStatus.objects.select_related('branch', 'exam', 'academic_year').filter(
+        id=branch_wise_exam_result_status_id,
+        is_active=True
     ).first()
     if not branch_status:
-        raise ValidationError({'Branch': "No record found for this branch & exam in the current academic year."})
-
-    # ✅ Get exam
-    try:
-        exam = Exam.objects.get(exam_id=exam_id, academic_year=current_academic_year, is_active=True)
-    except Exam.DoesNotExist:
-        raise ValidationError({'exam_id': "Invalid Exam ID."})
+        return Response({'branch_wise_exam_result_status_id': "Invalid Branch Wise Exam Result Status ID."}, status=status.HTTP_400_BAD_REQUEST)
+    if not branch_status.academic_year:
+        return Response({'academic_year': "Academic year is missing for this record."}, status=status.HTTP_400_BAD_REQUEST)
 
     # ✅ Get all matching sections
     sections = Section.objects.filter(
-        academic_year=current_academic_year,
-        branch__branch_id=branch_id,
-        class_name__class_name_id__in=exam.student_classes.values_list('class_name_id', flat=True),
-        orientation__orientation_id__in=exam.orientations.values_list('orientation_id', flat=True),
-        is_active=True
+        academic_year=branch_status.academic_year,
+        branch=branch_status.branch,
+        class_name__class_name_id__in=branch_status.exam.student_classes.values_list('class_name_id', flat=True),
+        orientation__orientation_id__in=branch_status.exam.orientations.values_list('orientation_id', flat=True),
+        is_active=True,
+        has_students=True,
     ).distinct()
 
     if not sections.exists():
@@ -629,47 +618,53 @@ def update_section_wise_exam_result_status_view(request, branch_id, exam_id):
     # ✅ Bulk update existing records
     existing_records = SectionWiseExamResultStatus.objects.filter(
         section__in=sections,
-        branch__branch_id=branch_id,
-        exam__exam_id=exam_id,
+        branch=branch_status.branch,
+        exam=branch_status.exam,
         is_active=True,
-        academic_year=current_academic_year
+        academic_year=branch_status.academic_year
     )
 
     updated_count = existing_records.update(
+        is_progress_card_downloaded=branch_status.is_progress_card_downloaded,
         marks_entry_expiry_datetime=branch_status.marks_entry_expiry_datetime,
         is_visible=branch_status.is_visible,
         updated_at=timezone.now()
     )
 
-    # ✅ Identify sections missing records
+    # ✅ Identify and create missing records
     existing_section_ids = existing_records.values_list('section__section_id', flat=True)
     missing_sections = sections.exclude(section_id__in=existing_section_ids)
 
     created_count = 0
     if missing_sections.exists():
-        new_objects = []
-        for section in missing_sections:
-            new_objects.append(SectionWiseExamResultStatus(
-                academic_year=current_academic_year,
+        new_objects = [
+            SectionWiseExamResultStatus(
+                academic_year=branch_status.academic_year,
                 branch=branch_status.branch,
                 section=section,
                 exam=branch_status.exam,
                 marks_entry_expiry_datetime=branch_status.marks_entry_expiry_datetime,
                 is_visible=branch_status.is_visible,
+                is_progress_card_downloaded=branch_status.is_progress_card_downloaded,
                 is_active=True,
-            ))
+            )
+            for section in missing_sections
+        ]
         SectionWiseExamResultStatus.objects.bulk_create(new_objects)
         created_count = len(new_objects)
 
+    # ✅ Response
+    if updated_count == 0 and created_count == 0:
+        msg = "All section-wise exam result statuses are already up to date."
+    else:
+        msg = f"{updated_count} section-wise records updated, {created_count} created successfully."
+
     return Response({
         "success": True,
-        "message": (
-            f"{updated_count} section-wise exam result records updated, "
-            f"{created_count} new records created successfully."
-        ),
+        "message": msg,
         "branch": branch_status.branch.name,
         "exam": branch_status.exam.name,
-        "academic_year": current_academic_year.name
+        "academic_year": branch_status.academic_year.name
     }, status=status.HTTP_200_OK)
             
 
