@@ -127,8 +127,9 @@ class SubjectViewSet(ModelViewSet):
     serializer_class = SubjectSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name', 'display_name']
-    filterset_fields = ['academic_devisions', 'class_names', ]
+    search_fields = ['name', 'display_name', 'description']  # text fields to search
+    filterset_fields = ['academic_devisions', 'class_names', 'is_active']  # FK/many2many and boolean
+    ordering_fields = ['name', 'display_name', 'created_at', 'updated_at']  # fields users can order by
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
@@ -156,8 +157,9 @@ class SubjectSkillViewSet(ModelViewSet):
     serializer_class = SubjectSkillSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name', 'subject__name']
-    filterset_fields = ['subject']
+    search_fields = ['name', 'subject__name']  # searchable text fields
+    filterset_fields = ['subject', 'is_active']  # FK and boolean fields
+    ordering_fields = ['name', 'subject__name', 'created_at', 'updated_at']  # sortable fields
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
@@ -185,7 +187,9 @@ class ExamTypeViewSet(ModelViewSet):
     serializer_class = ExamTypeSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name', 'description']
+    search_fields = ['name', 'description']       # text search
+    filterset_fields = ['is_active']             # boolean filter
+    ordering_fields = ['name', 'created_at', 'updated_at']  # sortable fields
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
@@ -212,9 +216,29 @@ class ExamViewSet(ModelViewSet):
     serializer_class = ExamSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name', 'exam_type__name', 'academic_year__name']
-    filterset_fields = ['exam_type', 'is_visible']
-    ordering = ['-start_date', 'is_visible']
+    search_fields = [
+        'name', 
+        'exam_type__name', 
+        'academic_year__name'
+    ]  # text search on exam name, exam type, and academic year
+
+    filterset_fields = [
+        'exam_type', 
+        'is_visible', 
+        'is_active', 
+        'academic_year'
+    ]  # FK, boolean, and academic year filter
+
+    ordering_fields = [
+        'exam_type__name', 
+        'start_date', 
+        'end_date', 
+        'name', 
+        'is_visible', 
+        'created_at', 
+        'updated_at'
+    ]  # sortable fields
+
     pagination_class = CustomPagination
 
     def get_queryset(self):
@@ -225,7 +249,7 @@ class ExamViewSet(ModelViewSet):
         exams = Exam.objects.filter(
             academic_year=current_academic_year,
             is_active=True
-        ).order_by('-start_date')
+        ).order_by('-id' , 'is_visible')
         return exams
 
     def perform_create(self, serializer):
@@ -262,7 +286,31 @@ class ExamInstanceViewSet(ModelViewSet):
     serializer_class = ExamInstanceSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['subject__name']
+    search_fields = [
+        'subject__name',
+        'exam__name',
+        'exam__exam_type__name'
+    ]  # search by subject name, exam name, and exam type
+
+    filterset_fields = [
+        'exam',
+        'subject',
+        'is_active',
+        'has_external_marks',
+        'has_internal_marks',
+        'has_subject_skills',
+        'has_subject_co_scholastic_grade'
+    ]  # FK and boolean filters
+
+    ordering_fields = [
+        'date',
+        'exam_start_time',
+        'exam_end_time',
+        'subject__name',
+        'exam__name',
+        'exam__start_date'
+    ]  # sortable by date, time, and related fields
+    
     pagination_class = CustomPagination
     lookup_field = 'pk'  # for retrieve/update
     lookup_url_kwarg = 'pk'
@@ -355,10 +403,28 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
     http_method_names = ['get', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = [
-        'exam_instance__exam__name',
-        'subject_skill__subject__name',
-        'subject_skill__skill__name',
+        'exam_instance__exam__name',       # search by exam name
+        'exam_instance__subject__name',    # search by exam instance's subject name
+        'subject_skill__name',             # search by skill name
+        'subject_skill__subject__name',    # search by skill's subject name
     ]
+
+    filterset_fields = [
+        'exam_instance',                   # filter by exam instance
+        'subject_skill',                   # filter by skill
+        'has_external_marks',
+        'has_internal_marks',
+        'has_subject_co_scholastic_grade',
+        'is_active',
+    ]
+
+    ordering_fields = [
+        'subject_skill__name',
+        'subject_skill__subject__name',
+        'exam_instance__date',
+        'exam_instance__exam__name',
+    ]
+
     pagination_class = CustomPagination
     lookup_field = 'pk'  # for retrieve/update
     lookup_url_kwarg = 'pk'
@@ -472,6 +538,25 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'status__name'
     ]
 
+    filterset_fields = [
+        'academic_year',
+        'branch',
+        'exam',
+        'status',
+        'is_visible',
+        'is_active',
+    ]
+
+    ordering_fields = [
+        'academic_year__name',
+        'branch__name',
+        'exam__name',
+        'status__name',
+        'marks_entry_expiry_datetime',
+        'marks_completion_percentage',
+        'updated_at',
+    ]
+
     def get_queryset(self):
         user = self.request.user
 
@@ -525,9 +610,37 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         'academic_year__name',
         'branch__name',
         'section__name',
+        'section__class_name__name',     
+        'section__orientation__name',     
         'exam__name',
         'status__name',
     ]
+
+    filterset_fields = [
+        'academic_year',
+        'branch',
+        'section',
+        'section__class_name',         
+        'section__orientation',           
+        'exam',
+        'status',
+        'is_visible',
+        'is_active',
+    ]
+
+    ordering_fields = [
+        'academic_year__name',
+        'branch__name',
+        'section__name',
+        'section__class_name__name',     
+        'section__orientation__name',     
+        'exam__name',
+        'status__name',
+        'marks_entry_expiry_datetime',
+        'marks_completion_percentage',
+        'updated_at',
+    ]
+
 
     def get_queryset(self):
         """
