@@ -35,7 +35,7 @@ class ExamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Exam
         fields = '__all__'
-        read_only_fields = ('created_by', 'updated_by', 'is_active', 'is_visible', 'is_progress_card_visible', 'exam_status')
+        read_only_fields = ('created_by', 'updated_by', 'is_active', 'is_editable' ,'is_visible', 'is_progress_card_visible', 'exam_status')
 
     def validate(self, data):
         start_date = data.get('start_date')
