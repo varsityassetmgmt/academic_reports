@@ -605,7 +605,8 @@ def update_section_wise_exam_result_status_view(request):
         branch=branch_status.branch,
         class_name__class_name_id__in=branch_status.exam.student_classes.values_list('class_name_id', flat=True),
         orientation__orientation_id__in=branch_status.exam.orientations.values_list('orientation_id', flat=True),
-        is_active=True
+        is_active=True,
+        has_students=True,
     ).distinct()
 
     if not sections.exists():
