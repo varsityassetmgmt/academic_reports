@@ -32,7 +32,7 @@ class SubjectDropdownViewSet(ModelViewSet):
 #     def get_queryset(self):
 #         exam_id = self.kwargs.get('exam_id')
 #         if not exam_id:
-#             raise ValidationError({'exam_id': "This field is required in the URL."})
+#             return Response({'exam_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
         
 #         classes = Exam.objects.filter(exam_id=exam_id).values_list('student_classes', flat=True)
 #         subjects =Subject.objects.filter(class_names__in=classes).distinct()
@@ -51,12 +51,12 @@ class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
     def get_queryset(self):
         exam_id = self.kwargs.get('exam_id')
         if not exam_id:
-            raise ValidationError({'exam_id': "This field is required in the URL."})
+            return Response({'exam_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
 
         # ✅ Get the exam safely (avoids DoesNotExist errors)
         exam = Exam.objects.filter(exam_id=exam_id, is_active=True).prefetch_related('student_classes').first()
         if not exam:
-            raise ValidationError({'exam_id': f"Exam with ID {exam_id} not found or inactive."})
+            return Response({'exam_id': f"Exam with ID {exam_id} not found or inactive."}, status=status.HTTP_400_BAD_REQUEST)
 
         # ✅ Fetch all subjects linked to the exam's classes
         subjects = (
@@ -273,7 +273,7 @@ class ExamInstanceViewSet(ModelViewSet):
         """
         exam_id = self.kwargs.get('exam_id')
         if not exam_id:
-            raise ValidationError({"exam_id": "This field is required in the URL."})
+            return Response({"exam_id": "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
         return exam_id
 
     def get_queryset(self):
@@ -369,7 +369,7 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
         """
         exam_instance_id = self.kwargs.get('exam_instance_id')
         if not exam_instance_id:
-            raise ValidationError({"exam_instance_id": "This field is required in the URL."})
+            return Response({"exam_instance_id": "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
         return exam_instance_id
 
     def get_queryset(self):
@@ -537,9 +537,9 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         exam_id = self.kwargs.get('exam_id')
 
         if not branch_id:
-            raise ValidationError({'branch_id': "This field is required in the URL."})
+            return Response({'branch_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
         if not exam_id:
-            raise ValidationError({'exam_id': "This field is required in the URL."})
+            return Response({'exam_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
         
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
@@ -587,7 +587,7 @@ def update_section_wise_exam_result_status_view(request):
     """
     branch_wise_exam_result_status_id = request.query_params.get('branch_wise_exam_result_status_id')
     if not branch_wise_exam_result_status_id:
-        raise ValidationError({'branch_wise_exam_result_status_id': "This field is required in the URL."})
+        return Response({'branch_wise_exam_result_status_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
 
     # ✅ Get branch-wise record
     branch_status = BranchWiseExamResultStatus.objects.select_related('branch', 'exam', 'academic_year').filter(
@@ -595,9 +595,9 @@ def update_section_wise_exam_result_status_view(request):
         is_active=True
     ).first()
     if not branch_status:
-        raise ValidationError({'branch_wise_exam_result_status_id': "Invalid Branch Wise Exam Result Status ID."})
+        return Response({'branch_wise_exam_result_status_id': "Invalid Branch Wise Exam Result Status ID."}, status=status.HTTP_400_BAD_REQUEST)
     if not branch_status.academic_year:
-        raise ValidationError({'academic_year': "Academic year is missing for this record."})
+        return Response({'academic_year': "Academic year is missing for this record."}, status=status.HTTP_400_BAD_REQUEST)
 
     # ✅ Get all matching sections
     sections = Section.objects.filter(
