@@ -833,8 +833,9 @@ class PublishExamAPIView(APIView):
         
         exam.is_visible = True
         exam.exam_status = exam_status
+        exam.is_editable  = False
         exam.updated_by = request.user
-        exam.save(update_fields=["is_visible", "exam_status", "updated_by"])
+        exam.save(update_fields=["is_visible", "exam_status","is_editable", "updated_by"])
 
         branch_updated_count = 0
 
@@ -890,8 +891,9 @@ class ExpireExamAPIView(APIView):
 
         exam.is_visible = False
         exam.exam_status = locked_status
+        exam.is_editable  = False
         exam.updated_by = request.user
-        exam.save(update_fields=["is_visible", "exam_status", "updated_by"])
+        exam.save(update_fields=["is_visible", "exam_status", "is_editable","updated_by"])
 
         # ✅ Hide all branch entries
        
