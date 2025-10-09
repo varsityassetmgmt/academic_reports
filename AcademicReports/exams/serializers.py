@@ -35,7 +35,7 @@ class ExamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Exam
         fields = '__all__'
-        read_only_fields = ('created_by', 'updated_by', 'is_active', 'is_visible', 'is_progress_card_visible', 'exam_status')
+        read_only_fields = ('created_by', 'updated_by', 'is_active', 'is_editable' ,'is_visible', 'is_progress_card_visible', 'exam_status')
 
     def validate(self, data):
         start_date = data.get('start_date')
@@ -275,6 +275,8 @@ class SectionWiseExamResultStatusSerializer(serializers.ModelSerializer):
     academic_year_name = serializers.CharField(source='academic_year.name', read_only=True)
     branch_name = serializers.CharField(source='branch.name', read_only=True)
     section_name = serializers.CharField(source='section.name', read_only=True)
+    class_name_display = serializers.CharField(source='section.class_name.name', read_only=True)
+    orientation_name = serializers.CharField(source='section.orientation.name', read_only=True)
     exam_name = serializers.CharField(source='exam.name', read_only=True)
     status_name = serializers.CharField(source='status.name', read_only=True)
     finalized_by_username = serializers.CharField(source='finalized_by.username', read_only=True)
@@ -291,6 +293,8 @@ class SectionWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'branch_name',
             'section',
             'section_name',
+            'class_name_display',
+            'orientation_name',
             'exam',
             'exam_name',
             'status_name',
