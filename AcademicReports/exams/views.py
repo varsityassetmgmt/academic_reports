@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
+from usermgmt.models import UserProfile
 from .serializers import *
 from . models import *
 from django_filters.rest_framework import DjangoFilterBackend
@@ -10,6 +11,7 @@ from .permissions import *
 from rest_framework import permissions, status
 from branches.models import *
 from rest_framework.exceptions import NotFound
+from rest_framework.decorators import api_view, permission_classes
 
 # ---------------- Subject ----------------
 class SubjectDropdownViewSet(ModelViewSet):
@@ -18,11 +20,52 @@ class SubjectDropdownViewSet(ModelViewSet):
     serializer_class = SubjectDropdownSerializer
     http_method_names = ['get']
 
+# class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
+#     # queryset = Subject.objects.filter(is_active=True).order_by('name')
+#     permission_classes = [IsAuthenticated]
+#     serializer_class = SubjectDropdownSerializer
+#     http_method_names = ['get']
+
+#     def get_queryset(self):
+#         exam_id = self.kwargs.get('exam_id')
+#         if not exam_id:
+#             raise ValidationError({'exam_id': "This field is required in the URL."})
+        
+#         classes = Exam.objects.filter(exam_id=exam_id).values_list('student_classes', flat=True)
+#         subjects =Subject.objects.filter(class_names__in=classes).distinct()
+
+#         return subjects
+
 class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
-    queryset = Subject.objects.filter(is_active=True).order_by('name')
+    """
+    Provides a dropdown list of subjects associated with the classes of a given Exam.
+    URL pattern: /subject_dropdown_for_exam_instance/<exam_id>/
+    """
     permission_classes = [IsAuthenticated]
     serializer_class = SubjectDropdownSerializer
     http_method_names = ['get']
+
+    def get_queryset(self):
+        exam_id = self.kwargs.get('exam_id')
+        if not exam_id:
+            raise ValidationError({'exam_id': "This field is required in the URL."})
+
+        # ✅ Get the exam safely (avoids DoesNotExist errors)
+        exam = Exam.objects.filter(exam_id=exam_id, is_active=True).prefetch_related('student_classes').first()
+        if not exam:
+            raise ValidationError({'exam_id': f"Exam with ID {exam_id} not found or inactive."})
+
+        # ✅ Fetch all subjects linked to the exam's classes
+        subjects = (
+            Subject.objects.filter(
+                is_active=True,
+                class_names__in=exam.student_classes.all()
+            )
+            .distinct()
+            .order_by('name')
+        )
+
+        return subjects
 
 
 # ---------------- SubjectSkill ----------------
@@ -415,19 +458,45 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
 
 
 class BranchWiseExamResultStatusViewSet(ModelViewSet):
-    queryset = BranchWiseExamResultStatus.objects.filter(is_active=True).order_by('updated_at')
     serializer_class = BranchWiseExamResultStatusSerializer
-    http_method_names = ['get', 'put',]
+    http_method_names = ['get', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-
-    # Only allow search by display fields, not FK filters
+    pagination_class = CustomPagination
     search_fields = [
         'academic_year__name',
         'branch__name',
         'exam__name',
         'status__name'
     ]
-    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # ✅ Efficient branching logic
+        if user.groups.filter(id=1).exists():  # Super admin or system user
+            branches = Branch.objects.filter(is_active=True)
+        else:
+            branches = (
+                UserProfile.objects.filter(user=user)
+                .values_list('branches', flat=True)
+                .distinct()
+            )
+
+        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+        if not current_academic_year:
+            raise NotFound("Current academic year not found.")
+
+        # ✅ Avoid returning inactive or invalid records
+        queryset = (
+            BranchWiseExamResultStatus.objects.filter(
+                is_active=True,
+                branch__in=branches,
+                academic_year=current_academic_year,
+            )
+            .select_related('academic_year', 'branch', 'exam', 'status')  # optimization
+            .order_by('-updated_at')
+        )
+        return queryset
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -439,6 +508,89 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         else:
             permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
+
+class SectionWiseExamResultStatusViewSet(ModelViewSet):
+    """
+    Handles viewing and updating Section-wise Exam Result Status entries.
+    """
+    serializer_class = SectionWiseExamResultStatusSerializer
+    http_method_names = ['get']
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    pagination_class = CustomPagination
+
+    search_fields = [
+        'academic_year__name',
+        'branch__name',
+        'section__name',
+        'exam__name',
+        'status__name',
+    ]
+
+    def get_queryset(self):
+        """
+        Filters queryset by branch_id and exam_id passed in the URL.
+        """
+        branch_id = self.kwargs.get('branch_id')
+        exam_id = self.kwargs.get('exam_id')
+
+        if not branch_id:
+            raise ValidationError({'branch_id': "This field is required in the URL."})
+        if not exam_id:
+            raise ValidationError({'exam_id': "This field is required in the URL."})
+        
+        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+        if not current_academic_year:
+            raise NotFound("Current academic year not found.")
+        
+        queryset = (
+            SectionWiseExamResultStatus.objects.filter(
+                is_active=True,
+                branch__branch_id=branch_id,
+                exam__exam_id=exam_id,
+                academic_year=current_academic_year,
+            )
+            .select_related(
+                'academic_year',
+                'branch',
+                'section',
+                'exam',
+                'status',
+            )
+            .order_by('-updated_at')  # show most recent first
+        )
+
+        return queryset
+
+    def get_permissions(self):
+        """
+        Assigns permission classes based on the current action.
+        """
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [CanViewSectionWiseExamResultStatus]
+        elif self.action in ['update', 'partial_update']:
+            permission_classes = [CanChangeSectionWiseExamResultStatus]
+        else:
+            permission_classes = [permissions.AllowAny]
+        return [permission() for permission in permission_classes]
+    
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def update_section_wise_exam_result_status_view(request, branch_id, exam_id):
+#         if not branch_id:
+#             raise ValidationError({'branch_id': "This field is required in the URL."})
+#         if not exam_id:
+#             raise ValidationError({'exam_id': "This field is required in the URL."})
+        
+#         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+#         if not current_academic_year:
+#             raise NotFound("Current academic year not found.")
+        
+#         branch_wise_exam_result_status = BranchWiseExamResultStatus.objects.filter(branch__branch_id=branch_id, exam__exam_id=exam_id, is_active=True, academic_year=current_academic_year)
+#         if not branch_wise_exam_result_status:
+#             raise ValidationError({'Branch': "No Record for this Branch and Exam combination for the currect academic year"})
+        
+        
+#         section_wise_exam_result_status = SectionWiseExamResultStatus.objects.filter(branch__branch_id=branch_id, exam__exam_id=exam_id, is_active=True, academic_year=current_academic_year)
 
 # # ==================== ExamAttendanceStatus ====================
 # class ExamAttendanceStatusViewSet(ModelViewSet):
