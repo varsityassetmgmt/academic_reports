@@ -12,6 +12,9 @@ from rest_framework import permissions, status
 from branches.models import *
 from rest_framework.exceptions import NotFound
 from rest_framework.decorators import api_view, permission_classes
+from django.db.models import F
+from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError, NotFound
 
 # ---------------- Subject ----------------
 class SubjectDropdownViewSet(ModelViewSet):
@@ -572,25 +575,60 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         else:
             permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def update_section_wise_exam_result_status_view(request, branch_id, exam_id):
+    """
+    Syncs section-wise exam result status from branch-wise exam result status for a given branch and exam.
+    """
+    if not branch_id:
+        raise ValidationError({'branch_id': "This field is required in the URL."})
+    if not exam_id:
+        raise ValidationError({'exam_id': "This field is required in the URL."})
+
+    # ✅ Get current academic year
+    current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+    if not current_academic_year:
+        raise NotFound("Current academic year not found.")
     
-# @api_view(['GET'])
-# @permission_classes([IsAuthenticated])
-# def update_section_wise_exam_result_status_view(request, branch_id, exam_id):
-#         if not branch_id:
-#             raise ValidationError({'branch_id': "This field is required in the URL."})
-#         if not exam_id:
-#             raise ValidationError({'exam_id': "This field is required in the URL."})
-        
-#         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
-#         if not current_academic_year:
-#             raise NotFound("Current academic year not found.")
-        
-#         branch_wise_exam_result_status = BranchWiseExamResultStatus.objects.filter(branch__branch_id=branch_id, exam__exam_id=exam_id, is_active=True, academic_year=current_academic_year)
-#         if not branch_wise_exam_result_status:
-#             raise ValidationError({'Branch': "No Record for this Branch and Exam combination for the currect academic year"})
-        
-        
-#         section_wise_exam_result_status = SectionWiseExamResultStatus.objects.filter(branch__branch_id=branch_id, exam__exam_id=exam_id, is_active=True, academic_year=current_academic_year)
+    # ✅ Get branch-wise record
+    branch_status = BranchWiseExamResultStatus.objects.filter(
+        branch__branch_id=branch_id,
+        exam__exam_id=exam_id,
+        is_active=True,
+        academic_year=current_academic_year
+    ).first()
+
+    if not branch_status:
+        raise ValidationError({'Branch': "No record found for this branch & exam in the current academic year."})
+    
+    exam = Exam.objects.get(exam_id=exam_id, academic_year=current_academic_year, is_active=True)
+
+    if not exam:
+        raise ValidationError({'exam_id': "Invalid Exam ID."})
+    
+    sections = Section.objects.filter(academic_year=current_academic_year, branch__branch_id=branch_id, class_name__class_name_id__in=exam.student_classes.class_name_id, orientation__orientation_id__in=exam.orientations.orientation_id).distinct()
+
+    # ✅ Update all section-wise records linked to this branch & exam
+    updated_count = SectionWiseExamResultStatus.objects.filter(
+        section__section_id__in = sections,
+        branch__branch_id=branch_id,
+        exam__exam_id=exam_id,
+        is_active=True,
+        academic_year=current_academic_year
+    ).update(
+        marks_entry_expiry_datetime=branch_status.marks_entry_expiry_datetime,
+        is_visible=branch_status.is_visible,
+    )
+
+    return Response({
+        "success": True,
+        "message": f"{updated_count} section-wise exam result records updated successfully.",
+        "branch": branch_status.branch.name,
+        "exam": branch_status.exam.name,
+        "academic_year": current_academic_year.name
+    })             
 
 # # ==================== ExamAttendanceStatus ====================
 # class ExamAttendanceStatusViewSet(ModelViewSet):
