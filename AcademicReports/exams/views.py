@@ -779,67 +779,6 @@ def update_section_wise_exam_result_status_view(request, branch_id, exam_id):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #====================================================================================================================================================================
 #=========================================================        EXAMS OPERATIONS        ===========================================================================
 #====================================================================================================================================================================
@@ -958,7 +897,6 @@ class ExpireExamAPIView(APIView):
 
         now = timezone.now()
 
-        # ✅ Check if expiry time has passed
         if not exam.marks_entry_expiry_datetime:
             return Response({"message": "This exam has no expiry datetime set."},status=status.HTTP_400_BAD_REQUEST,)
 
@@ -975,8 +913,6 @@ class ExpireExamAPIView(APIView):
         exam.is_editable  = False
         exam.updated_by = request.user
         exam.save(update_fields=["is_visible", "exam_status", "is_editable","updated_by"])
-
-        # ✅ Hide all branch entries
        
 
         branch_updated_count = 0
