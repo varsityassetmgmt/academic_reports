@@ -104,6 +104,8 @@ class Exam(models.Model):
     is_progress_card_visible = models.BooleanField(default=False)  # Enable this to allow progress card download for this exam
     is_active = models.BooleanField(default=True)
 
+    is_editable = models.BooleanField(default=True)
+
     marks_entry_expiry_datetime = models.DateTimeField(null=True,blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
@@ -136,6 +138,14 @@ class Exam(models.Model):
                 self.academic_year = current_academic_year
         super().save(*args, **kwargs)
 
+        if not self.exam_status:
+            try:
+                self.exam_status = ExamStatus.objects.get(id=1)
+            except ExamStatus.DoesNotExist:
+                pass   
+        super().save(*args, **kwargs)
+
+        
     def __str__(self):
         return f"{self.name} ({self.exam_type.name})"
 
@@ -488,7 +498,7 @@ class BranchWiseExamResultStatus(models.Model):
     academic_year = models.ForeignKey("branches.AcademicYear",null=True, blank=True, on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
     branch = models.ForeignKey("branches.Branch", on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
     exam = models.ForeignKey(Exam, on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
-    status = models.ForeignKey(ExamResultStatus, on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
+    status = models.ForeignKey(ExamResultStatus,null=True, blank=True, on_delete=models.PROTECT, related_name="branch_wise_exam_result_status")
 
     finalized_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="finalized_branch_exam_result_status")
     finalized_at = models.DateTimeField(null=True, blank=True)
@@ -536,8 +546,13 @@ class BranchWiseExamResultStatus(models.Model):
             current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True, is_active=True).first()
             if current_academic_year:
                 self.academic_year = current_academic_year
+                
+        if not self.status:
+            try:
+                self.status = ExamResultStatus.objects.get(id=1)
+            except ExamResultStatus.DoesNotExist:
+                pass   
         super().save(*args, **kwargs)
-
 
     def __str__(self):
         return f"{self.exam.name} - {self.branch.name} ({self.academic_year.name})"
@@ -550,7 +565,7 @@ class SectionWiseExamResultStatus(models.Model):
     branch = models.ForeignKey("branches.Branch",on_delete=models.PROTECT,related_name="section_exam_result_status")
     section = models.ForeignKey("students.Section",on_delete=models.PROTECT,related_name="section_exam_result_status")
     exam = models.ForeignKey(Exam,on_delete=models.PROTECT,related_name="section_exam_result_status")
-    status = models.ForeignKey(ExamResultStatus,on_delete=models.PROTECT,related_name="section_exam_result_status")
+    status = models.ForeignKey(ExamResultStatus,null=True, blank=True,on_delete=models.PROTECT,related_name="section_exam_result_status")
     finalized_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,null=True,blank=True,related_name="finalized_section_exam_result_status")
     finalized_at = models.DateTimeField(null=True, blank=True)
 
@@ -592,6 +607,12 @@ class SectionWiseExamResultStatus(models.Model):
                 self.academic_year = current_academic_year
         super().save(*args, **kwargs)
 
+        if not self.status:
+            try:
+                self.status = ExamResultStatus.objects.get(id=1)
+            except ExamResultStatus.DoesNotExist:
+                pass   
+        super().save(*args, **kwargs)
 
         
     def __str__(self):
