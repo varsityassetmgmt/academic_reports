@@ -249,7 +249,7 @@ class ExamViewSet(ModelViewSet):
         exams = Exam.objects.filter(
             academic_year=current_academic_year,
             is_active=True
-        ).order_by('-id' , 'is_visible')
+        ).order_by('-exam_id' , 'is_visible')
         return exams
 
     def perform_create(self, serializer):
