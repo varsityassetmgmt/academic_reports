@@ -800,3 +800,123 @@ class ExamMakeInvisibleAPIView(APIView):
 
         result = set_exam_visibility(exam, user=request.user, visible=False)
         return Response(result, status=200)
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Exam
+from django.utils import timezone
+
+class PublishExamAPIView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, *args, **kwargs):
+        exam_id = request.query_params.get("exam_id")
+
+        if not exam_id:
+            return Response({"detail": "exam_id is required."},status=status.HTTP_400_BAD_REQUEST,)
+        try:
+            exam = Exam.objects.get(exam_id = exam_id)
+        except Exam.DoesNotExist:
+            return Response({"detail": "Exam not found."},status=status.HTTP_404_NOT_FOUND,)
+    
+        if exam.marks_entry_expiry_datetime and exam.marks_entry_expiry_datetime < timezone.now():
+            return Response({"message": "Cannot publish. Marks entry expiry datetime has already passed.",},status=status.HTTP_400_BAD_REQUEST,)
+         
+        try:
+            exam_status = ExamStatus.objects.get(id =2)
+        except ExamStatus.DoesNotExist:
+            return Response({"detail": "ExamStatus with id=2 not found."},status=status.HTTP_400_BAD_REQUEST,)
+        
+        
+        exam.is_visible = True
+        exam.exam_status = exam_status
+        exam.is_editable  = False
+        exam.updated_by = request.user
+        exam.save(update_fields=["is_visible", "exam_status","is_editable", "updated_by"])
+
+        branch_updated_count = 0
+
+        with transaction.atomic():
+            for branch in exam.branches.all():
+                obj, created = BranchWiseExamResultStatus.objects.get_or_create(
+                    academic_year =exam.academic_year,
+                    branch=branch,
+                    exam=exam,
+                    defaults={
+                        "is_visible": True,
+                        "marks_entry_expiry_datetime": exam.marks_entry_expiry_datetime,
+                    },
+                )
+                if not created:
+                    obj.is_visible = True
+                    obj.marks_entry_expiry_datetime = exam.marks_entry_expiry_datetime
+                    obj.save(update_fields=["is_visible", "marks_entry_expiry_datetime"])
+                else:
+                    branch_updated_count += 1
+
+        return Response({"message": f"Exam '{exam.name}' published successfully.","branches_processed": branch_updated_count,},status=status.HTTP_200_OK,)
+
+
+
+
+class ExpireExamAPIView(APIView):
+   
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, *args, **kwargs):
+        exam_id = request.query_params.get("exam_id")
+        if not exam_id:
+            return Response({"detail": "exam_id is required."},status=status.HTTP_400_BAD_REQUEST,)
+        try:
+            exam = Exam.objects.get(exam_id=exam_id)
+        except Exam.DoesNotExist:
+            return Response({"detail": "Exam not found."},status=status.HTTP_404_NOT_FOUND,)
+
+        now = timezone.now()
+
+        # ✅ Check if expiry time has passed
+        if not exam.marks_entry_expiry_datetime:
+            return Response({"message": "This exam has no expiry datetime set."},status=status.HTTP_400_BAD_REQUEST,)
+
+        if exam.marks_entry_expiry_datetime > now:
+            return Response({"message": "Exam is still active. Expiry time not reached yet."},status=status.HTTP_400_BAD_REQUEST,)
+        
+        try:
+            locked_status = ExamStatus.objects.get(id = 3)
+        except ExamStatus.DoesNotExist:
+            return Response({"detail": "ExamStatus 'Marks Entry Locked' not found. Please create it."},status=status.HTTP_400_BAD_REQUEST,)
+
+        exam.is_visible = False
+        exam.exam_status = locked_status
+        exam.is_editable  = False
+        exam.updated_by = request.user
+        exam.save(update_fields=["is_visible", "exam_status", "is_editable","updated_by"])
+
+        # ✅ Hide all branch entries
+       
+
+        branch_updated_count = 0
+        with transaction.atomic():
+            branches = BranchWiseExamResultStatus.objects.filter(exam=exam, is_visible=True)
+            for branch in branches:
+                branch.is_visible = False
+                branch.marks_entry_expiry_datetime = exam.marks_entry_expiry_datetime
+            BranchWiseExamResultStatus.objects.bulk_update(branches, ["is_visible", "marks_entry_expiry_datetime"])
+            branch_updated_count = branches.count()
+            # for branch in BranchWiseExamResultStatus.objects.filter(exam=exam, is_visible=True):
+            #     branch.is_visible = False
+            #     branch.marks_entry_expiry_datetime = exam.marks_entry_expiry_datetime
+            #     branch.save(update_fields=["is_visible", "marks_entry_expiry_datetime"])
+            #     branch_updated_count += 1
+
+        return Response(
+            {
+                "message": f"Exam '{exam.name}' expired successfully.",
+                "branches_updated": branch_updated_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+       
