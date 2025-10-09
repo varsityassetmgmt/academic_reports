@@ -246,3 +246,5 @@ class SectionWiseExamResultStatusAdmin(admin.ModelAdmin):
             "fields": ("is_visible", "is_active", "updated_at"),
         }),
     )
+
+admin.site.register(ExamStatus)
