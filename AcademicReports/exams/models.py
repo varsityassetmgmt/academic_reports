@@ -328,7 +328,7 @@ class ExamResult(models.Model):
     exam_result_id = models.BigAutoField(primary_key=True)
     student = models.ForeignKey("students.Student", on_delete=models.PROTECT, related_name='exam_results_student')    
     exam_instance = models.ForeignKey(ExamInstance, on_delete=models.PROTECT, related_name='exam_results_exam_instance')
-    exam_attendance = models.ForeignKey(ExamAttendanceStatus, on_delete=models.PROTECT, related_name='exam_results_attendance')
+    exam_attendance = models.ForeignKey(ExamAttendanceStatus,null=True,blank=True, on_delete=models.PROTECT, related_name='exam_results_attendance')
 
     # --- Academic Marks ---
     external_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True)  
@@ -386,6 +386,13 @@ class ExamResult(models.Model):
         self.total_marks = obtained
         if total_max > 0:
             self.percentage = (obtained / total_max) * 100
+
+        
+        if not self.exam_attendance:
+            try:
+                self.exam_attendance = ExamAttendanceStatus.objects.get( id = 1 )
+            except ExamAttendanceStatus.DoesNotExist:
+                pass   
         super().save(*args, **kwargs)
 
 

@@ -709,6 +709,7 @@ def update_section_wise_exam_result_status_view(request):
     ).first()
     if not branch_status:
         return Response({'branch_wise_exam_result_status_id': "Invalid Branch Wise Exam Result Status ID."}, status=status.HTTP_400_BAD_REQUEST)
+   
     if not branch_status.academic_year:
         return Response({'academic_year': "Academic year is missing for this record."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -887,67 +888,6 @@ def update_section_wise_exam_result_status_view(request):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #====================================================================================================================================================================
 #=========================================================        EXAMS OPERATIONS        ===========================================================================
 #====================================================================================================================================================================
@@ -1066,7 +1006,6 @@ class ExpireExamAPIView(APIView):
 
         now = timezone.now()
 
-        # ✅ Check if expiry time has passed
         if not exam.marks_entry_expiry_datetime:
             return Response({"message": "This exam has no expiry datetime set."},status=status.HTTP_400_BAD_REQUEST,)
 
@@ -1083,8 +1022,6 @@ class ExpireExamAPIView(APIView):
         exam.is_editable  = False
         exam.updated_by = request.user
         exam.save(update_fields=["is_visible", "exam_status", "is_editable","updated_by"])
-
-        # ✅ Hide all branch entries
        
 
         branch_updated_count = 0
@@ -1109,3 +1046,64 @@ class ExpireExamAPIView(APIView):
             status=status.HTTP_200_OK,
         )
        
+
+
+# from django.utils import timezone
+# from django.db import transaction
+# from rest_framework.views import APIView
+# from rest_framework.response import Response
+# from rest_framework import status
+# from rest_framework.permissions import IsAuthenticated
+# from .models import Exam, BranchWiseExamResultStatus
+
+
+class PublishProgressCardAPIView(APIView):
+ 
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, *args, **kwargs):
+        exam_id = request.query_params.get("exam_id")
+
+        # ✅ Validate exam_id
+        if not exam_id:
+            return Response({"detail": "exam_id is required."},status=status.HTTP_400_BAD_REQUEST,)
+
+        # ✅ Get exam
+        try:
+            exam = Exam.objects.get(exam_id=exam_id)
+        except Exam.DoesNotExist:
+            return Response({"detail": "Exam not found."},status=status.HTTP_404_NOT_FOUND,)
+
+        # ✅ Check if exam is expired
+        # now = timezone.now()
+        # if exam.marks_entry_expiry_datetime and exam.marks_entry_expiry_datetime < now:
+        #     return Response(
+        #         {"message": "Cannot publish progress card. Exam has expired."},
+        #         status=status.HTTP_400_BAD_REQUEST,
+        #     )
+
+        # ✅ Update exam visibility fields
+        exam.is_progress_card_visible = True
+        exam.updated_by = request.user
+        exam.is_editable  = False
+        exam.save(update_fields=["is_progress_card_visible","is_editable", "updated_by"])
+
+        # ✅ Optionally, you can also mark all BranchWiseExamResultStatus as progress card visible
+        # (only if you maintain a similar field there)
+        branch_updated_count = 0
+        with transaction.atomic():
+            branches = BranchWiseExamResultStatus.objects.filter(exam=exam)
+            for branch in branches:
+                branch.is_progress_card_downloaded = True  # 👈 optional — use your field name
+            BranchWiseExamResultStatus.objects.bulk_update(
+                branches, ["is_progress_card_downloaded"]
+            )
+            branch_updated_count = branches.count()
+
+        return Response(
+            {
+                "message": f"Progress card published for exam '{exam.name}'.",
+                "branches_updated": branch_updated_count,
+            },
+            status=status.HTTP_200_OK,
+        )
