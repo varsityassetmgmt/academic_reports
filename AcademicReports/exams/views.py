@@ -996,7 +996,8 @@ def create_exam_results(request):
     students = Student.objects.filter(
         section=section_status.section,
         is_active=True,
-        admission_status__admission_status_id=3
+        admission_status__admission_status_id=3,
+        academic_year=exam.academic_year,
     )
 
     existing_results = ExamResult.objects.filter(
@@ -1057,7 +1058,7 @@ def create_exam_results(request):
                         'exam_skill_result_id': skill_result.exam_skill_result_id if skill_result else None,
                         'external_marks': skill_result.external_marks if skill_result else None,
                         'internal_marks': skill_result.internal_marks if skill_result else None,
-                        'co_scholastic_grade': skill_result.co_scholastic_grade_id if skill_result and skill_result.co_scholastic_grade else None,
+                        'co_scholastic_grade': skill_result.co_scholastic_grade.id if skill_result and skill_result.co_scholastic_grade else None,
                     })
 
             student_dict['exam_instances'].append({
@@ -1069,7 +1070,7 @@ def create_exam_results(request):
                 'exam_attendance': res.exam_attendance.exam_attendance_status_id if res and res.exam_attendance else None,
                 'external_marks': res.external_marks if res else None,
                 'internal_marks': res.internal_marks if res else None,
-                'co_scholastic_grade': res.co_scholastic_grade_id if res and res.co_scholastic_grade else None,
+                'co_scholastic_grade': res.co_scholastic_grade.id if res and res.co_scholastic_grade else None,
                 'has_subject_skills': instance.has_subject_skills,
                 'exam_skill_instances': skills_data,
             })
