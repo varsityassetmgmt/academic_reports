@@ -992,13 +992,13 @@ def create_exam_results(request):
                         status=status.HTTP_400_BAD_REQUEST)
 
     exam = section_status.exam
-    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).select_related('subject').prefetch_related('subject__subject_skills')
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).select_related('subject')
+    print(exam_instances)
     students = Student.objects.filter(
         section=section_status.section,
         is_active=True,
-        admission_status__admission_status_id=3,
         academic_year=exam.academic_year,
-    )
+    ).exclude(admission_status__admission_status_id=3,)
 
     existing_results = ExamResult.objects.filter(
         student__in=students,
