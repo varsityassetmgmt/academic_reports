@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 from usermgmt.models import UserProfile
@@ -133,10 +133,8 @@ class SubjectViewSet(ModelViewSet):
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
-        if serializer.is_valid():
             serializer.save(created_by=self.request.user, updated_by=self.request.user)
     def perform_update(self, serializer):
-        if serializer.is_valid():
             serializer.save(updated_by=self.request.user)
 
     def get_permissions(self):
@@ -163,10 +161,8 @@ class SubjectSkillViewSet(ModelViewSet):
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
-        if serializer.is_valid():
             serializer.save(created_by=self.request.user, updated_by=self.request.user)
     def perform_update(self, serializer):
-        if serializer.is_valid():
             serializer.save(updated_by=self.request.user)
 
     def get_permissions(self):
@@ -193,10 +189,8 @@ class ExamTypeViewSet(ModelViewSet):
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
-        if serializer.is_valid():
             serializer.save(created_by=self.request.user, updated_by=self.request.user)
     def perform_update(self, serializer):
-        if serializer.is_valid():
             serializer.save(updated_by=self.request.user)
 
     def get_permissions(self):
@@ -216,66 +210,45 @@ class ExamViewSet(ModelViewSet):
     serializer_class = ExamSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = [
-        'name', 
-        'exam_type__name', 
-        'academic_year__name'
-    ]  # text search on exam name, exam type, and academic year
-
+    search_fields = ['name', 'exam_type__name', 'academic_year__name']
     filterset_fields = [
-        'exam_type', 
-        'is_visible', 
-        'is_progress_card_visible',
-        'is_active', 
-        'academic_year',
-        'name',
-        'start_date',
-        'end_date',
-        'marks_entry_expiry_datetime',
-    ]  # FK, boolean, and academic year filter
-
+        'exam_type', 'is_visible', 'is_progress_card_visible',
+        'is_active', 'academic_year', 'name', 'start_date',
+        'end_date', 'marks_entry_expiry_datetime',
+    ]
     ordering_fields = [
-        'exam_type__name', 
-        'start_date', 
-        'end_date', 
-        'name', 
-        'is_visible', 
-        'created_at', 
-        'updated_at',
-        'acadmic_year',
-        'marks_entry_expiry_datetime',
-    ]  # sortable fields
-
+        'exam_type__name', 'start_date', 'end_date', 'name',
+        'is_visible', 'created_at', 'updated_at',
+        'academic_year', 'marks_entry_expiry_datetime',
+    ]
     pagination_class = CustomPagination
 
     def get_queryset(self):
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
             raise NotFound("Current academic year not found.")
-        
-        exams = Exam.objects.filter(
+        return Exam.objects.filter(
             academic_year=current_academic_year,
             is_active=True
-        ).order_by('-exam_id' , 'is_visible')
-        return exams
+        ).order_by('-exam_id', 'is_visible')
 
     def perform_create(self, serializer):
-        """
-        Automatically assign the current academic year when creating a new exam.
-        """
+        """Assign academic year and audit fields on creation."""
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
             raise NotFound("Current academic year not found.")
+        
+        # ✅ No need to call is_valid() again here
+        serializer.save(
+            academic_year=current_academic_year,
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
 
-        if serializer.is_valid():
-            serializer.save(academic_year=current_academic_year)
-
-    def perform_create(self, serializer):
-        if serializer.is_valid():
-            serializer.save(created_by=self.request.user, updated_by=self.request.user)
     def perform_update(self, serializer):
-        if serializer.is_valid():
-            serializer.save(updated_by=self.request.user)
+        """Update audit fields on modification."""
+        # ✅ No is_valid() call here either
+        serializer.save(updated_by=self.request.user)
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -298,16 +271,14 @@ class ExamInstanceViewSet(ModelViewSet):
         'subject__name',
         'exam__name',
         'exam__exam_type__name',
-    ]  # search by subject name, exam name, and exam type
-
+    ]
     filterset_fields = [
         'subject',
         'has_external_marks',
         'has_internal_marks',
         'has_subject_skills',
         'has_subject_co_scholastic_grade'
-    ]  # FK and boolean filters
-
+    ]
     ordering_fields = [
         'date',
         'exam_start_time',
@@ -316,19 +287,16 @@ class ExamInstanceViewSet(ModelViewSet):
         'has_external_marks',
         'has_internal_marks',
         'has_subject_skills',
-    ]  # sortable by date, time, and related fields
-    
+    ]
     pagination_class = CustomPagination
-    lookup_field = 'pk'  # for retrieve/update
+    lookup_field = 'pk'
     lookup_url_kwarg = 'pk'
 
+    # ✅ Get exam_id from URL kwargs
     def get_exam_id(self):
-        """
-        Get exam_id from URL kwargs
-        """
         exam_id = self.kwargs.get('exam_id')
         if not exam_id:
-            return Response({"exam_id": "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({"exam_id": "This field is required in the URL."})
         return exam_id
 
     def get_queryset(self):
@@ -338,22 +306,23 @@ class ExamInstanceViewSet(ModelViewSet):
             is_active=True
         ).order_by('date')
 
+    # ✅ No need to revalidate serializer here
     def perform_create(self, serializer):
         exam_id = self.get_exam_id()
-        if serializer.is_valid():
-            serializer.save(
-                exam_id=exam_id,
-                created_by=self.request.user,
-                updated_by=self.request.user
-            )
+        exam = get_object_or_404(Exam, pk=exam_id)
+        serializer.save(
+            exam=exam,
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
 
     def perform_update(self, serializer):
         exam_id = self.get_exam_id()
-        if serializer.is_valid():
-            serializer.save(
-                exam_id=exam_id,
-                updated_by=self.request.user
-            )
+        exam = get_object_or_404(Exam, pk=exam_id)
+        serializer.save(
+            exam=exam,
+            updated_by=self.request.user
+        )
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -409,15 +378,16 @@ class ExamInstanceViewSet(ModelViewSet):
 # ==================== ExamSubjectSkillInstance ====================
 class ExamSubjectSkillInstanceViewSet(ModelViewSet):
     serializer_class = ExamSubjectSkillInstanceSerializer
-    http_method_names = ['get', 'put']
+    http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
+
     search_fields = [
-        'subject_skill__name',             # search by skill name
-        'subject_skill__subject__name',    # search by skill's subject name
+        'subject_skill__name',              # search by skill name
+        'subject_skill__subject__name',     # search by related subject name
     ]
 
     filterset_fields = [
-        'subject_skill',                   # filter by skill
+        'subject_skill',
         'has_external_marks',
         'has_internal_marks',
         'has_subject_co_scholastic_grade',
@@ -426,15 +396,15 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
     ]
 
     ordering_fields = [
-        'subject_skill__name',
         'subject_skill__subject__name',
+        'subject_skill__name',
         'has_external_marks',
         'has_internal_marks',
-        'has_subject_skills',
+        'has_subject_co_scholastic_grade',
     ]
 
     pagination_class = CustomPagination
-    lookup_field = 'pk'  # for retrieve/update
+    lookup_field = 'pk'
     lookup_url_kwarg = 'pk'
 
     def get_exam_instance_id(self):
@@ -443,32 +413,30 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
         """
         exam_instance_id = self.kwargs.get('exam_instance_id')
         if not exam_instance_id:
-            return Response({"exam_instance_id": "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({"exam_instance_id": "This field is required in the URL."})
         return exam_instance_id
 
     def get_queryset(self):
         exam_instance_id = self.get_exam_instance_id()
         return ExamSubjectSkillInstance.objects.filter(
-            exam_instance__exam_instance_id=exam_instance_id,
+            exam_instance_id=exam_instance_id,  # ✅ direct FK reference
             is_active=True
         ).order_by('subject_skill__subject__name')
 
     def perform_create(self, serializer):
         exam_instance_id = self.get_exam_instance_id()
-        if serializer.is_valid():
-            serializer.save(
-                exam_instance_id=exam_instance_id,
-                created_by=self.request.user,
-                updated_by=self.request.user
-            )
+        serializer.save(
+            exam_instance_id=exam_instance_id,
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
 
     def perform_update(self, serializer):
         exam_instance_id = self.get_exam_instance_id()
-        if serializer.is_valid():
-            serializer.save(
-                exam_instance_id=exam_instance_id,
-                updated_by=self.request.user
-            )
+        serializer.save(
+            exam_instance_id=exam_instance_id,
+            updated_by=self.request.user
+        )
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
