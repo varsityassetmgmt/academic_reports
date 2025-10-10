@@ -993,7 +993,6 @@ def create_exam_results(request):
 
     exam = section_status.exam
     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).select_related('subject')
-    print(exam_instances)
     students = Student.objects.filter(
         section=section_status.section,
         is_active=True,
