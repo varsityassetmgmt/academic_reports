@@ -389,7 +389,7 @@ class ExamResult(models.Model):
         
         if not self.exam_attendance:
             try:
-                self.exam_attendance = ExamAttendanceStatus.objects.get( id = 1 )
+                self.exam_attendance = ExamAttendanceStatus.objects.get( exam_attendance_status_id = 1 )
             except ExamAttendanceStatus.DoesNotExist:
                 pass   
         super().save(*args, **kwargs)
