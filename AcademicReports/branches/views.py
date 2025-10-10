@@ -13,6 +13,12 @@ class AcademicDevisionDropdownViewSet(ModelViewSet):
     serializer_class = AcademicDevisionDropdownSerializer
     http_method_names = ['get',]
 
+class AcademicYearDropdownViewSet(ModelViewSet):
+    queryset = AcademicYear.objects.filter(is_active=True).order_by('-academic_year_id')
+    permission_classes = [IsAuthenticated]
+    serializer_class = AcademicYearDropdownSerialzier
+    http_method_names = ['get',]
+
 
 class StateDropdownViewSet(ModelViewSet):
     queryset = State.objects.filter(is_active=True).order_by('name')
