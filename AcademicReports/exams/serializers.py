@@ -89,6 +89,7 @@ class ExamSerializer(serializers.ModelSerializer):
     academic_year_name = serializers.CharField(source='academic_year.name', read_only=True)
     exam_type_name = serializers.CharField(source='exam_type.name', read_only=True)
     marks_entry_expiry_datetime_display = serializers.DateTimeField(source='marks_entry_expiry_datetime', format="%Y-%m-%d %H:%M:%S", read_only = True )
+    exam_status_name = serializers.CharField(source='exam_status.name', read_only=True)
 
     class Meta:
         model = Exam
@@ -117,7 +118,7 @@ class ExamSerializer(serializers.ModelSerializer):
         # Check start and end date
         start_date = data.get('start_date')
         end_date = data.get('end_date')
-        if start_date and end_date and end_date <= start_date:
+        if start_date and end_date and end_date < start_date:
             raise serializers.ValidationError({"end_date": "End date cannot be earlier than start date."})
 
         # Ensure at least one selection for all ManyToMany fields
@@ -180,7 +181,7 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
                 })
 
         # Validate exam start and end time
-        if start_time and end_time and end_time <= start_time:
+        if start_time and end_time and end_time < start_time:
             raise serializers.ValidationError({"exam_end_time": "Exam end time must be later than start time."})
 
         # Validate subject belongs to exam classes

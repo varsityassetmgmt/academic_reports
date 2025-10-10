@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 from usermgmt.models import UserProfile
@@ -133,10 +133,8 @@ class SubjectViewSet(ModelViewSet):
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
-        if serializer.is_valid():
             serializer.save(created_by=self.request.user, updated_by=self.request.user)
     def perform_update(self, serializer):
-        if serializer.is_valid():
             serializer.save(updated_by=self.request.user)
 
     def get_permissions(self):
@@ -163,10 +161,8 @@ class SubjectSkillViewSet(ModelViewSet):
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
-        if serializer.is_valid():
             serializer.save(created_by=self.request.user, updated_by=self.request.user)
     def perform_update(self, serializer):
-        if serializer.is_valid():
             serializer.save(updated_by=self.request.user)
 
     def get_permissions(self):
@@ -193,10 +189,8 @@ class ExamTypeViewSet(ModelViewSet):
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
-        if serializer.is_valid():
             serializer.save(created_by=self.request.user, updated_by=self.request.user)
     def perform_update(self, serializer):
-        if serializer.is_valid():
             serializer.save(updated_by=self.request.user)
 
     def get_permissions(self):
@@ -216,65 +210,45 @@ class ExamViewSet(ModelViewSet):
     serializer_class = ExamSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = [
-        'name', 
-        'exam_type__name', 
-        'academic_year__name'
-    ]  # text search on exam name, exam type, and academic year
-
+    search_fields = ['name', 'exam_type__name', 'academic_year__name']
     filterset_fields = [
-        'exam_type', 
-        'is_visible', 
-        'is_progress_card_visible',
-        'is_active', 
-        'academic_year',
-        'name',
-        'start_date',
-        'end_date',
-        'marks_entry_expiry_datetime',
-    ]  # FK, boolean, and academic year filter
-
+        'exam_type', 'is_visible', 'is_progress_card_visible',
+        'is_active', 'academic_year', 'name', 'start_date',
+        'end_date', 'marks_entry_expiry_datetime',
+    ]
     ordering_fields = [
-        'exam_type__name', 
-        'start_date', 
-        'end_date', 
-        'name', 
-        'is_visible', 
-        'created_at', 
-        'updated_at',
-        'acadmic_year',
-        'marks_entry_expiry_datetime',
-    ]  # sortable fields
-
+        'exam_type__name', 'start_date', 'end_date', 'name',
+        'is_visible', 'created_at', 'updated_at',
+        'academic_year', 'marks_entry_expiry_datetime',
+    ]
     pagination_class = CustomPagination
 
     def get_queryset(self):
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
             raise NotFound("Current academic year not found.")
-        
-        exams = Exam.objects.filter(
+        return Exam.objects.filter(
             academic_year=current_academic_year,
             is_active=True
-        ).order_by('-exam_id' , 'is_visible')
-        return exams
+        ).order_by('-exam_id', 'is_visible')
 
     def perform_create(self, serializer):
-        """
-        Automatically assign the current academic year when creating a new exam.
-        """
+        """Assign academic year and audit fields on creation."""
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
             raise NotFound("Current academic year not found.")
+        
+        # ✅ No need to call is_valid() again here
+        serializer.save(
+            academic_year=current_academic_year,
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
 
-        serializer.save(academic_year=current_academic_year)
-
-    def perform_create(self, serializer):
-        if serializer.is_valid():
-            serializer.save(created_by=self.request.user, updated_by=self.request.user)
     def perform_update(self, serializer):
-        if serializer.is_valid():
-            serializer.save(updated_by=self.request.user)
+        """Update audit fields on modification."""
+        # ✅ No is_valid() call here either
+        serializer.save(updated_by=self.request.user)
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -297,16 +271,14 @@ class ExamInstanceViewSet(ModelViewSet):
         'subject__name',
         'exam__name',
         'exam__exam_type__name',
-    ]  # search by subject name, exam name, and exam type
-
+    ]
     filterset_fields = [
         'subject',
         'has_external_marks',
         'has_internal_marks',
         'has_subject_skills',
         'has_subject_co_scholastic_grade'
-    ]  # FK and boolean filters
-
+    ]
     ordering_fields = [
         'date',
         'exam_start_time',
@@ -315,19 +287,16 @@ class ExamInstanceViewSet(ModelViewSet):
         'has_external_marks',
         'has_internal_marks',
         'has_subject_skills',
-    ]  # sortable by date, time, and related fields
-    
+    ]
     pagination_class = CustomPagination
-    lookup_field = 'pk'  # for retrieve/update
+    lookup_field = 'pk'
     lookup_url_kwarg = 'pk'
 
+    # ✅ Get exam_id from URL kwargs
     def get_exam_id(self):
-        """
-        Get exam_id from URL kwargs
-        """
         exam_id = self.kwargs.get('exam_id')
         if not exam_id:
-            return Response({"exam_id": "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({"exam_id": "This field is required in the URL."})
         return exam_id
 
     def get_queryset(self):
@@ -337,18 +306,21 @@ class ExamInstanceViewSet(ModelViewSet):
             is_active=True
         ).order_by('date')
 
+    # ✅ No need to revalidate serializer here
     def perform_create(self, serializer):
         exam_id = self.get_exam_id()
+        exam = get_object_or_404(Exam, pk=exam_id)
         serializer.save(
-            exam_id=exam_id,
+            exam=exam,
             created_by=self.request.user,
             updated_by=self.request.user
         )
 
     def perform_update(self, serializer):
         exam_id = self.get_exam_id()
+        exam = get_object_or_404(Exam, pk=exam_id)
         serializer.save(
-            exam_id=exam_id,
+            exam=exam,
             updated_by=self.request.user
         )
 
@@ -406,15 +378,16 @@ class ExamInstanceViewSet(ModelViewSet):
 # ==================== ExamSubjectSkillInstance ====================
 class ExamSubjectSkillInstanceViewSet(ModelViewSet):
     serializer_class = ExamSubjectSkillInstanceSerializer
-    http_method_names = ['get', 'put']
+    http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
+
     search_fields = [
-        'subject_skill__name',             # search by skill name
-        'subject_skill__subject__name',    # search by skill's subject name
+        'subject_skill__name',              # search by skill name
+        'subject_skill__subject__name',     # search by related subject name
     ]
 
     filterset_fields = [
-        'subject_skill',                   # filter by skill
+        'subject_skill',
         'has_external_marks',
         'has_internal_marks',
         'has_subject_co_scholastic_grade',
@@ -423,15 +396,15 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
     ]
 
     ordering_fields = [
-        'subject_skill__name',
         'subject_skill__subject__name',
+        'subject_skill__name',
         'has_external_marks',
         'has_internal_marks',
-        'has_subject_skills',
+        'has_subject_co_scholastic_grade',
     ]
 
     pagination_class = CustomPagination
-    lookup_field = 'pk'  # for retrieve/update
+    lookup_field = 'pk'
     lookup_url_kwarg = 'pk'
 
     def get_exam_instance_id(self):
@@ -440,13 +413,13 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
         """
         exam_instance_id = self.kwargs.get('exam_instance_id')
         if not exam_instance_id:
-            return Response({"exam_instance_id": "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({"exam_instance_id": "This field is required in the URL."})
         return exam_instance_id
 
     def get_queryset(self):
         exam_instance_id = self.get_exam_instance_id()
         return ExamSubjectSkillInstance.objects.filter(
-            exam_instance__exam_instance_id=exam_instance_id,
+            exam_instance_id=exam_instance_id,  # ✅ direct FK reference
             is_active=True
         ).order_by('subject_skill__subject__name')
 
@@ -1002,47 +975,37 @@ class PublishProgressCardAPIView(APIView):
 #=============================================================================================================
 #============================================ Marks Entry Page ===============================================
 #=============================================================================================================
-
 @api_view(['GET'])
 @permission_classes([CanViewExamResult])
 def create_exam_results(request):
-    section_wise_exam_result_status_id = request.query_params.get('section_wise_exam_result_status_id')
-    if not section_wise_exam_result_status_id:
-        return Response(
-            {'section_wise_exam_result_status_id': "This field is required in the URL."},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    section_status_id = request.query_params.get('section_wise_exam_result_status_id')
+    if not section_status_id:
+        return Response({'section_wise_exam_result_status_id': "This field is required in the URL."},
+                        status=status.HTTP_400_BAD_REQUEST)
 
     try:
         section_status = SectionWiseExamResultStatus.objects.select_related('exam', 'section').get(
-            id=section_wise_exam_result_status_id, is_active=True
+            id=section_status_id, is_active=True
         )
     except SectionWiseExamResultStatus.DoesNotExist:
-        return Response(
-            {'section_wise_exam_result_status_id': "Invalid id"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({'section_wise_exam_result_status_id': "Invalid id"},
+                        status=status.HTTP_400_BAD_REQUEST)
 
     exam = section_status.exam
-    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).select_related('subject')
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).select_related('subject').prefetch_related('subject__subject_skills')
     students = Student.objects.filter(
         section=section_status.section,
         is_active=True,
         admission_status__admission_status_id=3
     )
 
-    # Fetch all existing ExamResults for these students and exam_instances
     existing_results = ExamResult.objects.filter(
         student__in=students,
         exam_instance__in=exam_instances,
         is_active=True
     ).select_related('student', 'exam_instance', 'exam_attendance', 'co_scholastic_grade')
 
-    # Map for fast lookup
-    results_dict = {
-        (res.student_id, res.exam_instance_id): res
-        for res in existing_results
-    }
+    results_dict = {(res.student_id, res.exam_instance_id): res for res in existing_results}
 
     # Create missing ExamResults
     new_results = []
@@ -1050,37 +1013,70 @@ def create_exam_results(request):
         for student in students:
             key = (student.student_id, instance.exam_instance_id)
             if key not in results_dict:
-                new_result = ExamResult(student=student, exam_instance=instance)
-                new_result.save()  # ensures total_marks and percentage are computed
+                new_result = ExamResult.objects.create(student=student, exam_instance=instance)
                 results_dict[key] = new_result
+                new_results.append(new_result)
 
-            
+    # Handle skill results
+    for instance in exam_instances.filter(has_subject_skills=True):
+        skills = instance.subject.subject_skills.all()
+        for student in students:
+            res = results_dict.get((student.student_id, instance.exam_instance_id))
+            for skill in skills:
+                ExamSkillResult.objects.get_or_create(exam_result=res, skill=skill)
 
-    # Build final response
+    # Build response
     data = []
     for student in students:
+        student_dict = {
+            'student_id': student.student_id,
+            'student_name': student.name,
+            'SCS_Number': student.SCS_Number,
+            'exam_instances': []
+        }
+
         for instance in exam_instances:
             res = results_dict.get((student.student_id, instance.exam_instance_id))
-            student_data = {
-                'student_name': student.name,
-                'SCS_Number': student.SCS_Number,
-                'exam_instances': {
-                    'subject_name': instance.subject.name,
-                    'has_external_marks': instance.has_external_marks,
-                    'has_internal_marks': instance.has_internal_marks,
-                    'has_subject_co_scholastic_grade': instance.has_subject_co_scholastic_grade,
-                    'exam_result_id': res.exam_result_id if res else None,
-                    'exam_attendance': res.exam_attendance.id if res and res.exam_attendance else None,
-                    'external_marks': res.external_marks if res else None,
-                    'internal_marks': res.internal_marks if res else None,
-                    'co_scholastic_grade': res.co_scholastic_grade.id if res and res.co_scholastic_grade else None,
-                    'has_subject_skills': instance.has_subject_skills,
-                }
-            }
-            data.append(student_data)
+            skills_data = []
+
+            if instance.has_subject_skills:
+                for skill in instance.subject.subject_skills.all():
+                    skill_instance = ExamSubjectSkillInstance.objects.filter(
+                        exam_instance=instance, subject_skill=skill, is_active=True
+                    ).first()
+
+                    skill_result = ExamSkillResult.objects.filter(
+                        exam_result=res, skill=skill
+                    ).first()
+
+                    skills_data.append({
+                        'skill_name': skill.name,
+                        'has_external_marks': skill_instance.has_external_marks if skill_instance else False,
+                        'has_internal_marks': skill_instance.has_internal_marks if skill_instance else False,
+                        'has_subject_co_scholastic_grade': skill_instance.has_subject_co_scholastic_grade if skill_instance else False,
+                        'exam_skill_result_id': skill_result.exam_skill_result_id if skill_result else None,
+                        'external_marks': skill_result.external_marks if skill_result else None,
+                        'internal_marks': skill_result.internal_marks if skill_result else None,
+                        'co_scholastic_grade': skill_result.co_scholastic_grade_id if skill_result and skill_result.co_scholastic_grade else None,
+                    })
+
+            student_dict['exam_instances'].append({
+                'subject_name': instance.subject.name,
+                'exam_result_id': res.exam_result_id if res else None,
+                'has_external_marks': instance.has_external_marks,
+                'has_internal_marks': instance.has_internal_marks,
+                'has_subject_co_scholastic_grade': instance.has_subject_co_scholastic_grade,
+                'exam_attendance': res.exam_attendance.exam_attendance_status_id if res and res.exam_attendance else None,
+                'external_marks': res.external_marks if res else None,
+                'internal_marks': res.internal_marks if res else None,
+                'co_scholastic_grade': res.co_scholastic_grade_id if res and res.co_scholastic_grade else None,
+                'has_subject_skills': instance.has_subject_skills,
+                'exam_skill_instances': skills_data,
+            })
+
+        data.append(student_dict)
 
     return Response(data)
-
 
 
 
