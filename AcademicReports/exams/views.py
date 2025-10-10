@@ -267,7 +267,8 @@ class ExamViewSet(ModelViewSet):
         if not current_academic_year:
             raise NotFound("Current academic year not found.")
 
-        serializer.save(academic_year=current_academic_year)
+        if serializer.is_valid():
+            serializer.save(academic_year=current_academic_year)
 
     def perform_create(self, serializer):
         if serializer.is_valid():
@@ -339,18 +340,20 @@ class ExamInstanceViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         exam_id = self.get_exam_id()
-        serializer.save(
-            exam_id=exam_id,
-            created_by=self.request.user,
-            updated_by=self.request.user
-        )
+        if serializer.is_valid():
+            serializer.save(
+                exam_id=exam_id,
+                created_by=self.request.user,
+                updated_by=self.request.user
+            )
 
     def perform_update(self, serializer):
         exam_id = self.get_exam_id()
-        serializer.save(
-            exam_id=exam_id,
-            updated_by=self.request.user
-        )
+        if serializer.is_valid():
+            serializer.save(
+                exam_id=exam_id,
+                updated_by=self.request.user
+            )
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -452,18 +455,20 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         exam_instance_id = self.get_exam_instance_id()
-        serializer.save(
-            exam_instance_id=exam_instance_id,
-            created_by=self.request.user,
-            updated_by=self.request.user
-        )
+        if serializer.is_valid():
+            serializer.save(
+                exam_instance_id=exam_instance_id,
+                created_by=self.request.user,
+                updated_by=self.request.user
+            )
 
     def perform_update(self, serializer):
         exam_instance_id = self.get_exam_instance_id()
-        serializer.save(
-            exam_instance_id=exam_instance_id,
-            updated_by=self.request.user
-        )
+        if serializer.is_valid():
+            serializer.save(
+                exam_instance_id=exam_instance_id,
+                updated_by=self.request.user
+            )
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -1002,47 +1007,37 @@ class PublishProgressCardAPIView(APIView):
 #=============================================================================================================
 #============================================ Marks Entry Page ===============================================
 #=============================================================================================================
-
 @api_view(['GET'])
 @permission_classes([CanViewExamResult])
 def create_exam_results(request):
-    section_wise_exam_result_status_id = request.query_params.get('section_wise_exam_result_status_id')
-    if not section_wise_exam_result_status_id:
-        return Response(
-            {'section_wise_exam_result_status_id': "This field is required in the URL."},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    section_status_id = request.query_params.get('section_wise_exam_result_status_id')
+    if not section_status_id:
+        return Response({'section_wise_exam_result_status_id': "This field is required in the URL."},
+                        status=status.HTTP_400_BAD_REQUEST)
 
     try:
         section_status = SectionWiseExamResultStatus.objects.select_related('exam', 'section').get(
-            id=section_wise_exam_result_status_id, is_active=True
+            id=section_status_id, is_active=True
         )
     except SectionWiseExamResultStatus.DoesNotExist:
-        return Response(
-            {'section_wise_exam_result_status_id': "Invalid id"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({'section_wise_exam_result_status_id': "Invalid id"},
+                        status=status.HTTP_400_BAD_REQUEST)
 
     exam = section_status.exam
-    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).select_related('subject')
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).select_related('subject').prefetch_related('subject__subject_skills')
     students = Student.objects.filter(
         section=section_status.section,
         is_active=True,
         admission_status__admission_status_id=3
     )
 
-    # Fetch all existing ExamResults for these students and exam_instances
     existing_results = ExamResult.objects.filter(
         student__in=students,
         exam_instance__in=exam_instances,
         is_active=True
     ).select_related('student', 'exam_instance', 'exam_attendance', 'co_scholastic_grade')
 
-    # Map for fast lookup
-    results_dict = {
-        (res.student_id, res.exam_instance_id): res
-        for res in existing_results
-    }
+    results_dict = {(res.student_id, res.exam_instance_id): res for res in existing_results}
 
     # Create missing ExamResults
     new_results = []
@@ -1050,37 +1045,70 @@ def create_exam_results(request):
         for student in students:
             key = (student.student_id, instance.exam_instance_id)
             if key not in results_dict:
-                new_result = ExamResult(student=student, exam_instance=instance)
-                new_result.save()  # ensures total_marks and percentage are computed
+                new_result = ExamResult.objects.create(student=student, exam_instance=instance)
                 results_dict[key] = new_result
+                new_results.append(new_result)
 
-            
+    # Handle skill results
+    for instance in exam_instances.filter(has_subject_skills=True):
+        skills = instance.subject.subject_skills.all()
+        for student in students:
+            res = results_dict.get((student.student_id, instance.exam_instance_id))
+            for skill in skills:
+                ExamSkillResult.objects.get_or_create(exam_result=res, skill=skill)
 
-    # Build final response
+    # Build response
     data = []
     for student in students:
+        student_dict = {
+            'student_id': student.student_id,
+            'student_name': student.name,
+            'SCS_Number': student.SCS_Number,
+            'exam_instances': []
+        }
+
         for instance in exam_instances:
             res = results_dict.get((student.student_id, instance.exam_instance_id))
-            student_data = {
-                'student_name': student.name,
-                'SCS_Number': student.SCS_Number,
-                'exam_instances': {
-                    'subject_name': instance.subject.name,
-                    'has_external_marks': instance.has_external_marks,
-                    'has_internal_marks': instance.has_internal_marks,
-                    'has_subject_co_scholastic_grade': instance.has_subject_co_scholastic_grade,
-                    'exam_result_id': res.exam_result_id if res else None,
-                    'exam_attendance': res.exam_attendance.id if res and res.exam_attendance else None,
-                    'external_marks': res.external_marks if res else None,
-                    'internal_marks': res.internal_marks if res else None,
-                    'co_scholastic_grade': res.co_scholastic_grade.id if res and res.co_scholastic_grade else None,
-                    'has_subject_skills': instance.has_subject_skills,
-                }
-            }
-            data.append(student_data)
+            skills_data = []
+
+            if instance.has_subject_skills:
+                for skill in instance.subject.subject_skills.all():
+                    skill_instance = ExamSubjectSkillInstance.objects.filter(
+                        exam_instance=instance, subject_skill=skill, is_active=True
+                    ).first()
+
+                    skill_result = ExamSkillResult.objects.filter(
+                        exam_result=res, skill=skill
+                    ).first()
+
+                    skills_data.append({
+                        'skill_name': skill.name,
+                        'has_external_marks': skill_instance.has_external_marks if skill_instance else False,
+                        'has_internal_marks': skill_instance.has_internal_marks if skill_instance else False,
+                        'has_subject_co_scholastic_grade': skill_instance.has_subject_co_scholastic_grade if skill_instance else False,
+                        'exam_skill_result_id': skill_result.exam_skill_result_id if skill_result else None,
+                        'external_marks': skill_result.external_marks if skill_result else None,
+                        'internal_marks': skill_result.internal_marks if skill_result else None,
+                        'co_scholastic_grade': skill_result.co_scholastic_grade_id if skill_result and skill_result.co_scholastic_grade else None,
+                    })
+
+            student_dict['exam_instances'].append({
+                'subject_name': instance.subject.name,
+                'exam_result_id': res.exam_result_id if res else None,
+                'has_external_marks': instance.has_external_marks,
+                'has_internal_marks': instance.has_internal_marks,
+                'has_subject_co_scholastic_grade': instance.has_subject_co_scholastic_grade,
+                'exam_attendance': res.exam_attendance.exam_attendance_status_id if res and res.exam_attendance else None,
+                'external_marks': res.external_marks if res else None,
+                'internal_marks': res.internal_marks if res else None,
+                'co_scholastic_grade': res.co_scholastic_grade_id if res and res.co_scholastic_grade else None,
+                'has_subject_skills': instance.has_subject_skills,
+                'exam_skill_instances': skills_data,
+            })
+
+        data.append(student_dict)
 
     return Response(data)
-
 
 
 

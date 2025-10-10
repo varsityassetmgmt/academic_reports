@@ -410,7 +410,7 @@ class ExamResult(models.Model):
 
 
 class ExamSkillResult(models.Model):
-    examp_skill_result_id = models.BigAutoField(primary_key=True)
+    exam_skill_result_id = models.BigAutoField(primary_key=True)
     exam_result = models.ForeignKey(ExamResult, on_delete=models.PROTECT, related_name="skill_results")
     skill = models.ForeignKey(SubjectSkill, on_delete=models.PROTECT, related_name="skill_results")
     co_scholastic_grade = models.ForeignKey(CoScholasticGrade,on_delete=models.PROTECT,null=True,blank = True, related_name="exam_skill_results")
@@ -419,6 +419,7 @@ class ExamSkillResult(models.Model):
     external_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True) 
     internal_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True)  
     marks_obtained = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True) 
+
     def __str__(self):
         return f"{self.exam_result.student} - {self.skill.name}: {self.value}"
     
