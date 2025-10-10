@@ -136,7 +136,6 @@ class Exam(models.Model):
             current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True, is_active=True).first()
             if current_academic_year:
                 self.academic_year = current_academic_year
-        super().save(*args, **kwargs)
 
         if not self.exam_status:
             try:
