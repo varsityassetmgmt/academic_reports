@@ -11,5 +11,5 @@ router.register(r'orientation_dropdown_for_exam', OrientationDropdownForExamView
 
 urlpatterns = [
 
-    
+    path('get_branch_wise_orientations/',trigger_branch_orientation_sync),
 ]+ router.urls

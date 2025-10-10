@@ -12,6 +12,8 @@ urlpatterns = [
     path('branches/', include('branches.urls')),
     path('students/', include('students.urls')),
     path('exams/', include('exams.urls')),
+    path('api/', include('apibridge.urls')),
+    
 ]
 
 if settings.DEBUG:
