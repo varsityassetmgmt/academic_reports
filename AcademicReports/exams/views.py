@@ -127,8 +127,9 @@ class SubjectViewSet(ModelViewSet):
     serializer_class = SubjectSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name', 'display_name']
-    filterset_fields = ['academic_devisions', 'class_names', ]
+    search_fields = ['name', 'display_name', 'description']  # text fields to search
+    filterset_fields = ['academic_devisions', 'class_names', 'is_active']  # FK/many2many and boolean
+    ordering_fields = ['name', 'display_name', 'created_at', 'updated_at']  # fields users can order by
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
@@ -156,8 +157,9 @@ class SubjectSkillViewSet(ModelViewSet):
     serializer_class = SubjectSkillSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name', 'subject__name']
-    filterset_fields = ['subject']
+    search_fields = ['name', 'subject__name']  # searchable text fields
+    filterset_fields = ['subject', 'is_active']  # FK and boolean fields
+    ordering_fields = ['name', 'subject__name', 'created_at', 'updated_at']  # sortable fields
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
@@ -185,7 +187,9 @@ class ExamTypeViewSet(ModelViewSet):
     serializer_class = ExamTypeSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name', 'description']
+    search_fields = ['name', 'description']       # text search
+    filterset_fields = ['is_active']             # boolean filter
+    ordering_fields = ['name', 'created_at', 'updated_at']  # sortable fields
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
@@ -212,9 +216,36 @@ class ExamViewSet(ModelViewSet):
     serializer_class = ExamSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name', 'exam_type__name', 'academic_year__name']
-    filterset_fields = ['exam_type', 'is_visible']
-    ordering = ['-start_date', 'is_visible']
+    search_fields = [
+        'name', 
+        'exam_type__name', 
+        'academic_year__name'
+    ]  # text search on exam name, exam type, and academic year
+
+    filterset_fields = [
+        'exam_type', 
+        'is_visible', 
+        'is_progress_card_visible',
+        'is_active', 
+        'academic_year',
+        'name',
+        'start_date',
+        'end_date',
+        'marks_entry_expiry_datetime',
+    ]  # FK, boolean, and academic year filter
+
+    ordering_fields = [
+        'exam_type__name', 
+        'start_date', 
+        'end_date', 
+        'name', 
+        'is_visible', 
+        'created_at', 
+        'updated_at',
+        'acadmic_year',
+        'marks_entry_expiry_datetime',
+    ]  # sortable fields
+
     pagination_class = CustomPagination
 
     def get_queryset(self):
@@ -225,7 +256,7 @@ class ExamViewSet(ModelViewSet):
         exams = Exam.objects.filter(
             academic_year=current_academic_year,
             is_active=True
-        ).order_by('-start_date')
+        ).order_by('-exam_id' , 'is_visible')
         return exams
 
     def perform_create(self, serializer):
@@ -262,7 +293,30 @@ class ExamInstanceViewSet(ModelViewSet):
     serializer_class = ExamInstanceSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['subject__name']
+    search_fields = [
+        'subject__name',
+        'exam__name',
+        'exam__exam_type__name',
+    ]  # search by subject name, exam name, and exam type
+
+    filterset_fields = [
+        'subject',
+        'has_external_marks',
+        'has_internal_marks',
+        'has_subject_skills',
+        'has_subject_co_scholastic_grade'
+    ]  # FK and boolean filters
+
+    ordering_fields = [
+        'date',
+        'exam_start_time',
+        'exam_end_time',
+        'subject__name',
+        'has_external_marks',
+        'has_internal_marks',
+        'has_subject_skills',
+    ]  # sortable by date, time, and related fields
+    
     pagination_class = CustomPagination
     lookup_field = 'pk'  # for retrieve/update
     lookup_url_kwarg = 'pk'
@@ -355,10 +409,27 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
     http_method_names = ['get', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = [
-        'exam_instance__exam__name',
-        'subject_skill__subject__name',
-        'subject_skill__skill__name',
+        'subject_skill__name',             # search by skill name
+        'subject_skill__subject__name',    # search by skill's subject name
     ]
+
+    filterset_fields = [
+        'subject_skill',                   # filter by skill
+        'has_external_marks',
+        'has_internal_marks',
+        'has_subject_co_scholastic_grade',
+        'subject_skill__name',
+        'subject_skill__subject__name',
+    ]
+
+    ordering_fields = [
+        'subject_skill__name',
+        'subject_skill__subject__name',
+        'has_external_marks',
+        'has_internal_marks',
+        'has_subject_skills',
+    ]
+
     pagination_class = CustomPagination
     lookup_field = 'pk'  # for retrieve/update
     lookup_url_kwarg = 'pk'
@@ -472,6 +543,25 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'status__name'
     ]
 
+    filterset_fields = [
+        'academic_year',
+        'branch',
+        'exam',
+        'status',
+        'is_visible',
+        'is_active',
+    ]
+
+    ordering_fields = [
+        'academic_year__name',
+        'branch__name',
+        'exam__name',
+        'status__name',
+        'marks_entry_expiry_datetime',
+        'marks_completion_percentage',
+        'updated_at',
+    ]
+
     def get_queryset(self):
         user = self.request.user
 
@@ -523,11 +613,33 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
 
     search_fields = [
         'academic_year__name',
-        'branch__name',
         'section__name',
-        'exam__name',
+        'section__class_name__name',     
+        'section__orientation__name',     
         'status__name',
     ]
+
+    filterset_fields = [
+        'academic_year',
+        'section__name',
+        'section__class_name',         
+        'section__orientation',           
+        'status',
+        'is_visible',
+        'is_active',
+    ]
+
+    ordering_fields = [
+        'academic_year__name',
+        'section__name',
+        'section__class_name__name',     
+        'section__orientation__name',     
+        'status__name',
+        'marks_entry_expiry_datetime',
+        'marks_completion_percentage',
+        'updated_at',
+    ]
+
 
     def get_queryset(self):
         """
@@ -667,111 +779,6 @@ def update_section_wise_exam_result_status_view(request):
         "exam": branch_status.exam.name,
         "academic_year": branch_status.academic_year.name
     }, status=status.HTTP_200_OK)
-            
-
-# # ==================== ExamAttendanceStatus ====================
-# class ExamAttendanceStatusViewSet(ModelViewSet):
-#     queryset = ExamAttendanceStatus.objects.filter(is_active=True).order_by('name')
-#     serializer_class = ExamAttendanceStatusSerializer
-#     http_method_names = ['get', 'post', 'put']
-#     filter_backends = [DjangoFilterBackend, SearchFilter]
-#     search_fields = ['name', 'short_code']
-#     pagination_class = CustomPagination
-
-#     def get_permissions(self):
-#         if self.action in ['list', 'retrieve']:
-#             permission_classes = [CanViewExamAttendanceStatus]
-#         elif self.action == 'create':
-#             permission_classes = [CanAddExamAttendanceStatus]
-#         elif self.action in ['update', 'partial_update']:
-#             permission_classes = [CanChangeExamAttendanceStatus]
-#         else:
-#             permission_classes = [permissions.AllowAny]
-#         return [permission() for permission in permission_classes]
-
-
-# # ==================== GradeBoundary ====================
-# class GradeBoundaryViewSet(ModelViewSet):
-#     queryset = GradeBoundary.objects.filter(is_active=True).order_by('-min_percentage')
-#     serializer_class = GradeBoundarySerializer
-#     http_method_names = ['get', 'post', 'put']
-#     filter_backends = [DjangoFilterBackend, SearchFilter]
-#     search_fields = ['grade', 'exam_type__name', 'orientation__name']
-#     pagination_class = CustomPagination
-
-#     def get_permissions(self):
-#         if self.action in ['list', 'retrieve']:
-#             permission_classes = [CanViewGradeBoundary]
-#         elif self.action == 'create':
-#             permission_classes = [CanAddGradeBoundary]
-#         elif self.action in ['update', 'partial_update']:
-#             permission_classes = [CanChangeGradeBoundary]
-#         else:
-#             permission_classes = [permissions.AllowAny]
-#         return [permission() for permission in permission_classes]
-
-
-# # ==================== ExamResult ====================
-# class ExamResultViewSet(ModelViewSet):
-#     queryset = ExamResult.objects.filter(is_active=True).order_by('-id')
-#     serializer_class = ExamResultSerializer
-#     http_method_names = ['get', 'post', 'put']
-#     filter_backends = [DjangoFilterBackend, SearchFilter]
-#     search_fields = ['student__SCS_Number', 'student__name', 'exam_instance__exam__name']
-#     pagination_class = CustomPagination
-
-#     def get_permissions(self):
-#         if self.action in ['list', 'retrieve']:
-#             permission_classes = [CanViewExamResult]
-#         elif self.action == 'create':
-#             permission_classes = [CanAddExamResult]
-#         elif self.action in ['update', 'partial_update']:
-#             permission_classes = [CanChangeExamResult]
-#         else:
-#             permission_classes = [permissions.AllowAny]
-#         return [permission() for permission in permission_classes]
-
-
-# # ==================== ExamSkillResult ====================
-# class ExamSkillResultViewSet(ModelViewSet):
-#     queryset = ExamSkillResult.objects.all()
-#     serializer_class = ExamSkillResultSerializer
-#     http_method_names = ['get', 'post', 'put']
-#     filter_backends = [DjangoFilterBackend, SearchFilter]
-#     search_fields = ['exam_result__student__name', 'skill__name']
-#     pagination_class = CustomPagination
-
-#     def get_permissions(self):
-#         if self.action in ['list', 'retrieve']:
-#             permission_classes = [CanViewExamSkillResult]
-#         elif self.action == 'create':
-#             permission_classes = [CanAddExamSkillResult]
-#         elif self.action in ['update', 'partial_update']:
-#             permission_classes = [CanChangeExamSkillResult]
-#         else:
-#             permission_classes = [permissions.AllowAny]
-#         return [permission() for permission in permission_classes]
-
-
-# # ==================== StudentExamSummary ====================
-# class StudentExamSummaryViewSet(ModelViewSet):
-#     queryset = StudentExamSummary.objects.filter(is_active=True).order_by('-id')
-#     serializer_class = StudentExamSummarySerializer
-#     http_method_names = ['get', 'post', 'put']
-#     filter_backends = [DjangoFilterBackend, SearchFilter]
-#     search_fields = ['student__SCS_Number', 'student__name', 'exam__name']
-#     pagination_class = CustomPagination
-
-#     def get_permissions(self):
-#         if self.action in ['list', 'retrieve']:
-#             permission_classes = [CanViewStudentExamSummary]
-#         elif self.action == 'create':
-#             permission_classes = [CanAddStudentExamSummary]
-#         elif self.action in ['update', 'partial_update']:
-#             permission_classes = [CanChangeStudentExamSummary]
-#         else:
-#             permission_classes = [permissions.AllowAny]
-#         return [permission() for permission in permission_classes]
 
 
 
@@ -932,8 +939,6 @@ class ExpireExamAPIView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-       
-
 
 # from django.utils import timezone
 # from django.db import transaction
@@ -994,3 +999,147 @@ class PublishProgressCardAPIView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+#=============================================================================================================
+#============================================ Marks Entry Page ===============================================
+#=============================================================================================================
+
+@api_view(['GET'])
+@permission_classes([CanViewExamResult])
+def create_exam_results(request):
+    section_wise_exam_result_status_id = request.query_params.get('section_wise_exam_result_status_id')
+    if not section_wise_exam_result_status_id:
+        return Response(
+            {'section_wise_exam_result_status_id': "This field is required in the URL."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        section_status = SectionWiseExamResultStatus.objects.select_related('exam', 'section').get(
+            id=section_wise_exam_result_status_id, is_active=True
+        )
+    except SectionWiseExamResultStatus.DoesNotExist:
+        return Response(
+            {'section_wise_exam_result_status_id': "Invalid id"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    exam = section_status.exam
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).select_related('subject')
+    students = Student.objects.filter(
+        section=section_status.section,
+        is_active=True,
+        admission_status__admission_status_id=3
+    )
+
+    # Fetch all existing ExamResults for these students and exam_instances
+    existing_results = ExamResult.objects.filter(
+        student__in=students,
+        exam_instance__in=exam_instances,
+        is_active=True
+    ).select_related('student', 'exam_instance', 'exam_attendance', 'co_scholastic_grade')
+
+    # Map for fast lookup
+    results_dict = {
+        (res.student_id, res.exam_instance_id): res
+        for res in existing_results
+    }
+
+    # Create missing ExamResults
+    new_results = []
+    for instance in exam_instances:
+        for student in students:
+            key = (student.student_id, instance.exam_instance_id)
+            if key not in results_dict:
+                new_result = ExamResult(student=student, exam_instance=instance)
+                new_result.save()  # ensures total_marks and percentage are computed
+                results_dict[key] = new_result
+
+            
+
+    # Build final response
+    data = []
+    for student in students:
+        for instance in exam_instances:
+            res = results_dict.get((student.student_id, instance.exam_instance_id))
+            student_data = {
+                'student_name': student.name,
+                'SCS_Number': student.SCS_Number,
+                'exam_instances': {
+                    'subject_name': instance.subject.name,
+                    'has_external_marks': instance.has_external_marks,
+                    'has_internal_marks': instance.has_internal_marks,
+                    'has_subject_co_scholastic_grade': instance.has_subject_co_scholastic_grade,
+                    'exam_result_id': res.exam_result_id if res else None,
+                    'exam_attendance': res.exam_attendance.id if res and res.exam_attendance else None,
+                    'external_marks': res.external_marks if res else None,
+                    'internal_marks': res.internal_marks if res else None,
+                    'co_scholastic_grade': res.co_scholastic_grade.id if res and res.co_scholastic_grade else None,
+                    'has_subject_skills': instance.has_subject_skills,
+                }
+            }
+            data.append(student_data)
+
+    return Response(data)
+
+
+
+
+# @api_view(['GET'])
+# @api_view([CanViewExamResult])
+# def create_exam_results(request):
+#     section_wise_exam_result_status_id = request.query_params.get('section_wise_exam_result_status_id')
+#     if not section_wise_exam_result_status_id:
+#         return Response({'section_wise_exam_result_status_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
+    
+#     section_wise_exam_result_status = SectionWiseExamResultStatus.objects.get(id=section_wise_exam_result_status_id, is_active=True)
+#     if not section_wise_exam_result_status:
+#         return Response({'section_wise_exam_result_status_id': "Invalid id"}, status=status.HTTP_400_BAD_REQUEST)
+    
+#     exam = section_wise_exam_result_status.exam
+#     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+#     students = Student.objects.filter(section=section_wise_exam_result_status.section, is_active=True, admission_status__admission_status_id=3)  # admission_status_id for Dropout Students
+    
+#     for instance in exam_instances:
+#         existing_students = ExamResult.objects.filter(student__student_id__in=students.values_list('student_id', flat=True).distinct(), exam_instance=instance, is_active=True)
+#         missing_students = students.exclude(student_id=existing_students.values_list('student__students_id', flat=True))
+
+#         if missing_students.exists():
+#             new_results = [
+#                 ExamResult(
+#                     student=student,
+#                     exam_instance = instance,
+#                 )
+#                 for student in missing_students
+#             ]
+#             ExamResult.objects.bulk_create(new_results)
+
+#     # exam_results = ExamResult.objects.filter(student__student_id__in=students.values_list('student_id', flat=True).distinct(), exam_instance__exam_instance_id__in=exam_instances.values_list('exam_instance_id', flat=True), is_active=True)
+
+#     data = []
+
+#     for student in students:
+#         for instance in exam_instances:
+#             # student_result = exam_results.filter(student=student, exam_instance=instance)
+#             student_result = ExamResult.objects.filter(student=student, exam_instance=instance)
+#             student_data = {
+#                 'student_name' : student.name,
+#                 'SCS_Number' : student.SCS_Number,
+                
+#                 'exam_instances' :{
+#                     'subject_name' : instance.subject.name,
+#                     'has_external_marks' : instance.has_external_marks,
+#                     'has_internal_marks' : instance.has_internal_marks,
+#                     'has_subject_co_scholastic_grade' : instance.has_subject_co_scholastic_grade,
+#                     'exam_result_id': student_result.exam_result_id,
+#                     'exam_attendance' : student_result.exam_attendance,
+#                     'external_marks': student_result.external_marks,
+#                     'internal_marks': student_result.internal_marks,
+#                     'co_scholastic_grade': student_result.co_scholastic_grade,
+
+#                     'has_subject_skills' : instance.has_subject_skills,
+#                 }
+#             }
+
+#             data.append(student_data)
+
+#     return Response(data)
