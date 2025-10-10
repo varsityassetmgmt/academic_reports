@@ -999,3 +999,147 @@ class PublishProgressCardAPIView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+#=============================================================================================================
+#============================================ Marks Entry Page ===============================================
+#=============================================================================================================
+
+@api_view(['GET'])
+@permission_classes([CanViewExamResult])
+def create_exam_results(request):
+    section_wise_exam_result_status_id = request.query_params.get('section_wise_exam_result_status_id')
+    if not section_wise_exam_result_status_id:
+        return Response(
+            {'section_wise_exam_result_status_id': "This field is required in the URL."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        section_status = SectionWiseExamResultStatus.objects.select_related('exam', 'section').get(
+            id=section_wise_exam_result_status_id, is_active=True
+        )
+    except SectionWiseExamResultStatus.DoesNotExist:
+        return Response(
+            {'section_wise_exam_result_status_id': "Invalid id"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    exam = section_status.exam
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).select_related('subject')
+    students = Student.objects.filter(
+        section=section_status.section,
+        is_active=True,
+        admission_status__admission_status_id=3
+    )
+
+    # Fetch all existing ExamResults for these students and exam_instances
+    existing_results = ExamResult.objects.filter(
+        student__in=students,
+        exam_instance__in=exam_instances,
+        is_active=True
+    ).select_related('student', 'exam_instance', 'exam_attendance', 'co_scholastic_grade')
+
+    # Map for fast lookup
+    results_dict = {
+        (res.student_id, res.exam_instance_id): res
+        for res in existing_results
+    }
+
+    # Create missing ExamResults
+    new_results = []
+    for instance in exam_instances:
+        for student in students:
+            key = (student.student_id, instance.exam_instance_id)
+            if key not in results_dict:
+                new_result = ExamResult(student=student, exam_instance=instance)
+                new_result.save()  # ensures total_marks and percentage are computed
+                results_dict[key] = new_result
+
+            
+
+    # Build final response
+    data = []
+    for student in students:
+        for instance in exam_instances:
+            res = results_dict.get((student.student_id, instance.exam_instance_id))
+            student_data = {
+                'student_name': student.name,
+                'SCS_Number': student.SCS_Number,
+                'exam_instances': {
+                    'subject_name': instance.subject.name,
+                    'has_external_marks': instance.has_external_marks,
+                    'has_internal_marks': instance.has_internal_marks,
+                    'has_subject_co_scholastic_grade': instance.has_subject_co_scholastic_grade,
+                    'exam_result_id': res.exam_result_id if res else None,
+                    'exam_attendance': res.exam_attendance.id if res and res.exam_attendance else None,
+                    'external_marks': res.external_marks if res else None,
+                    'internal_marks': res.internal_marks if res else None,
+                    'co_scholastic_grade': res.co_scholastic_grade.id if res and res.co_scholastic_grade else None,
+                    'has_subject_skills': instance.has_subject_skills,
+                }
+            }
+            data.append(student_data)
+
+    return Response(data)
+
+
+
+
+# @api_view(['GET'])
+# @api_view([CanViewExamResult])
+# def create_exam_results(request):
+#     section_wise_exam_result_status_id = request.query_params.get('section_wise_exam_result_status_id')
+#     if not section_wise_exam_result_status_id:
+#         return Response({'section_wise_exam_result_status_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
+    
+#     section_wise_exam_result_status = SectionWiseExamResultStatus.objects.get(id=section_wise_exam_result_status_id, is_active=True)
+#     if not section_wise_exam_result_status:
+#         return Response({'section_wise_exam_result_status_id': "Invalid id"}, status=status.HTTP_400_BAD_REQUEST)
+    
+#     exam = section_wise_exam_result_status.exam
+#     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+#     students = Student.objects.filter(section=section_wise_exam_result_status.section, is_active=True, admission_status__admission_status_id=3)  # admission_status_id for Dropout Students
+    
+#     for instance in exam_instances:
+#         existing_students = ExamResult.objects.filter(student__student_id__in=students.values_list('student_id', flat=True).distinct(), exam_instance=instance, is_active=True)
+#         missing_students = students.exclude(student_id=existing_students.values_list('student__students_id', flat=True))
+
+#         if missing_students.exists():
+#             new_results = [
+#                 ExamResult(
+#                     student=student,
+#                     exam_instance = instance,
+#                 )
+#                 for student in missing_students
+#             ]
+#             ExamResult.objects.bulk_create(new_results)
+
+#     # exam_results = ExamResult.objects.filter(student__student_id__in=students.values_list('student_id', flat=True).distinct(), exam_instance__exam_instance_id__in=exam_instances.values_list('exam_instance_id', flat=True), is_active=True)
+
+#     data = []
+
+#     for student in students:
+#         for instance in exam_instances:
+#             # student_result = exam_results.filter(student=student, exam_instance=instance)
+#             student_result = ExamResult.objects.filter(student=student, exam_instance=instance)
+#             student_data = {
+#                 'student_name' : student.name,
+#                 'SCS_Number' : student.SCS_Number,
+                
+#                 'exam_instances' :{
+#                     'subject_name' : instance.subject.name,
+#                     'has_external_marks' : instance.has_external_marks,
+#                     'has_internal_marks' : instance.has_internal_marks,
+#                     'has_subject_co_scholastic_grade' : instance.has_subject_co_scholastic_grade,
+#                     'exam_result_id': student_result.exam_result_id,
+#                     'exam_attendance' : student_result.exam_attendance,
+#                     'external_marks': student_result.external_marks,
+#                     'internal_marks': student_result.internal_marks,
+#                     'co_scholastic_grade': student_result.co_scholastic_grade,
+
+#                     'has_subject_skills' : instance.has_subject_skills,
+#                 }
+#             }
+
+#             data.append(student_data)
+
+#     return Response(data)
