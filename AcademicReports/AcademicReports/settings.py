@@ -46,11 +46,16 @@ INSTALLED_APPS = [
     "corsheaders",
     'django_filters', 
     'rest_framework.authtoken',
+    'django_celery_results',
+    'django_celery_beat',
 
     'usermgmt',
     'branches',
     'students',
     'exams',
+    'apibridge',
+
+   
     
 ]
 
@@ -178,3 +183,23 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+
+
+
+#================================================  Celery  starts ========================================================
+
+# CELERY_BROKER_URL = 'redis://127.0.0.1:6379'
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
+# CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT =  ['application/json']
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TASK_SERIALIZER = 'json'
+CELRY_TIMEZONE = 'Asia/Kolkata'
+CELERY_ENABLE_UTC = False
+CELERY_RESULT_BACKEND = 'django-db'
+# CELERY BEAT
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+#================================================ Celery Ends      ========================================================

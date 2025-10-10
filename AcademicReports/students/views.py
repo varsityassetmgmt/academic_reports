@@ -9,6 +9,10 @@ from usermgmt.custompagination import CustomPagination
 from .permmissions import *
 from rest_framework import permissions, status
 from rest_framework.exceptions import NotFound
+from students import tasks
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 # Create your views here.
 class ClassNameDropdownViewSet(ModelViewSet):
@@ -143,3 +147,15 @@ class StudentViewSet(ModelViewSet):
             permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
 
+
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def trigger_branch_orientation_sync(request):
+    tasks.sync_branch_wise_orientations.delay()
+    return Response(
+        {"message": "Branch orientation sync task triggered successfully."},
+    )
+        

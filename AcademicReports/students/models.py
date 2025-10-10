@@ -67,7 +67,7 @@ class Section(models.Model):
     orientation = models.ForeignKey('students.Orientation', related_name="section_orientation", null=True, blank=True, on_delete=models.SET_NULL) 
     name = models.CharField(max_length=250, null=False, blank=False)
     external_name = models.CharField(max_length=250, null=True, blank=True)
-    external_id = models.CharField(max_length=250, null=True, blank=True)
+    varna_section_id = models.CharField(max_length=250, null=True, blank=True)
     strength = models.IntegerField(null=True, blank=True)
     has_students = models.BooleanField(default = False)
     is_active = models.BooleanField(default=True)  
