@@ -89,6 +89,7 @@ class ExamSerializer(serializers.ModelSerializer):
     academic_year_name = serializers.CharField(source='academic_year.name', read_only=True)
     exam_type_name = serializers.CharField(source='exam_type.name', read_only=True)
     marks_entry_expiry_datetime_display = serializers.DateTimeField(source='marks_entry_expiry_datetime', format="%Y-%m-%d %H:%M:%S", read_only = True )
+    exam_status_name = serializers.CharField(source='exam_status.name', read_only=True)
 
     class Meta:
         model = Exam
