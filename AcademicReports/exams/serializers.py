@@ -118,7 +118,7 @@ class ExamSerializer(serializers.ModelSerializer):
         # Check start and end date
         start_date = data.get('start_date')
         end_date = data.get('end_date')
-        if start_date and end_date and end_date <= start_date:
+        if start_date and end_date and end_date < start_date:
             raise serializers.ValidationError({"end_date": "End date cannot be earlier than start date."})
 
         # Ensure at least one selection for all ManyToMany fields
@@ -181,7 +181,7 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
                 })
 
         # Validate exam start and end time
-        if start_time and end_time and end_time <= start_time:
+        if start_time and end_time and end_time < start_time:
             raise serializers.ValidationError({"exam_end_time": "Exam end time must be later than start time."})
 
         # Validate subject belongs to exam classes
