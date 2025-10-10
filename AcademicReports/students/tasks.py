@@ -10,13 +10,13 @@ from students.models import *
 
 @shared_task
 def sync_branch_wise_orientations():
-    academic_year_id = AcademicYear.objects.filter(is_current_academic_year = True, is_active=True).values_list('academic_year_id', flat=True).first()
+    academic_year = AcademicYear.objects.filter(is_current_academic_year = True, is_active=True).first()
 
-    if not academic_year_id:
+    if not academic_year:
         return "No active current academic year found."
 
     url = "http://192.168.0.6/varna_api/branchorientations.php"
-    params = {"token": "chaitanya", "academic_year_id": academic_year_id}
+    params = {"token": "chaitanya", "academic_year_id": academic_year.academic_year_id}
 
     try:
         response = requests.get(url, params=params,timeout=15)
@@ -39,7 +39,10 @@ def sync_branch_wise_orientations():
             except (Branch.DoesNotExist, Orientation.DoesNotExist):
                 continue
 
-            branch_orientation, _ = BranchOrientations.objects.get_or_create(branch=branch)
+            branch_orientation, _ = BranchOrientations.objects.get_or_create(
+                academic_year = academic_year,
+                branch = branch
+                )
 
             if is_active:
                 branch_orientation.orientations.add(orientation)
