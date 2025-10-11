@@ -499,7 +499,7 @@ class EditExamResultSerializer(serializers.ModelSerializer):
         internal_marks = attrs.get('internal_marks')
         exam_result_id = attrs.get('exam_result_id')
 
-        exam_instance = ExamResult.objects.get(exam_result_id=exam_result_id).exam_instance
+        exam_instance = self.instance.exam_instance
 
         # Default attendance = Present
         attendance_obj = None
