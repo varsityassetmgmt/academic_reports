@@ -311,22 +311,20 @@ class ExamInstanceViewSet(ModelViewSet):
         exam_id = self.get_exam_id()
         exam = get_object_or_404(Exam, pk=exam_id)
         if exam.is_editable== False:
-            raise ValidationError({"exam_id": "This Exam is already published; editing is not allowed"})
-        serializer.save(
-            exam=exam,
-            created_by=self.request.user,
-            updated_by=self.request.user
-        )
+            serializer.save(
+                exam=exam,
+                created_by=self.request.user,
+                updated_by=self.request.user
+            )
 
     def perform_update(self, serializer):
         exam_id = self.get_exam_id()
         exam = get_object_or_404(Exam, pk=exam_id)
         if exam.is_editable== False:
-            raise ValidationError({"exam_id": "This Exam is already published; editing is not allowed"})
-        serializer.save(
-            exam=exam,
-            updated_by=self.request.user
-        )
+            serializer.save(
+                exam=exam,
+                updated_by=self.request.user
+            )
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
