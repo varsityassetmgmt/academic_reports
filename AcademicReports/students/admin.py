@@ -74,6 +74,7 @@ class BranchOrientationsAdmin(admin.ModelAdmin):
 class SectionAdmin(admin.ModelAdmin):
     # Columns displayed in the list view
     list_display = (
+        'section_id',
         'name',
         'external_name',
         'class_name',
@@ -99,9 +100,10 @@ class SectionAdmin(admin.ModelAdmin):
 
     # Searchable fields
     search_fields = (
+        'section_id'
         'name',
         'external_name',
-        'external_id',
+        'varna_section_id',
     )
 
     # Default ordering
@@ -113,7 +115,7 @@ class SectionAdmin(admin.ModelAdmin):
     # Optional: Add field grouping for clarity
     fieldsets = (
         ('Basic Information', {
-            'fields': ('name', 'external_name', 'external_id')
+            'fields': ('name', 'external_name', 'varna_section_id')
         }),
         ('Relationships', {
             'fields': ('academic_year', 'branch', 'class_name', 'orientation')
