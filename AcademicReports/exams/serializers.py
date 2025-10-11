@@ -880,3 +880,8 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
         attrs['marks_obtained'] = total
 
         return attrs
+
+class CoScholasticGradeDropdownSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoScholasticGrade
+        fields =['id','name',]

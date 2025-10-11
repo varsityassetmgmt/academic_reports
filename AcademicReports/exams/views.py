@@ -1219,3 +1219,8 @@ def edit_exam_skill_result(request, exam_skill_result_id):
 #         if not exam_result_id:
 #             return Response({'exam_result_id': "This Field is Required"})
         
+class CoScholasticGradeDropdownViewSet(ModelViewSet):
+    queryset = CoScholasticGrade.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = CoScholasticGradeDropdownSerializer
+    http_method_names = ['get']
