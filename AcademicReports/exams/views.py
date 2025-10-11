@@ -992,7 +992,7 @@ def create_exam_results(request):
                         status=status.HTTP_400_BAD_REQUEST)
 
     exam = section_status.exam
-    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).select_related('subject')
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True) #.select_related('subject')
     students = Student.objects.filter(
         section=section_status.section,
         is_active=True,
@@ -1019,7 +1019,7 @@ def create_exam_results(request):
 
     # Handle skill results
     for instance in exam_instances.filter(has_subject_skills=True):
-        skills = instance.subject.subject_skills.all()
+        skills = instance.subject_skills.all()
         for student in students:
             res = results_dict.get((student.student_id, instance.exam_instance_id))
             for skill in skills:
@@ -1035,12 +1035,12 @@ def create_exam_results(request):
             'exam_instances': []
         }
 
+        # Build response
         for instance in exam_instances:
             res = results_dict.get((student.student_id, instance.exam_instance_id))
             skills_data = []
-
             if instance.has_subject_skills:
-                for skill in instance.subject.subject_skills.all():
+                for skill in instance.subject_skills.all():
                     skill_instance = ExamSubjectSkillInstance.objects.filter(
                         exam_instance=instance, subject_skill=skill, is_active=True
                     ).first()
