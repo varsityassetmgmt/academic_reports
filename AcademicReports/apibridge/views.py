@@ -655,9 +655,13 @@ def process_sections_for_branch(branch_id):
         current_academic_year =  AcademicYear.objects.filter(is_current_academic_year = True , is_active = True).first()
         if not current_academic_year:
              return {"error": f"Current Academic Year Not Fount"}
-        academic_year = current_academic_year.name
+        academic_year_name = current_academic_year.name
+ 
         # API request
-        url = f"http://192.168.0.6/varna_api/section.php?token=chaitanya&academic_year={academic_year}&branch_id={branch_id}"
+        # url = f"http://192.168.0.6/varna_api/section.php?token=chaitanya&academic_year={academic_year_name}&branch_id={branch_id}"
+        
+        #this api with Student Count
+        url = f"http://192.168.0.6/varna_api/section_std_count.php/?token=chaitanya&academic_year={academic_year_name}&branch_id={branch_id}"
         response = requests.get(url,timeout=10)
         response.raise_for_status()  # This will raise an exception for 4xx/5xx responses
         data = response.json()
@@ -673,6 +677,14 @@ def process_sections_for_branch(branch_id):
             
             is_active = True if item.get('active_status') == "1" else False
             orientation_id = item.get('orientation')
+            student_count_str = item.get("student_count", "0")
+
+            try:
+                student_count = int(student_count_str)
+            except (TypeError, ValueError):
+                student_count = 0
+
+            has_students = student_count > 0
 
             # Fetch related objects, handle missing ones gracefully
             academic_year = AcademicYear.objects.filter(academic_year_id=academic_year_id).first()
@@ -691,6 +703,8 @@ def process_sections_for_branch(branch_id):
                 existing_section.class_name = class_name
                 existing_section.branch = branch
                 existing_section.academic_year = academic_year
+                existing_section.has_students = has_students
+                existing_section.strength = student_count
                 existing_section.save()
             else:
                 Section.objects.create(
@@ -700,7 +714,8 @@ def process_sections_for_branch(branch_id):
                     class_name=class_name,
                     orientation=orientation,
                     name=section_name,
-                    strength=0,
+                    strength=student_count,
+                    has_students = has_students,
                     is_active = is_active
                 )
 
