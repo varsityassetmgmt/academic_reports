@@ -101,15 +101,22 @@ class ExamSerializer(serializers.ModelSerializer):
     def validate(self, data):
         # ---- 1. Prevent editing published exams ----
         if self.instance and self.instance.is_editable is False:
-            raise serializers.ValidationError({"non_field_errors":"This Exam is Already Published, Edit is not allowed."})
+            raise serializers.ValidationError({"non_field_errors": "This Exam is already published, editing is not allowed."})
 
         # ---- 2. Duplicate name validation ----
-        name = self.initial_data.get('name')
+        # fallback to instance values when updating
+        name = self.initial_data.get('name') or getattr(self.instance, 'name', None)
         if not name or str(name).strip() == "":
             raise serializers.ValidationError({"name": "Exam name is required."})
 
-        academic_year = self.initial_data.get('academic_year')
-        exam_type = self.initial_data.get('exam_type')
+        academic_year = (
+            self.initial_data.get('academic_year')
+            or (self.instance.academic_year_id if self.instance else None)
+        )
+        exam_type = (
+            self.initial_data.get('exam_type')
+            or (self.instance.exam_type_id if self.instance else None)
+        )
 
         if academic_year and exam_type:
             qs = Exam.objects.filter(
@@ -125,57 +132,142 @@ class ExamSerializer(serializers.ModelSerializer):
                 })
 
         # ---- 3. Date validation (start < end) ----
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
+        start_date = data.get('start_date') or getattr(self.instance, 'start_date', None)
+        end_date = data.get('end_date') or getattr(self.instance, 'end_date', None)
+
         if start_date and end_date and end_date < start_date:
             raise serializers.ValidationError({"end_date": "End date cannot be earlier than start date."})
 
         # ---- 4. Marks entry expiry datetime checks ----
-        marks_entry_expiry_datetime = data.get('marks_entry_expiry_datetime')
+        marks_entry_expiry_datetime = (
+            data.get('marks_entry_expiry_datetime')
+            or getattr(self.instance, 'marks_entry_expiry_datetime', None)
+        )
         if not marks_entry_expiry_datetime:
-            raise serializers.ValidationError({"endmarks_entry_expiry_datetime_date": " Marks entry expiry datetime must be selected.."})
-        if marks_entry_expiry_datetime:
-            from django.utils import timezone
-            now = timezone.now()
-            if timezone.is_naive(marks_entry_expiry_datetime):
-                marks_entry_expiry_datetime = timezone.make_aware(marks_entry_expiry_datetime)
+            raise serializers.ValidationError({
+                "marks_entry_expiry_datetime": "Marks entry expiry datetime must be selected."
+            })
 
-            # 4a. Expiry must be in future
-            if marks_entry_expiry_datetime <= now:
+        now = timezone.now()
+        if timezone.is_naive(marks_entry_expiry_datetime):
+            marks_entry_expiry_datetime = timezone.make_aware(marks_entry_expiry_datetime)
+
+        # 4a. Expiry must be in future
+        if marks_entry_expiry_datetime <= now:
+            raise serializers.ValidationError({
+                "marks_entry_expiry_datetime": "Marks entry expiry datetime must be in the future."
+            })
+
+        # 4b. Expiry must be AFTER exam end date
+        if end_date:
+            end_of_day = timezone.make_aware(
+                datetime.datetime.combine(end_date, datetime.time.max)
+            )
+            if marks_entry_expiry_datetime <= end_of_day:
                 raise serializers.ValidationError({
-                    "marks_entry_expiry_datetime": "Marks entry expiry datetime must be in the future."
+                    "marks_entry_expiry_datetime": "Marks entry expiry datetime must be after the exam end date."
                 })
 
-            # 4b. Expiry must be AFTER exam end date
-            if end_date:
-                # Convert end_date to datetime for proper comparison
-                end_of_day = timezone.make_aware(
-                    datetime.datetime.combine(end_date, datetime.time.max)
-                )
-                if marks_entry_expiry_datetime <= end_of_day:
-                    raise serializers.ValidationError({
-                        "marks_entry_expiry_datetime": "Marks entry expiry datetime must be after the exam end date."
-                    })
+        # ---- 5. M2M Field Validation ----
+        # only validate during creation, not on update
+        if not self.instance:
+            m2m_fields = {
+                "branches": self.initial_data.get('branches', []),
+                "states": self.initial_data.get('states', []),
+                "zones": self.initial_data.get('zones', []),
+                "orientations": self.initial_data.get('orientations', []),
+                "academic_devisions": self.initial_data.get('academic_devisions', []),
+                "student_classes": self.initial_data.get('student_classes', []),
+            }
 
-        # ---- 5. Many-to-Many Field Validation ----
-        m2m_fields = {
-            "branches": self.initial_data.get('branches', []),
-            "states": self.initial_data.get('states', []),
-            "zones": self.initial_data.get('zones', []),
-            "orientations": self.initial_data.get('orientations', []),
-            "academic_devisions": self.initial_data.get('academic_devisions', []),
-            "student_classes": self.initial_data.get('student_classes', []),
-        }
+            m2m_errors = {}
+            for field_name, field_value in m2m_fields.items():
+                if not field_value:
+                    m2m_errors[field_name] = f"At least one {field_name.replace('_', ' ')} must be selected."
 
-        m2m_errors = {}
-        for field_name, field_value in m2m_fields.items():
-            if not field_value:
-                m2m_errors[field_name] = f"At least one {field_name.replace('_', ' ')} must be selected."
-
-        if m2m_errors:
-            raise serializers.ValidationError(m2m_errors)
+            if m2m_errors:
+                raise serializers.ValidationError(m2m_errors)
 
         return data
+
+    # def validate(self, data):
+    #     # ---- 1. Prevent editing published exams ----
+    #     if self.instance and self.instance.is_editable is False:
+    #         raise serializers.ValidationError({"non_field_errors":"This Exam is Already Published, Edit is not allowed."})
+
+    #     # ---- 2. Duplicate name validation ----
+    #     name = self.initial_data.get('name')
+    #     if not name or str(name).strip() == "":
+    #         raise serializers.ValidationError({"name": "Exam name is required."})
+
+    #     academic_year = self.initial_data.get('academic_year')
+    #     exam_type = self.initial_data.get('exam_type')
+
+    #     if academic_year and exam_type:
+    #         qs = Exam.objects.filter(
+    #             name__iexact=name.strip(),
+    #             academic_year_id=academic_year,
+    #             exam_type_id=exam_type
+    #         )
+    #         if self.instance:
+    #             qs = qs.exclude(pk=self.instance.pk)
+    #         if qs.exists():
+    #             raise serializers.ValidationError({
+    #                 "name": "An exam with this name, year, and type already exists."
+    #             })
+
+    #     # ---- 3. Date validation (start < end) ----
+    #     start_date = data.get('start_date')
+    #     end_date = data.get('end_date')
+    #     if start_date and end_date and end_date < start_date:
+    #         raise serializers.ValidationError({"end_date": "End date cannot be earlier than start date."})
+
+    #     # ---- 4. Marks entry expiry datetime checks ----
+    #     marks_entry_expiry_datetime = data.get('marks_entry_expiry_datetime')
+    #     if not marks_entry_expiry_datetime:
+    #         raise serializers.ValidationError({"endmarks_entry_expiry_datetime_date": " Marks entry expiry datetime must be selected.."})
+    #     if marks_entry_expiry_datetime:
+    #         from django.utils import timezone
+    #         now = timezone.now()
+    #         if timezone.is_naive(marks_entry_expiry_datetime):
+    #             marks_entry_expiry_datetime = timezone.make_aware(marks_entry_expiry_datetime)
+
+    #         # 4a. Expiry must be in future
+    #         if marks_entry_expiry_datetime <= now:
+    #             raise serializers.ValidationError({
+    #                 "marks_entry_expiry_datetime": "Marks entry expiry datetime must be in the future."
+    #             })
+
+    #         # 4b. Expiry must be AFTER exam end date
+    #         if end_date:
+    #             # Convert end_date to datetime for proper comparison
+    #             end_of_day = timezone.make_aware(
+    #                 datetime.datetime.combine(end_date, datetime.time.max)
+    #             )
+    #             if marks_entry_expiry_datetime <= end_of_day:
+    #                 raise serializers.ValidationError({
+    #                     "marks_entry_expiry_datetime": "Marks entry expiry datetime must be after the exam end date."
+    #                 })
+
+    #     # ---- 5. Many-to-Many Field Validation ----
+    #     m2m_fields = {
+    #         "branches": self.initial_data.get('branches', []),
+    #         "states": self.initial_data.get('states', []),
+    #         "zones": self.initial_data.get('zones', []),
+    #         "orientations": self.initial_data.get('orientations', []),
+    #         "academic_devisions": self.initial_data.get('academic_devisions', []),
+    #         "student_classes": self.initial_data.get('student_classes', []),
+    #     }
+
+    #     m2m_errors = {}
+    #     for field_name, field_value in m2m_fields.items():
+    #         if not field_value:
+    #             m2m_errors[field_name] = f"At least one {field_name.replace('_', ' ')} must be selected."
+
+    #     if m2m_errors:
+    #         raise serializers.ValidationError(m2m_errors)
+
+    #     return data
 
 # ==================== ExamInstance ====================
 class ExamInstanceSerializer(serializers.ModelSerializer):
