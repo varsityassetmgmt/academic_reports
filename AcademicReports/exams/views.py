@@ -976,7 +976,7 @@ class PublishProgressCardAPIView(APIView):
 #============================================ Marks Entry Page ===============================================
 #=============================================================================================================
 @api_view(['GET'])
-@permission_classes([CanViewExamResult])
+@permission_classes([CanAddExamResult])
 def create_exam_results(request):
     section_status_id = request.query_params.get('section_wise_exam_result_status_id')
     if not section_status_id:
@@ -992,7 +992,7 @@ def create_exam_results(request):
                         status=status.HTTP_400_BAD_REQUEST)
 
     exam = section_status.exam
-    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).select_related('subject')
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True) #.select_related('subject')
     students = Student.objects.filter(
         section=section_status.section,
         is_active=True,
@@ -1019,7 +1019,7 @@ def create_exam_results(request):
 
     # Handle skill results
     for instance in exam_instances.filter(has_subject_skills=True):
-        skills = instance.subject.subject_skills.all()
+        skills = instance.subject_skills.all()
         for student in students:
             res = results_dict.get((student.student_id, instance.exam_instance_id))
             for skill in skills:
@@ -1035,12 +1035,12 @@ def create_exam_results(request):
             'exam_instances': []
         }
 
+        # Build response
         for instance in exam_instances:
             res = results_dict.get((student.student_id, instance.exam_instance_id))
             skills_data = []
-
             if instance.has_subject_skills:
-                for skill in instance.subject.subject_skills.all():
+                for skill in instance.subject_skills.all():
                     skill_instance = ExamSubjectSkillInstance.objects.filter(
                         exam_instance=instance, subject_skill=skill, is_active=True
                     ).first()
@@ -1055,7 +1055,9 @@ def create_exam_results(request):
                         'has_internal_marks': skill_instance.has_internal_marks if skill_instance else False,
                         'has_subject_co_scholastic_grade': skill_instance.has_subject_co_scholastic_grade if skill_instance else False,
                         'exam_skill_result_id': skill_result.exam_skill_result_id if skill_result else None,
+                        'max_cut_off_marks_external' : skill_instance.cut_off_marks_external if skill_instance else 0,
                         'external_marks': skill_result.external_marks if skill_result else None,
+                        'max_cut_off_marks_internal': skill_instance.cut_off_marks_internal if skill_instance else 0,
                         'internal_marks': skill_result.internal_marks if skill_result else None,
                         'co_scholastic_grade': skill_result.co_scholastic_grade.id if skill_result and skill_result.co_scholastic_grade else None,
                     })
@@ -1067,7 +1069,9 @@ def create_exam_results(request):
                 'has_internal_marks': instance.has_internal_marks,
                 'has_subject_co_scholastic_grade': instance.has_subject_co_scholastic_grade,
                 'exam_attendance': res.exam_attendance.exam_attendance_status_id if res and res.exam_attendance else None,
+                'max_cut_off_marks_external': instance.cut_off_marks_external,
                 'external_marks': res.external_marks if res else None,
+                'max_cut_off_marks_internal': instance.cut_off_marks_internal,
                 'internal_marks': res.internal_marks if res else None,
                 'co_scholastic_grade': res.co_scholastic_grade.id if res and res.co_scholastic_grade else None,
                 'has_subject_skills': instance.has_subject_skills,
@@ -1139,3 +1143,77 @@ def create_exam_results(request):
 #             data.append(student_data)
 
 #     return Response(data)
+
+@api_view(['PATCH', 'PUT'])
+@permission_classes([CanChangeExamResult])
+def edit_exam_results(request, exam_result_id):
+    """
+    Update an ExamResult instance.
+    PATCH → Partial update
+    PUT   → Full update
+    Handles external/internal marks, co-scholastic grade, 
+    and automatically sets attendance based on marks.
+    """
+    try:
+        exam_result = ExamResult.objects.get(exam_result_id=exam_result_id, is_active=True)
+    except ExamResult.DoesNotExist:
+        return Response(
+            {"exam_result_id": "Invalid Exam Result ID"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # If PUT, force full update (partial=False); PATCH → partial=True
+    partial_update = request.method == 'PATCH'
+
+    serializer = EditExamResultSerializer(exam_result, data=request.data, partial=partial_update)
+
+    try:
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+    except serializers.ValidationError as e:
+        return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response(
+            {"detail": f"An error occurred: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['PATCH', 'PUT'])
+@permission_classes([CanChangeExamResult])
+def edit_exam_skill_result(request, exam_skill_result_id):
+    """
+    Update an ExamSkillResult.
+    PATCH → partial update, PUT → full update
+    """
+    try:
+        skill_result = ExamSkillResult.objects.get(exam_skill_result_id=exam_skill_result_id)
+    except ExamSkillResult.DoesNotExist:
+        return Response({"exam_skill_result_id": "Invalid ID"}, status=status.HTTP_404_NOT_FOUND)
+
+    partial_update = request.method == 'PATCH'
+    serializer = ExamSkillResultSerializer(skill_result, data=request.data, partial=partial_update)
+
+    try:
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+    except serializers.ValidationError as e:
+        return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+# class EditExamResults(ModelViewSet):
+#     permission_classes = [CanChangeExamResult]
+#     serializer_class = EditExamResultSerializer
+#     http_method_names = ['get', 'put']
+
+#     def get_queryset(self):
+#         exam_result_id = self.request.query_params.get('exam_result_id')
+#         if not exam_result_id:
+#             return Response({'exam_result_id': "This Field is Required"})
+        
