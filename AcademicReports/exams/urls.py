@@ -45,7 +45,7 @@ urlpatterns = [
 
         path('create_exam_results/', create_exam_results, name='create_exam_results'),
         path('edit_exam_results/<int:exam_result_id>/', edit_exam_results, name='edit_exam_results'),
-       
+        path('edit_exam_skill_result/<int:exam_skill_result_id>/', edit_exam_skill_result, name='edit_exam_skill_result'),
 
 
 

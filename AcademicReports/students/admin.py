@@ -100,7 +100,7 @@ class SectionAdmin(admin.ModelAdmin):
 
     # Searchable fields
     search_fields = (
-        'section_id'
+        'section_id',
         'name',
         'external_name',
         'varna_section_id',
