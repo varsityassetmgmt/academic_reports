@@ -132,6 +132,8 @@ class ExamSerializer(serializers.ModelSerializer):
 
         # ---- 4. Marks entry expiry datetime checks ----
         marks_entry_expiry_datetime = data.get('marks_entry_expiry_datetime')
+        if not marks_entry_expiry_datetime:
+            raise serializers.ValidationError({"endmarks_entry_expiry_datetime_date": " Marks entry expiry datetime must be selected.."})
         if marks_entry_expiry_datetime:
             from django.utils import timezone
             now = timezone.now()
