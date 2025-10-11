@@ -234,13 +234,13 @@ class ExamViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         """Assign academic year and audit fields on creation."""
-        # current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
-        # if not current_academic_year:
-        #     raise NotFound("Current academic year not found.")
+        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+        if not current_academic_year:
+            raise NotFound("Current academic year not found.")
         
         # ✅ No need to call is_valid() again here
         serializer.save(
-            # academic_year=current_academic_year,
+            academic_year=current_academic_year,
             created_by=self.request.user,
             updated_by=self.request.user
         )
