@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import *
 from django.utils import timezone
+from decimal import Decimal, InvalidOperation
 
 # ==================== Subject ====================
 class SubjectSerializer(serializers.ModelSerializer):
@@ -471,3 +472,160 @@ class SectionWiseExamResultStatusSerializer(serializers.ModelSerializer):
 
         return data
 
+
+class EditExamResultSerializer(serializers.ModelSerializer):
+    external_marks = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    internal_marks = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
+    class Meta:
+        model = ExamResult
+        fields = [
+            'exam_result_id',
+            'student',
+            'exam_instance',
+            'exam_attendance',
+            'external_marks',
+            'internal_marks',
+            'co_scholastic_grade',
+        ]
+        read_only_fields = [
+            'exam_result_id',
+            'student',
+            'exam_instance',
+        ]
+
+    def validate(self, attrs):
+        external_marks = attrs.get('external_marks')
+        internal_marks = attrs.get('internal_marks')
+        exam_result_id = attrs.get('exam_result_id')
+
+        exam_instance = ExamResult.objects.get(exam_result_id=exam_result_id).exam_instance
+
+        # Default attendance = Present
+        attendance_obj = None
+
+        # Define valid absent keywords
+        ABSENT_VALUES = ['AB', 'ABSENT', '', 'A', 'a']
+        DROPOUT_VALUES = ['DR', 'DROPOUT', 'Drop', 'D', 'd']
+
+        def parse_marks(value, field_name):
+            """Parse and validate mark values."""
+            if value in [None, ""]:
+                return None  # empty input → None
+
+            str_val = str(value).strip().upper()
+
+            # Handle Absent
+            if str_val in ABSENT_VALUES:
+                return "ABSENT"
+            
+            if str_val in DROPOUT_VALUES:
+                return "DROPOUT"
+
+            # Handle numeric
+            try:
+                return Decimal(str(value))
+            except (InvalidOperation, TypeError, ValueError):
+                raise serializers.ValidationError({field_name: f"Invalid input for {field_name}. Must be a number or 'AB' or 'DR'."})
+
+        ext_value = parse_marks(external_marks, "external_marks")
+        int_value = parse_marks(internal_marks, "internal_marks")
+
+        # Determine attendance based on marks
+        if ext_value == "ABSENT" or int_value == "ABSENT":
+            # Absent case → nullify marks
+            attrs['external_marks'] = None
+            attrs['internal_marks'] = None
+            try:
+                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=2)  # Absent
+            except ExamAttendanceStatus.DoesNotExist:
+                pass
+
+        elif ext_value == 'DROPOUT' or int_value == 'DROPOUT':
+            attrs['external_marks'] = None
+            attrs['internal_marks'] = None
+            try:
+                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=3)  # Dropout
+            except ExamAttendanceStatus.DoesNotExist:
+                pass
+        else:
+            if isinstance(ext_value, Decimal) and exam_instance.cut_off_marks_external is not None:
+                if ext_value > exam_instance.cut_off_marks_external:
+                    raise serializers.ValidationError({'external_marks': 'External Marks must be less than Cut off Marks'})
+
+            if isinstance(int_value, Decimal) and exam_instance.cut_off_marks_internal is not None:
+                if int_value > exam_instance.cut_off_marks_internal:
+                    raise serializers.ValidationError({'internal_marks': 'Internal Marks must be less than Cut off Marks'})
+                
+            attrs['external_marks'] = ext_value
+            attrs['internal_marks'] = int_value
+            try:
+                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=1)  # Present
+            except ExamAttendanceStatus.DoesNotExist:
+                pass
+
+        if attendance_obj:
+            attrs['exam_attendance'] = attendance_obj
+
+        return attrs
+
+class ExamSkillResultSerializer(serializers.ModelSerializer):
+    external_marks = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    internal_marks = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
+    class Meta:
+        model = ExamSkillResult
+        fields = [
+            'exam_skill_result_id',
+            'exam_result',
+            'skill',
+            'co_scholastic_grade',
+            'external_marks',
+            'internal_marks',
+            'marks_obtained',
+        ]
+        read_only_fields = [
+            'exam_skill_result_id',
+            'exam_result',
+            'skill',
+            'marks_obtained',
+        ]
+
+    def validate(self, attrs):
+        external_marks = attrs.get('external_marks')
+        internal_marks = attrs.get('internal_marks')
+        exam_skill_result = self.instance
+
+        # Fetch related ExamSubjectSkillInstance for cut-off info
+        try:
+            skill_instance = ExamSubjectSkillInstance.objects.get(
+                exam_instance=exam_skill_result.exam_result.exam_instance,
+                subject_skill=exam_skill_result.skill,
+                is_active=True
+            )
+        except ExamSubjectSkillInstance.DoesNotExist:
+            raise serializers.ValidationError("ExamSubjectSkillInstance not found for this skill and exam.")
+
+        def parse_marks(value, field_name, cut_off):
+            if value in [None, ""]:
+                return None
+            str_val = str(value).strip().upper()
+
+            # Absent or Dropout handling can be added here if required
+            try:
+                dec_val = Decimal(str(value))
+            except (InvalidOperation, TypeError, ValueError):
+                raise serializers.ValidationError({field_name: f"Invalid input for {field_name}. Must be numeric."})
+
+            if cut_off is not None and dec_val > cut_off:
+                raise serializers.ValidationError({field_name: f"{field_name} cannot exceed cut-off marks ({cut_off})."})
+            return dec_val
+
+        attrs['external_marks'] = parse_marks(external_marks, 'external_marks', skill_instance.cut_off_marks_external)
+        attrs['internal_marks'] = parse_marks(internal_marks, 'internal_marks', skill_instance.cut_off_marks_internal)
+
+        # Calculate total marks_obtained
+        total = (attrs['external_marks'] or 0) + (attrs['internal_marks'] or 0)
+        attrs['marks_obtained'] = total
+
+        return attrs

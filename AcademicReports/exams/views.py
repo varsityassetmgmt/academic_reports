@@ -976,7 +976,7 @@ class PublishProgressCardAPIView(APIView):
 #============================================ Marks Entry Page ===============================================
 #=============================================================================================================
 @api_view(['GET'])
-@permission_classes([CanViewExamResult, CanAddExamResult])
+@permission_classes([CanAddExamResult])
 def create_exam_results(request):
     section_status_id = request.query_params.get('section_wise_exam_result_status_id')
     if not section_status_id:
@@ -1144,13 +1144,76 @@ def create_exam_results(request):
 
 #     return Response(data)
 
+@api_view(['PATCH', 'PUT'])
+@permission_classes([CanChangeExamResult])
+def edit_exam_results(request, exam_result_id):
+    """
+    Update an ExamResult instance.
+    PATCH → Partial update
+    PUT   → Full update
+    Handles external/internal marks, co-scholastic grade, 
+    and automatically sets attendance based on marks.
+    """
+    try:
+        exam_result = ExamResult.objects.get(exam_result_id=exam_result_id, is_active=True)
+    except ExamResult.DoesNotExist:
+        return Response(
+            {"exam_result_id": "Invalid Exam Result ID"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # If PUT, force full update (partial=False); PATCH → partial=True
+    partial_update = request.method == 'PATCH'
+
+    serializer = EditExamResultSerializer(exam_result, data=request.data, partial=partial_update)
+
+    try:
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+    except serializers.ValidationError as e:
+        return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response(
+            {"detail": f"An error occurred: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['PATCH', 'PUT'])
+@permission_classes([CanChangeExamResult])
+def edit_exam_skill_result(request, exam_skill_result_id):
+    """
+    Update an ExamSkillResult.
+    PATCH → partial update, PUT → full update
+    """
+    try:
+        skill_result = ExamSkillResult.objects.get(exam_skill_result_id=exam_skill_result_id)
+    except ExamSkillResult.DoesNotExist:
+        return Response({"exam_skill_result_id": "Invalid ID"}, status=status.HTTP_404_NOT_FOUND)
+
+    partial_update = request.method == 'PATCH'
+    serializer = ExamSkillResultSerializer(skill_result, data=request.data, partial=partial_update)
+
+    try:
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+    except serializers.ValidationError as e:
+        return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
 # class EditExamResults(ModelViewSet):
 #     permission_classes = [CanChangeExamResult]
-#     serializer_class = 
+#     serializer_class = EditExamResultSerializer
 #     http_method_names = ['get', 'put']
 
 #     def get_queryset(self):
-#         return 
-
-
-
+#         exam_result_id = self.request.query_params.get('exam_result_id')
+#         if not exam_result_id:
+#             return Response({'exam_result_id': "This Field is Required"})
+        

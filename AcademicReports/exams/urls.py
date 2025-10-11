@@ -43,7 +43,8 @@ urlpatterns = [
         path('exam_subject_skill_instance/<int:exam_instance_id>/',ExamSubjectSkillInstanceViewSet.as_view({'get': 'list'}),name='exam_subject_skill_instance_list'),
         path('exam_subject_skill_instance/<int:exam_instance_id>/<int:pk>/',ExamSubjectSkillInstanceViewSet.as_view({'get': 'retrieve', 'put': 'update'}),name='exam_subject_skill_instance_retrieve'),
 
-        path('create_exam_results/', create_exam_results, name='create_exam_results')
+        path('create_exam_results/', create_exam_results, name='create_exam_results'),
+        path('edit_exam_results/<int:exam_result_id>/', edit_exam_results, name='edit_exam_results'),
        
 
 

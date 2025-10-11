@@ -4,7 +4,7 @@ from .models import *
 # ===================== Subject =====================
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
-    list_display = ('name', 'display_name', 'is_active')
+    list_display = ('subject_id', 'name', 'display_name', 'is_active')
     search_fields = ('name', 'display_name')
     list_filter = ('is_active',)
     filter_horizontal = ('academic_devisions', 'class_names')
@@ -12,7 +12,7 @@ class SubjectAdmin(admin.ModelAdmin):
 
 @admin.register(SubjectSkill)
 class SubjectSkillAdmin(admin.ModelAdmin):
-    list_display = ('name', 'subject', 'is_active')
+    list_display = ('id','name', 'subject', 'is_active')
     search_fields = ('name', 'subject__name')
     list_filter = ('is_active',)
     autocomplete_fields = ('subject',)
@@ -21,7 +21,7 @@ class SubjectSkillAdmin(admin.ModelAdmin):
 # ===================== Exam Type =====================
 @admin.register(ExamType)
 class ExamTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'is_active')
+    list_display = ('exam_type_id','name', 'is_active')
     search_fields = ('name',)
     list_filter = ('is_active',)
 
@@ -29,7 +29,7 @@ class ExamTypeAdmin(admin.ModelAdmin):
 # ===================== Exam =====================
 @admin.register(Exam)
 class ExamAdmin(admin.ModelAdmin):
-    list_display = ('name', 'exam_type', 'is_active','exam_status', 'is_visible', 'is_editable' ,'is_progress_card_visible')
+    list_display = ('exam_id','name', 'exam_type', 'is_active','exam_status', 'is_visible', 'is_editable' ,'is_progress_card_visible')
     search_fields = ('name', 'exam_type__name', 'exam_status__name')
     list_filter = ('is_active','exam_status', 'is_editable', 'is_visible', 'is_progress_card_visible')
     filter_horizontal = ('states', 'zones', 'branches', 'orientations', 'academic_devisions', 'student_classes')
@@ -39,7 +39,7 @@ class ExamAdmin(admin.ModelAdmin):
 # ===================== Exam Instance =====================
 @admin.register(ExamInstance)
 class ExamInstanceAdmin(admin.ModelAdmin):
-    list_display = ('exam', 'subject', 'date', 'is_optional', 'is_active')
+    list_display = ('exam_instance_id', 'exam', 'subject', 'date', 'is_optional', 'is_active')
     search_fields = ('exam__name', 'subject__name')
     list_filter = ('is_active', 'is_optional', 'has_external_marks', 'has_internal_marks', 'has_subject_skills', 'has_subject_co_scholastic_grade')
     filter_horizontal = ('subject_skills',)
@@ -49,7 +49,7 @@ class ExamInstanceAdmin(admin.ModelAdmin):
 # ===================== Exam Subject Skill Instance =====================
 @admin.register(ExamSubjectSkillInstance)
 class ExamSubjectSkillInstanceAdmin(admin.ModelAdmin):
-    list_display = ('exam_instance', 'subject_skill', 'is_active')
+    list_display = ('id','exam_instance', 'subject_skill', 'is_active')
     list_filter = ('is_active', 'has_external_marks', 'has_internal_marks', 'has_subject_co_scholastic_grade')
     autocomplete_fields = ('exam_instance', 'subject_skill')
 
@@ -57,7 +57,7 @@ class ExamSubjectSkillInstanceAdmin(admin.ModelAdmin):
 # ===================== Exam Attendance Status =====================
 @admin.register(ExamAttendanceStatus)
 class ExamAttendanceStatusAdmin(admin.ModelAdmin):
-    list_display = ('name', 'short_code', 'is_active')
+    list_display = ('exam_attendance_status_id','name', 'short_code', 'is_active')
     search_fields = ('name', 'short_code')
     list_filter = ('is_active',)
 
@@ -65,7 +65,7 @@ class ExamAttendanceStatusAdmin(admin.ModelAdmin):
 # ===================== Grade Boundary =====================
 @admin.register(GradeBoundary)
 class GradeBoundaryAdmin(admin.ModelAdmin):
-    list_display = ('grade', 'exam_type', 'orientation', 'min_percentage', 'max_percentage', 'is_active')
+    list_display = ('grade_boundary_id', 'grade', 'exam_type', 'orientation', 'min_percentage', 'max_percentage', 'is_active')
     search_fields = ('grade', 'exam_type__name', 'orientation__name')
     list_filter = ('is_active',)
     autocomplete_fields = ('exam_type', 'orientation')
@@ -74,7 +74,7 @@ class GradeBoundaryAdmin(admin.ModelAdmin):
 # ===================== Co-Scholastic Grade =====================
 @admin.register(CoScholasticGrade)
 class CoScholasticGradeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description', 'point', 'is_active')
+    list_display = ('id','name', 'description', 'point', 'is_active')
     search_fields = ('name', 'description')
     list_filter = ('is_active',)
 
@@ -82,7 +82,7 @@ class CoScholasticGradeAdmin(admin.ModelAdmin):
 # ===================== Exam Result =====================
 @admin.register(ExamResult)
 class ExamResultAdmin(admin.ModelAdmin):
-    list_display = ('student', 'exam_instance', 'total_marks', 'percentage', 'is_active')
+    list_display = ('exam_result_id','student', 'exam_instance', 'total_marks', 'percentage', 'is_active')
     search_fields = ('student__name', 'exam_instance__subject__name', 'exam_instance__exam__name')
     list_filter = ('is_active',)
     autocomplete_fields = ('student', 'exam_instance', 'exam_attendance', 'co_scholastic_grade')
@@ -91,7 +91,7 @@ class ExamResultAdmin(admin.ModelAdmin):
 # ===================== Exam Skill Result =====================
 @admin.register(ExamSkillResult)
 class ExamSkillResultAdmin(admin.ModelAdmin):
-    list_display = ('exam_result', 'skill', 'marks_obtained')
+    list_display = ('exam_skill_result_id', 'exam_result', 'skill', 'marks_obtained')
     search_fields = ('exam_result__student__name', 'skill__name')
     list_filter = ()
     autocomplete_fields = ('exam_result', 'skill', 'co_scholastic_grade')
@@ -100,7 +100,7 @@ class ExamSkillResultAdmin(admin.ModelAdmin):
 # ===================== Student Exam Summary =====================
 @admin.register(StudentExamSummary)
 class StudentExamSummaryAdmin(admin.ModelAdmin):
-    list_display = ('student', 'exam', 'total_subjects_marks', 'percentage', 'overall_grade', 'is_active')
+    list_display = ('students_exam_summary_id', 'student', 'exam', 'total_subjects_marks', 'percentage', 'overall_grade', 'is_active')
     search_fields = ('student__name', 'exam__name')
     list_filter = ('is_active',)
     autocomplete_fields = ('student', 'exam')
@@ -108,7 +108,7 @@ class StudentExamSummaryAdmin(admin.ModelAdmin):
 # ==================== ExamResultStatus ====================
 @admin.register(ExamResultStatus)
 class ExamResultStatusAdmin(admin.ModelAdmin):
-    list_display = ("name", "description", "display_order")
+    list_display = ('id',"name", "description", "display_order")
     search_fields = ("name", "description")
     ordering = ("display_order", "name")
 
@@ -117,6 +117,7 @@ class ExamResultStatusAdmin(admin.ModelAdmin):
 @admin.register(BranchWiseExamResultStatus)
 class BranchWiseExamResultStatusAdmin(admin.ModelAdmin):
     list_display = (
+        'id',
         "academic_year",
         "branch",
         "exam",
@@ -182,6 +183,7 @@ class BranchWiseExamResultStatusAdmin(admin.ModelAdmin):
 @admin.register(SectionWiseExamResultStatus)
 class SectionWiseExamResultStatusAdmin(admin.ModelAdmin):
     list_display = (
+        'id',
         "academic_year",
         "branch",
         "section",
