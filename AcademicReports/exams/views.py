@@ -310,6 +310,8 @@ class ExamInstanceViewSet(ModelViewSet):
     def perform_create(self, serializer):
         exam_id = self.get_exam_id()
         exam = get_object_or_404(Exam, pk=exam_id)
+        if exam.is_editable== False:
+            raise ValidationError({"exam_id": "This Exam is already published; editing is not allowed"})
         serializer.save(
             exam=exam,
             created_by=self.request.user,
@@ -319,6 +321,8 @@ class ExamInstanceViewSet(ModelViewSet):
     def perform_update(self, serializer):
         exam_id = self.get_exam_id()
         exam = get_object_or_404(Exam, pk=exam_id)
+        if exam.is_editable== False:
+            raise ValidationError({"exam_id": "This Exam is already published; editing is not allowed"})
         serializer.save(
             exam=exam,
             updated_by=self.request.user
@@ -1193,7 +1197,7 @@ def edit_exam_skill_result(request, exam_skill_result_id):
         return Response({"exam_skill_result_id": "Invalid ID"}, status=status.HTTP_404_NOT_FOUND)
 
     partial_update = request.method == 'PATCH'
-    serializer = ExamSkillResultSerializer(skill_result, data=request.data, partial=partial_update)
+    serializer = EditExamSkillResultSerializer(skill_result, data=request.data, partial=partial_update)
 
     try:
         serializer.is_valid(raise_exception=True)
