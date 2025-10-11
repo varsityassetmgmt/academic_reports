@@ -414,6 +414,7 @@ class ExamSkillResult(models.Model):
     skill = models.ForeignKey(SubjectSkill, on_delete=models.PROTECT, related_name="skill_results")
     co_scholastic_grade = models.ForeignKey(CoScholasticGrade,on_delete=models.PROTECT,null=True,blank = True, related_name="exam_skill_results")
     # custom_value = models.CharField(max_length=100, blank=True, null=True)
+    exam_attendance = models.ForeignKey(ExamAttendanceStatus,null=True,blank=True, on_delete=models.PROTECT, related_name='exam_skill_results_attendance')
 
     external_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True) 
     internal_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True)  

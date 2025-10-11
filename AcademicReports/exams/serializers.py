@@ -580,6 +580,7 @@ class ExamSkillResultSerializer(serializers.ModelSerializer):
             'exam_result',
             'skill',
             'co_scholastic_grade',
+            'exam_attendance',
             'external_marks',
             'internal_marks',
             'marks_obtained',
@@ -594,35 +595,81 @@ class ExamSkillResultSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         external_marks = attrs.get('external_marks')
         internal_marks = attrs.get('internal_marks')
-        exam_skill_result = self.instance
+        skill_result = self.instance
 
         # Fetch related ExamSubjectSkillInstance for cut-off info
         try:
             skill_instance = ExamSubjectSkillInstance.objects.get(
-                exam_instance=exam_skill_result.exam_result.exam_instance,
-                subject_skill=exam_skill_result.skill,
+                exam_instance=skill_result.exam_result.exam_instance,
+                subject_skill=skill_result.skill,
                 is_active=True
             )
         except ExamSubjectSkillInstance.DoesNotExist:
-            raise serializers.ValidationError("ExamSubjectSkillInstance not found for this skill and exam.")
+            raise serializers.ValidationError(
+                "ExamSubjectSkillInstance not found for this skill and exam."
+            )
+
+        # Attendance handling
+        attendance_obj = None
+        ABSENT_VALUES = ['AB', 'ABSENT', '', 'A', 'a']
+        DROPOUT_VALUES = ['DR', 'DROPOUT', 'Drop', 'D', 'd']
 
         def parse_marks(value, field_name, cut_off):
             if value in [None, ""]:
                 return None
+
             str_val = str(value).strip().upper()
 
-            # Absent or Dropout handling can be added here if required
+            # Handle Absent
+            if str_val in ABSENT_VALUES:
+                return "ABSENT"
+            
+            if str_val in DROPOUT_VALUES:
+                return "DROPOUT"
+
+            # Convert numeric
             try:
-                dec_val = Decimal(str(value))
-            except (InvalidOperation, TypeError, ValueError):
-                raise serializers.ValidationError({field_name: f"Invalid input for {field_name}. Must be numeric."})
+                dec_val = Decimal(value)
+            except (TypeError, InvalidOperation):
+                raise serializers.ValidationError(
+                    {field_name: f"Invalid value for {field_name}. Must be numeric, 'AB', or 'DR'."}
+                )
 
             if cut_off is not None and dec_val > cut_off:
-                raise serializers.ValidationError({field_name: f"{field_name} cannot exceed cut-off marks ({cut_off})."})
+                raise serializers.ValidationError(
+                    {field_name: f"{field_name} cannot exceed cut-off ({cut_off})."}
+                )
             return dec_val
 
-        attrs['external_marks'] = parse_marks(external_marks, 'external_marks', skill_instance.cut_off_marks_external)
-        attrs['internal_marks'] = parse_marks(internal_marks, 'internal_marks', skill_instance.cut_off_marks_internal)
+        ext_value = parse_marks(external_marks, "external_marks", skill_instance.cut_off_marks_external)
+        int_value = parse_marks(internal_marks, "internal_marks", skill_instance.cut_off_marks_internal)
+
+        # Determine attendance
+        if ext_value == "ABSENT" or int_value == "ABSENT":
+            attrs['external_marks'] = None
+            attrs['internal_marks'] = None
+            try:
+                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=2)  # Absent
+            except ExamAttendanceStatus.DoesNotExist:
+                pass
+        elif ext_value == "DROPOUT" or int_value == "DROPOUT":
+            attrs['external_marks'] = None
+            attrs['internal_marks'] = None
+            try:
+                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=3)  # Dropout
+            except ExamAttendanceStatus.DoesNotExist:
+                pass
+        else:
+            attrs['external_marks'] = ext_value
+            attrs['internal_marks'] = int_value
+            try:
+                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=1)  # Present
+            except ExamAttendanceStatus.DoesNotExist:
+                pass
+
+        # Set attendance if found
+        if attendance_obj:
+            attrs['exam_attendance'] = attendance_obj
 
         # Calculate total marks_obtained
         total = (attrs['external_marks'] or 0) + (attrs['internal_marks'] or 0)
