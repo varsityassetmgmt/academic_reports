@@ -976,7 +976,7 @@ class PublishProgressCardAPIView(APIView):
 #============================================ Marks Entry Page ===============================================
 #=============================================================================================================
 @api_view(['GET'])
-@permission_classes([CanViewExamResult])
+@permission_classes([CanViewExamResult, CanAddExamResult])
 def create_exam_results(request):
     section_status_id = request.query_params.get('section_wise_exam_result_status_id')
     if not section_status_id:
@@ -1055,7 +1055,9 @@ def create_exam_results(request):
                         'has_internal_marks': skill_instance.has_internal_marks if skill_instance else False,
                         'has_subject_co_scholastic_grade': skill_instance.has_subject_co_scholastic_grade if skill_instance else False,
                         'exam_skill_result_id': skill_result.exam_skill_result_id if skill_result else None,
+                        'max_cut_off_marks_external' : skill_instance.cut_off_marks_external if skill_instance else 0,
                         'external_marks': skill_result.external_marks if skill_result else None,
+                        'max_cut_off_marks_internal': skill_instance.cut_off_marks_internal if skill_instance else 0,
                         'internal_marks': skill_result.internal_marks if skill_result else None,
                         'co_scholastic_grade': skill_result.co_scholastic_grade.id if skill_result and skill_result.co_scholastic_grade else None,
                     })
@@ -1067,7 +1069,9 @@ def create_exam_results(request):
                 'has_internal_marks': instance.has_internal_marks,
                 'has_subject_co_scholastic_grade': instance.has_subject_co_scholastic_grade,
                 'exam_attendance': res.exam_attendance.exam_attendance_status_id if res and res.exam_attendance else None,
+                'max_cut_off_marks_external': instance.cut_off_marks_external,
                 'external_marks': res.external_marks if res else None,
+                'max_cut_off_marks_internal': instance.cut_off_marks_internal,
                 'internal_marks': res.internal_marks if res else None,
                 'co_scholastic_grade': res.co_scholastic_grade.id if res and res.co_scholastic_grade else None,
                 'has_subject_skills': instance.has_subject_skills,
@@ -1139,3 +1143,14 @@ def create_exam_results(request):
 #             data.append(student_data)
 
 #     return Response(data)
+
+# class EditExamResults(ModelViewSet):
+#     permission_classes = [CanChangeExamResult]
+#     serializer_class = 
+#     http_method_names = ['get', 'put']
+
+#     def get_queryset(self):
+#         return 
+
+
+
