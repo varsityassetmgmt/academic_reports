@@ -101,7 +101,7 @@ class ExamSerializer(serializers.ModelSerializer):
     def validate(self, data):
         # ---- 1. Prevent editing published exams ----
         if self.instance and self.instance.is_editable is False:
-            raise serializers.ValidationError("This Exam is Already Published, Edit is not allowed.")
+            raise serializers.ValidationError({"non_field_errors":"This Exam is Already Published, Edit is not allowed."})
 
         # ---- 2. Duplicate name validation ----
         name = self.initial_data.get('name')
@@ -201,7 +201,7 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
 
         # --- Prevent editing a published exam ---
         if self.instance and self.instance.exam and not self.instance.exam.is_editable:
-            raise serializers.ValidationError("This Exam is already published; editing is not allowed.")
+            raise serializers.ValidationError({"non_field_errors":"This Exam is Already Published, Edit is not allowed."})
 
         # --- Validate exam date range ---
         if exam and exam_date:
