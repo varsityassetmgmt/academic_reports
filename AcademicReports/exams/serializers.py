@@ -699,21 +699,23 @@ class EditExamResultSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
-        external_marks = attrs.get('external_marks')
-        internal_marks = attrs.get('internal_marks')
-        exam_result_id = attrs.get('exam_result_id')
-
-        exam_instance = self.instance.exam_instance
-
+        instance = self.instance
+        exam_instance = instance.exam_instance
         marks_entry_expiry_datetime = exam_instance.exam.marks_entry_expiry_datetime
-        if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
-            raise serializers.ValidationError({'marks_entry_expiry_datetime': 'Marks Entry Time is Expired'})
 
+        if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
+            raise serializers.ValidationError({
+                'marks_entry_expiry_datetime': 'Marks Entry Time is Expired'
+            })
+
+        # ✅ If marks are not being updated, skip marks logic entirely
+        if 'external_marks' not in attrs and 'internal_marks' not in attrs:
+            return attrs
 
         # Default attendance = Present
         attendance_obj = None
 
-        # Define valid absent keywords
+        # Define valid absent/dropout keywords
         ABSENT_VALUES = ['AB', 'ABSENT', 'A', 'a']
         DROPOUT_VALUES = ['DR', 'DROPOUT', 'Drop', 'D', 'd']
 
@@ -724,54 +726,59 @@ class EditExamResultSerializer(serializers.ModelSerializer):
 
             str_val = str(value).strip().upper()
 
-            # Handle Absent
             if str_val in ABSENT_VALUES:
                 return "ABSENT"
-            
             if str_val in DROPOUT_VALUES:
                 return "DROPOUT"
 
-            # Handle numeric
             try:
                 return Decimal(str(value))
             except (InvalidOperation, TypeError, ValueError):
-                raise serializers.ValidationError({field_name: f"Invalid input for {field_name}. Must be a number or 'AB' or 'DR'."})
+                raise serializers.ValidationError({
+                    field_name: f"Invalid input for {field_name}. Must be a number or 'AB' or 'DR'."
+                })
 
-        ext_value = parse_marks(external_marks, "external_marks")
-        int_value = parse_marks(internal_marks, "internal_marks")
+        # ✅ Safely fetch values (only process ones included in the request)
+        external_marks = attrs.get('external_marks', instance.external_marks)
+        internal_marks = attrs.get('internal_marks', instance.internal_marks)
 
-        # Determine attendance based on marks
+        ext_value = parse_marks(external_marks, "external_marks") if 'external_marks' in attrs else instance.external_marks
+        int_value = parse_marks(internal_marks, "internal_marks") if 'internal_marks' in attrs else instance.internal_marks
+
+        # Determine attendance
         if ext_value == "ABSENT" or int_value == "ABSENT":
-            # Absent case → nullify marks
-            attrs['external_marks'] = None
-            attrs['internal_marks'] = None
-            try:
-                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=2)  # Absent
-            except ExamAttendanceStatus.DoesNotExist:
-                pass
+            if 'external_marks' in attrs:
+                attrs['external_marks'] = None
+            if 'internal_marks' in attrs:
+                attrs['internal_marks'] = None
+            attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=2).first()  # Absent
 
-        elif ext_value == 'DROPOUT' or int_value == 'DROPOUT':
-            attrs['external_marks'] = None
-            attrs['internal_marks'] = None
-            try:
-                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=3)  # Dropout
-            except ExamAttendanceStatus.DoesNotExist:
-                pass
+        elif ext_value == "DROPOUT" or int_value == "DROPOUT":
+            if 'external_marks' in attrs:
+                attrs['external_marks'] = None
+            if 'internal_marks' in attrs:
+                attrs['internal_marks'] = None
+            attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=3).first()  # Dropout
+
         else:
-            if isinstance(ext_value, Decimal) and exam_instance.cut_off_marks_external is not None:
-                if ext_value > exam_instance.cut_off_marks_external:
-                    raise serializers.ValidationError({'external_marks': 'External Marks must be less than Cut off Marks'})
+            # ✅ Range validation (only if those fields are being updated)
+            if 'external_marks' in attrs and isinstance(ext_value, Decimal):
+                if exam_instance.cut_off_marks_external is not None and ext_value > exam_instance.cut_off_marks_external:
+                    raise serializers.ValidationError({
+                        'external_marks': 'External Marks must be less than Cut off Marks'
+                    })
 
-            if isinstance(int_value, Decimal) and exam_instance.cut_off_marks_internal is not None:
-                if int_value > exam_instance.cut_off_marks_internal:
-                    raise serializers.ValidationError({'internal_marks': 'Internal Marks must be less than Cut off Marks'})
-                
-            attrs['external_marks'] = ext_value
-            attrs['internal_marks'] = int_value
-            try:
-                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=1)  # Present
-            except ExamAttendanceStatus.DoesNotExist:
-                pass
+            if 'internal_marks' in attrs and isinstance(int_value, Decimal):
+                if exam_instance.cut_off_marks_internal is not None and int_value > exam_instance.cut_off_marks_internal:
+                    raise serializers.ValidationError({
+                        'internal_marks': 'Internal Marks must be less than Cut off Marks'
+                    })
+
+            if 'external_marks' in attrs:
+                attrs['external_marks'] = ext_value
+            if 'internal_marks' in attrs:
+                attrs['internal_marks'] = int_value
+            attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=1).first()  # Present
 
         if attendance_obj:
             attrs['exam_attendance'] = attendance_obj
