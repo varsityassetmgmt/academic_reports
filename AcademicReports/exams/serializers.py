@@ -705,11 +705,16 @@ class EditExamResultSerializer(serializers.ModelSerializer):
 
         exam_instance = self.instance.exam_instance
 
+        marks_entry_expiry_datetime = exam_instance.exam.marks_entry_expiry_datetime
+        if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
+            raise serializers.ValidationError({'marks_entry_expiry_datetime': 'Marks Entry Time is Expired'})
+
+
         # Default attendance = Present
         attendance_obj = None
 
         # Define valid absent keywords
-        ABSENT_VALUES = ['AB', 'ABSENT', '', 'A', 'a']
+        ABSENT_VALUES = ['AB', 'ABSENT', 'A', 'a']
         DROPOUT_VALUES = ['DR', 'DROPOUT', 'Drop', 'D', 'd']
 
         def parse_marks(value, field_name):
@@ -812,10 +817,14 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "ExamSubjectSkillInstance not found for this skill and exam."
             )
+        
+        marks_entry_expiry_datetime = skill_instance.exam_instance.exam.marks_entry_expiry_datetime
+        if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
+            raise serializers.ValidationError({'marks_entry_expiry_datetime': 'Marks Entry Time is Expired'})
 
         # Attendance handling
         attendance_obj = None
-        ABSENT_VALUES = ['AB', 'ABSENT', '', 'A', 'a']
+        ABSENT_VALUES = ['AB', 'ABSENT', 'A', 'a']
         DROPOUT_VALUES = ['DR', 'DROPOUT', 'Drop', 'D', 'd']
 
         def parse_marks(value, field_name, cut_off):
