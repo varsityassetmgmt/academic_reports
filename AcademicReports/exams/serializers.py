@@ -745,7 +745,6 @@ class EditExamResultSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         instance = self.instance
         exam_instance = instance.exam_instance
-        marks_entry_expiry_datetime = exam_instance.exam.marks_entry_expiry_datetime
         exam = exam_instance.exam
 
         # ✅ 1. Marks entry lock validation
@@ -753,10 +752,15 @@ class EditExamResultSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'exam': 'Exam marks entry is locked.'
             })
+        
+        # ✅ 2. Marks entry expiry validation (branch-wise)
+        branch = instance.student.branch
+        branch_status = BranchWiseExamResultStatus.objects.filter(exam=exam, branch=branch).first()
+        marks_entry_expiry_datetime = getattr(branch_status, 'marks_entry_expiry_datetime', None)
 
         if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
             raise serializers.ValidationError({
-                'marks_entry_expiry_datetime': 'Marks Entry Time is Expired'
+                'marks_entry_expiry_datetime': 'Marks entry time has expired.'
             })
 
         # ✅ If marks are not being updated, skip marks logic entirely
@@ -881,10 +885,19 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
                 'exam': 'Exam marks entry is locked.'
             })
 
-        
-        marks_entry_expiry_datetime = skill_instance.exam_instance.exam.marks_entry_expiry_datetime
+        # ✅ 2. Marks entry expiry validation (branch-wise)
+        branch = skill_instance.exam_instance.student.branch
+        branch_status = BranchWiseExamResultStatus.objects.filter(exam=exam, branch=branch).first()
+        marks_entry_expiry_datetime = getattr(branch_status, 'marks_entry_expiry_datetime', None)
+
         if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
-            raise serializers.ValidationError({'marks_entry_expiry_datetime': 'Marks Entry Time is Expired'})
+            raise serializers.ValidationError({
+                'marks_entry_expiry_datetime': 'Marks entry time has expired.'
+            })
+        
+        # marks_entry_expiry_datetime = skill_instance.exam_instance.exam.marks_entry_expiry_datetime
+        # if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
+        #     raise serializers.ValidationError({'marks_entry_expiry_datetime': 'Marks Entry Time is Expired'})
 
         # Attendance handling
         attendance_obj = None
