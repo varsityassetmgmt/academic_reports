@@ -746,6 +746,13 @@ class EditExamResultSerializer(serializers.ModelSerializer):
         instance = self.instance
         exam_instance = instance.exam_instance
         marks_entry_expiry_datetime = exam_instance.exam.marks_entry_expiry_datetime
+        exam = exam_instance.exam
+
+        # ✅ 1. Marks entry lock validation
+        if exam.exam_status_id == 3:  # assuming 3 = locked
+            raise serializers.ValidationError({
+                'exam': 'Exam marks entry is locked.'
+            })
 
         if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
             raise serializers.ValidationError({
@@ -865,6 +872,15 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "ExamSubjectSkillInstance not found for this skill and exam."
             )
+
+        exam = skill_instance.exam_instance.exam
+
+        # ✅ 1. Marks entry lock validation
+        if exam.exam_status_id == 3:  # assuming 3 = locked
+            raise serializers.ValidationError({
+                'exam': 'Exam marks entry is locked.'
+            })
+
         
         marks_entry_expiry_datetime = skill_instance.exam_instance.exam.marks_entry_expiry_datetime
         if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
