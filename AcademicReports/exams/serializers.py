@@ -353,7 +353,7 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
             if (
                 data.get('cut_off_marks_external') is not None
                 and data.get('maximum_marks_external') is not None
-                and data['cut_off_marks_external'] >= data['maximum_marks_external']
+                and data['cut_off_marks_external'] > data['maximum_marks_external']
             ):
                 raise serializers.ValidationError({
                     "cut_off_marks_external": "Cut-off marks must be less than maximum marks for external."
@@ -372,7 +372,7 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
             if (
                 data.get('cut_off_marks_internal') is not None
                 and data.get('maximum_marks_internal') is not None
-                and data['cut_off_marks_internal'] >= data['maximum_marks_internal']
+                and data['cut_off_marks_internal'] > data['maximum_marks_internal']
             ):
                 raise serializers.ValidationError({
                     "cut_off_marks_internal": "Cut-off marks must be less than maximum marks for internal."
@@ -385,7 +385,7 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
             })
 
         # --- Prevent duplicate instance for same exam, subject, and date ---
-        existing = ExamInstance.objects.filter(exam=exam, subject=subject, date=exam_date)
+        existing = ExamInstance.objects.filter(exam=exam, subject=subject)
         if self.instance:
             existing = existing.exclude(pk=self.instance.pk)
         if existing.exists():
@@ -430,19 +430,58 @@ class ExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
                 "result_types": "At least one of external marks, internal marks, or co-scholastic grade must be selected."
             })
 
-        # ✅ 3. Marks validation
+        # # ✅ 3. Marks validation
+        # if has_external:
+        #     max_external = data.get('maximum_marks_external', getattr(self.instance, 'maximum_marks_external', None))
+        #     if max_external is None:
+        #         raise serializers.ValidationError({
+        #             "maximum_marks_external": "Required if external marks are enabled."
+        #         })
+        # if has_internal:
+        #     max_internal = data.get('maximum_marks_internal', getattr(self.instance, 'maximum_marks_internal', None))
+        #     if max_internal is None:
+        #         raise serializers.ValidationError({
+        #             "maximum_marks_internal": "Required if internal marks are enabled."
+        #         })
+
+        # --- External marks validations ---
         if has_external:
-            max_external = data.get('maximum_marks_external', getattr(self.instance, 'maximum_marks_external', None))
-            if max_external is None:
+            if not data.get('maximum_marks_external'):
                 raise serializers.ValidationError({
-                    "maximum_marks_external": "Required if external marks are enabled."
+                    "maximum_marks_external": "This field is required when external marks are enabled."
                 })
+            if not data.get('cut_off_marks_external'):
+                raise serializers.ValidationError({
+                    "cut_off_marks_external": "This field is required when external marks are enabled."
+                })
+            if (
+                data.get('cut_off_marks_external') is not None
+                and data.get('maximum_marks_external') is not None
+                and data['cut_off_marks_external'] > data['maximum_marks_external']
+            ):
+                raise serializers.ValidationError({
+                    "cut_off_marks_external": "Cut-off marks must be less than maximum marks for external."
+                })
+
+        # --- Internal marks validations ---
         if has_internal:
-            max_internal = data.get('maximum_marks_internal', getattr(self.instance, 'maximum_marks_internal', None))
-            if max_internal is None:
+            if not data.get('maximum_marks_internal'):
                 raise serializers.ValidationError({
-                    "maximum_marks_internal": "Required if internal marks are enabled."
+                    "maximum_marks_internal": "This field is required when internal marks are enabled."
                 })
+            if not data.get('cut_off_marks_internal'):
+                raise serializers.ValidationError({
+                    "cut_off_marks_internal": "This field is required when internal marks are enabled."
+                })
+            if (
+                data.get('cut_off_marks_internal') is not None
+                and data.get('maximum_marks_internal') is not None
+                and data['cut_off_marks_internal'] > data['maximum_marks_internal']
+            ):
+                raise serializers.ValidationError({
+                    "cut_off_marks_internal": "Cut-off marks must be less than maximum marks for internal."
+                })
+
 
         return data
 
