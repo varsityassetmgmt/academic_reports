@@ -519,28 +519,18 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
 
     def get_queryset(self):
         exam_instance_id = self.get_exam_instance_id()
+        exam_instance = ExamInstance.objects.get(exam_instance_id=exam_instance_id)
         return ExamSubjectSkillInstance.objects.filter(
-            exam_instance_id=exam_instance_id,  # ✅ direct FK reference
+            exam_instance=exam_instance,  # ✅ direct FK reference
             is_active=True
         ).order_by('subject_skill__subject__name')
 
-    def perform_create(self, serializer):
-        exam_instance_id = self.get_exam_instance_id()
-
-        try:
-            with transaction.atomic():
-                serializer.save(
-                    exam_instance_id=exam_instance_id,
-                    created_by=self.request.user,
-                    updated_by=self.request.user
-                )
-        except IntegrityError:
-            raise ValidationError({"detail": "Duplicate skill entry or integrity constraint violated."})
-
     def perform_update(self, serializer):
         exam_instance_id = self.get_exam_instance_id()
+        exam_instance = ExamInstance.objects.get(exam_instance_id=exam_instance_id)
+
         serializer.save(
-            exam_instance_id=exam_instance_id,
+            exam_instance=exam_instance,
             updated_by=self.request.user
         )
 
@@ -803,8 +793,7 @@ def update_section_wise_exam_result_status_view(request):
 
     if not sections.exists():
         return Response({
-            "success": False,
-            "message": "No sections found matching the given branch, exam classes, and orientations."
+            "message": ["No sections found matching the given branch, exam classes, and orientations."]
         }, status=status.HTTP_404_NOT_FOUND)
 
     # ✅ Bulk update existing records

@@ -410,11 +410,15 @@ class ExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
             'created_by',
             'updated_by',
             'is_active',
+            'exam_instance',
+            'subject_skill',
         )
 
     def validate(self, data):
-        exam_instance = data.get('exam_instance') or getattr(self.instance, 'exam_instance', None)
-        subject_skill = data.get('subject_skill') or getattr(self.instance, 'subject_skill', None)
+        # exam_instance = data.get('exam_instance') or getattr(self.instance, 'exam_instance', None)
+        # subject_skill = data.get('subject_skill') or getattr(self.instance, 'subject_skill', None)
+        exam_instance = self.instance.exam_instance
+        subject_skill = self.instance.subject_skill
 
         # ✅ 1. Ensure skill belongs to exam's subject
         if exam_instance and subject_skill and subject_skill.subject != exam_instance.subject:
@@ -483,7 +487,6 @@ class ExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     "cut_off_marks_internal": "Cut-off marks must be less than maximum marks for internal."
                 })
-
 
         return data
 
@@ -744,11 +747,22 @@ class EditExamResultSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         instance = self.instance
         exam_instance = instance.exam_instance
-        marks_entry_expiry_datetime = exam_instance.exam.marks_entry_expiry_datetime
+        exam = exam_instance.exam
+
+        # ✅ 1. Marks entry lock validation
+        if exam.exam_status_id == 3:  # assuming 3 = locked
+            raise serializers.ValidationError({
+                'exam': 'Exam marks entry is locked.'
+            })
+        
+        # ✅ 2. Marks entry expiry validation (branch-wise)
+        branch = instance.student.branch
+        branch_status = BranchWiseExamResultStatus.objects.filter(exam=exam, branch=branch).first()
+        marks_entry_expiry_datetime = getattr(branch_status, 'marks_entry_expiry_datetime', None)
 
         if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
             raise serializers.ValidationError({
-                'marks_entry_expiry_datetime': 'Marks Entry Time is Expired'
+                'marks_entry_expiry_datetime': 'Marks entry time has expired.'
             })
 
         # ✅ If marks are not being updated, skip marks logic entirely
@@ -790,17 +804,11 @@ class EditExamResultSerializer(serializers.ModelSerializer):
 
         # Determine attendance
         if ext_value == "ABSENT" or int_value == "ABSENT":
-            if 'external_marks' in attrs:
-                attrs['external_marks'] = None
-            if 'internal_marks' in attrs:
-                attrs['internal_marks'] = None
+            attrs['external_marks'] = None
             attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=2).first()  # Absent
 
         elif ext_value == "DROPOUT" or int_value == "DROPOUT":
-            if 'external_marks' in attrs:
-                attrs['external_marks'] = None
-            if 'internal_marks' in attrs:
-                attrs['internal_marks'] = None
+            attrs['external_marks'] = None
             attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=3).first()  # Dropout
 
         else:
@@ -808,20 +816,23 @@ class EditExamResultSerializer(serializers.ModelSerializer):
             if 'external_marks' in attrs and isinstance(ext_value, Decimal):
                 if exam_instance.cut_off_marks_external is not None and ext_value > exam_instance.cut_off_marks_external:
                     raise serializers.ValidationError({
-                        'external_marks': 'External Marks must be less than Cut off Marks'
+                        'external_marks': f'External Marks must be less than Cut off Marks ({exam_instance.cut_off_marks_external}) '
                     })
 
             if 'internal_marks' in attrs and isinstance(int_value, Decimal):
                 if exam_instance.cut_off_marks_internal is not None and int_value > exam_instance.cut_off_marks_internal:
                     raise serializers.ValidationError({
-                        'internal_marks': 'Internal Marks must be less than Cut off Marks'
+                        'internal_marks': f'Internal Marks must be less than Cut off Marks ({exam_instance.cut_off_marks_internal}) '
                     })
 
             if 'external_marks' in attrs:
                 attrs['external_marks'] = ext_value
             if 'internal_marks' in attrs:
                 attrs['internal_marks'] = int_value
-            attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=1).first()  # Present
+            try:
+                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=1)  # Present
+            except ExamAttendanceStatus.DoesNotExist:
+                pass
 
         if attendance_obj:
             attrs['exam_attendance'] = attendance_obj
@@ -867,10 +878,28 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "ExamSubjectSkillInstance not found for this skill and exam."
             )
-        
-        marks_entry_expiry_datetime = skill_instance.exam_instance.exam.marks_entry_expiry_datetime
+
+        exam = skill_instance.exam_instance.exam
+
+        # ✅ 1. Marks entry lock validation
+        if exam.exam_status_id == 3:  # assuming 3 = locked
+            raise serializers.ValidationError({
+                'exam': 'Exam marks entry is locked.'
+            })
+
+        # ✅ 2. Marks entry expiry validation (branch-wise)
+        branch = skill_instance.exam_instance.student.branch
+        branch_status = BranchWiseExamResultStatus.objects.filter(exam=exam, branch=branch).first()
+        marks_entry_expiry_datetime = getattr(branch_status, 'marks_entry_expiry_datetime', None)
+
         if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
-            raise serializers.ValidationError({'marks_entry_expiry_datetime': 'Marks Entry Time is Expired'})
+            raise serializers.ValidationError({
+                'marks_entry_expiry_datetime': 'Marks entry time has expired.'
+            })
+        
+        # marks_entry_expiry_datetime = skill_instance.exam_instance.exam.marks_entry_expiry_datetime
+        # if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
+        #     raise serializers.ValidationError({'marks_entry_expiry_datetime': 'Marks Entry Time is Expired'})
 
         # Attendance handling
         attendance_obj = None
@@ -921,6 +950,19 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             except ExamAttendanceStatus.DoesNotExist:
                 pass
         else:
+            # ✅ Range validation (only if those fields are being updated)
+            if 'external_marks' in attrs and isinstance(ext_value, Decimal):
+                if skill_instance.cut_off_marks_external is not None and ext_value > skill_instance.cut_off_marks_external:
+                    raise serializers.ValidationError({
+                        'external_marks': f'External Marks must be less than Cut off Marks ({skill_instance.cut_off_marks_external}) '
+                    })
+
+            if 'internal_marks' in attrs and isinstance(int_value, Decimal):
+                if skill_instance.cut_off_marks_internal is not None and int_value > skill_instance.cut_off_marks_internal:
+                    raise serializers.ValidationError({
+                        'internal_marks': f'Internal Marks must be less than Cut off Marks ({skill_instance.cut_off_marks_internal}) '
+                    })
+
             if 'external_marks' in attrs:
                 attrs['external_marks'] = ext_value
             if 'internal_marks' in attrs:
@@ -933,10 +975,6 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
         # Set attendance if found
         if attendance_obj:
             attrs['exam_attendance'] = attendance_obj
-
-        # Calculate total marks_obtained
-        total = (attrs['external_marks'] or 0) + (attrs['internal_marks'] or 0)
-        attrs['marks_obtained'] = total
 
         return attrs
 
