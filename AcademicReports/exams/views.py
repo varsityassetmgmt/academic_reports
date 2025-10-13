@@ -14,6 +14,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError, NotFound
+from django.db import IntegrityError, transaction
 
 # ---------------- Subject ----------------
 class SubjectDropdownViewSet(ModelViewSet):
@@ -255,11 +256,15 @@ class ExamViewSet(ModelViewSet):
                 "name": "An exam with this name, year, and type already exists."
             })
 
-        serializer.save(
-            academic_year=current_academic_year,
-            created_by=self.request.user,
-            updated_by=self.request.user
-        )
+        try:
+            with transaction.atomic():
+                serializer.save(
+                    academic_year=current_academic_year,
+                    created_by=self.request.user,
+                    updated_by=self.request.user
+                )
+        except IntegrityError:
+            raise ValidationError({'detail': 'Duplicate exam entry or integrity constraint violated.'})
 
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
@@ -330,7 +335,11 @@ class ExamInstanceViewSet(ModelViewSet):
         # date = serializer.validated_data.get("date")
         if ExamInstance.objects.filter(subject=subject, exam=exam).exists():
             raise ValidationError({"non_field_errors": "An exam for this subject and date already exists."})
-        serializer.save(exam=exam, created_by=self.request.user, updated_by=self.request.user)
+        try:
+            with transaction.atomic():
+                serializer.save(exam=exam, created_by=self.request.user, updated_by=self.request.user)
+        except IntegrityError:
+            raise ValidationError({'detail': 'Duplicate exam instance or integrity constraint violated.'})
 
     def perform_update(self, serializer):
         exam_id = self.get_exam_id()
@@ -441,11 +450,15 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         exam_instance_id = self.get_exam_instance_id()
-        serializer.save(
-            exam_instance_id=exam_instance_id,
-            created_by=self.request.user,
-            updated_by=self.request.user
-        )
+        try:
+            with transaction.atomic():
+                serializer.save(
+                    exam_instance_id=exam_instance_id,
+                    created_by=self.request.user,
+                    updated_by=self.request.user
+                )
+        except IntegrityError:
+            raise ValidationError({'detail': 'Duplicate skill entry or integrity constraint violated.'})
 
     def perform_update(self, serializer):
         exam_instance_id = self.get_exam_instance_id()
