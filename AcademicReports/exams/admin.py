@@ -63,12 +63,36 @@ class ExamAttendanceStatusAdmin(admin.ModelAdmin):
 
 
 # ===================== Grade Boundary =====================
+from django.contrib import admin
+from .models import GradeBoundary
+
+
 @admin.register(GradeBoundary)
 class GradeBoundaryAdmin(admin.ModelAdmin):
-    list_display = ('grade_boundary_id', 'grade', 'exam_type', 'orientation', 'min_percentage', 'max_percentage', 'is_active')
-    search_fields = ('grade', 'exam_type__name', 'orientation__name')
+    list_display = (
+        'grade',
+        'min_percentage',
+        'max_percentage',
+        'remarks',
+        'is_active',
+    )
     list_filter = ('is_active',)
-    autocomplete_fields = ('exam_type', 'orientation')
+    search_fields = ('grade', 'remarks')
+    ordering = ('-min_percentage',)
+    list_editable = ('is_active',)
+    list_per_page = 20
+
+    fieldsets = (
+        ('Grade Information', {
+            'fields': ('grade', 'remarks')
+        }),
+        ('Percentage Range', {
+            'fields': ('min_percentage', 'max_percentage')
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+    )
 
 
 # ===================== Co-Scholastic Grade =====================

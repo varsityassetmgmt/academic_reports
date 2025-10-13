@@ -109,6 +109,7 @@ class ExamSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"name": "Exam name is required."})
 
         academic_year = self.initial_data.get('academic_year')
+        
         exam_type = self.initial_data.get('exam_type')
 
         if academic_year and exam_type:

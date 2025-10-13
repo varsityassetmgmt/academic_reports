@@ -259,9 +259,7 @@ class ExamAttendanceStatus(models.Model):
 
 class GradeBoundary(models.Model):
     grade_boundary_id = models.BigAutoField(primary_key=True)
-    exam_type = models.ForeignKey(ExamType, on_delete=models.PROTECT, related_name="grade_bound_exam_type")
-    orientation = models.ForeignKey("students.Orientation", on_delete=models.PROTECT, related_name="grade_bound_orientation")
-    grade = models.CharField(max_length=10)  # e.g., 'A+', 'A', etc.
+    grade = models.CharField(max_length=10,unique=True)  # e.g., 'A+', 'A', etc.
     min_percentage = models.DecimalField(max_digits=5, decimal_places=2)  # e.g., 84.50
     max_percentage = models.DecimalField(max_digits=5, decimal_places=2)  # e.g., 100.00
     remarks = models.CharField(max_length=100, null=True, blank=True)  # e.g., 'Excellent', 'Good', etc.
@@ -269,26 +267,24 @@ class GradeBoundary(models.Model):
 
     class Meta:
         ordering = ['-min_percentage']  # Highest to lowest for easier matching
-        unique_together = ('exam_type', 'orientation', 'grade')  # Ensure uniqueness for each combination
-        # indexes = [
-        #             models.Index(fields=["exam_type", "orientation"]),
-        #             models.Index(fields=["min_percentage", "max_percentage"]),
-        #         ]
+       
+        indexes = [
+            models.Index(fields=["min_percentage", "max_percentage"]),
+        ]
+        verbose_name_plural = "Grade Boundaries"
 
     def __str__(self):
-        return f"{self.grade} ({self.exam_type.name} - {self.orientation.name})"
+        return f"{self.grade} ({self.min_percentage}% - {self.max_percentage}%)"
 
     @staticmethod
-    def get_grade_for_percentage(exam_type, orientation, percentage):
+    def get_grade_for_percentage(percentage):
         """
-        Returns the grade for a given percentage for a specific exam type and orientation.
-        If no matching grade boundary is found, it returns None.
+        Returns the GradeBoundary object for the given percentage.
         """
         return GradeBoundary.objects.filter(
-            exam_type=exam_type,
-            orientation=orientation,
             min_percentage__lte=percentage,
-            max_percentage__gte=percentage
+            max_percentage__gte=percentage,
+            is_active=True
         ).first()
 
 
@@ -351,6 +347,9 @@ class ExamResult(models.Model):
 
     is_active = models.BooleanField(default=True)
 
+    # 🔥 New Field — Grade as FK
+    grade = models.ForeignKey("GradeBoundary", on_delete=models.SET_NULL, null=True, blank=True,related_name="exam_results_grade")
+
     class Meta:
         constraints = [
         models.UniqueConstraint(
@@ -380,32 +379,59 @@ class ExamResult(models.Model):
         ]
     
     def save(self, *args, **kwargs):
-        total_max = (self.exam_instance.maximum_marks_external or 0) + (self.exam_instance.maximum_marks_internal or 0)
-        obtained = (self.external_marks or 0) + (self.internal_marks or 0)
-        self.total_marks = obtained
-        if total_max > 0:
-            self.percentage = (obtained / total_max) * 100
+    
+    # --- Compute obtained & total marks ---
+        external = self.external_marks or 0
+        internal = self.internal_marks or 0
+        self.total_marks = external + internal
 
-        
+        # --- Compute percentage safely ---
+        max_external = getattr(self.exam_instance, "maximum_marks_external", 0) or 0
+        max_internal = getattr(self.exam_instance, "maximum_marks_internal", 0) or 0
+        total_max = max_external + max_internal
+
+        if total_max > 0:
+            self.percentage = (self.total_marks / total_max) * 100
+        else:
+            self.percentage = None
+
+        # --- Assign grade automatically ---
+        if self.percentage is not None:
+            self.grade = GradeBoundary.get_grade_for_percentage(self.percentage)
+        else:
+            self.grade = None
+
+        # --- Default exam attendance ---
         if not self.exam_attendance:
-            try:
-                self.exam_attendance = ExamAttendanceStatus.objects.get( exam_attendance_status_id = 1 )
-            except ExamAttendanceStatus.DoesNotExist:
-                pass   
+            default_status = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=1).first()
+            if default_status:
+                self.exam_attendance = default_status
+
+        # --- Save record ---
         super().save(*args, **kwargs)
+
+    # def save(self, *args, **kwargs):
+    #     total_max = (self.exam_instance.maximum_marks_external or 0) + (self.exam_instance.maximum_marks_internal or 0)
+    #     obtained = (self.external_marks or 0) + (self.internal_marks or 0)
+    #     self.total_marks = obtained
+    #     if total_max > 0:
+    #         self.percentage = (obtained / total_max) * 100
+
+    #     if self.percentage is not None:
+    #         self.grade = GradeBoundary.get_grade_for_percentage(self.percentage)
+        
+    #     if not self.exam_attendance:
+    #         try:
+    #             self.exam_attendance = ExamAttendanceStatus.objects.get( exam_attendance_status_id = 1 )
+    #         except ExamAttendanceStatus.DoesNotExist:
+    #             pass   
+    #     super().save(*args, **kwargs)
 
 
   
     def __str__(self):
         return f"{self.student} - {self.exam_instance.subject.name}"
     
-# class SkillResultValue(models.Model):
-#     id = models.BigAutoField(primary_key=True)
-#     name = models.CharField(max_length=50, unique=True)
-#     description = models.CharField(max_length=200, blank=True, null=True)
-
-#     def __str__(self):
-#         return self.name
 
 
 class ExamSkillResult(models.Model):
@@ -444,6 +470,7 @@ class StudentExamSummary(models.Model):
     student = models.ForeignKey("students.Student", on_delete=models.PROTECT, related_name='exam_summary_student')
     exam = models.ForeignKey(Exam, on_delete=models.PROTECT, related_name='exam_summary_exam')
     
+
     total_subjects_marks = models.DecimalField(max_digits=7,decimal_places=2,blank=True,null=True) 
     percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     
