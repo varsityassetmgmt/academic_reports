@@ -12,7 +12,6 @@ from rest_framework import permissions, status
 from branches.models import *
 from rest_framework.exceptions import NotFound
 from rest_framework.decorators import api_view, permission_classes
-from django.db.models import F
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError, NotFound
 
@@ -227,27 +226,42 @@ class ExamViewSet(ModelViewSet):
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
             raise NotFound("Current academic year not found.")
-        return Exam.objects.filter(
-            academic_year=current_academic_year,
-            is_active=True
-        ).order_by('-exam_id', 'is_visible')
+        return (
+            Exam.objects.filter(academic_year=current_academic_year, is_active=True)
+            .order_by('-exam_id', 'is_visible')
+        )
 
     def perform_create(self, serializer):
-        """Assign academic year and audit fields on creation."""
-        # current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
-        # if not current_academic_year:
-        #     raise NotFound("Current academic year not found.")
-        
-        # ✅ No need to call is_valid() again here
+        validated_data = serializer.validated_data
+        name = validated_data.get("name")
+        exam_type = validated_data.get("exam_type")
+
+        if not name or not str(name).strip():
+            raise serializers.ValidationError({"name": "Exam name is required."})
+        if not exam_type:
+            raise serializers.ValidationError({"exam_type": "Exam Type is required."})
+
+        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+        if not current_academic_year:
+            raise NotFound("Current academic year not found.")
+
+        # Check duplicate
+        if Exam.objects.filter(
+            name__iexact=name.strip(),
+            academic_year=current_academic_year,
+            exam_type=exam_type,
+        ).exists():
+            raise serializers.ValidationError({
+                "name": "An exam with this name, year, and type already exists."
+            })
+
         serializer.save(
-            # academic_year=current_academic_year,
+            academic_year=current_academic_year,
             created_by=self.request.user,
             updated_by=self.request.user
         )
 
     def perform_update(self, serializer):
-        """Update audit fields on modification."""
-        # ✅ No is_valid() call here either
         serializer.save(updated_by=self.request.user)
 
     def get_permissions(self):
@@ -308,8 +322,20 @@ class ExamInstanceViewSet(ModelViewSet):
 
     # ✅ No need to revalidate serializer here
     def perform_create(self, serializer):
+        validated_data = serializer.validated_data
+        subject = validated_data.get("subject")
         exam_id = self.get_exam_id()
         exam = get_object_or_404(Exam, pk=exam_id)
+        if exam.is_editable==False:
+            return Response({
+                "non_field_errors":"This Exam is Already Published, Edit is not allowed."            })
+        if ExamInstance.objects.filter(
+            subject=subject,
+            exam=exam
+        ).exists():
+            return Response({
+                "non_field_errors": "An exam for this subject and date already exists."
+            })
         if exam.is_editable== False:
             serializer.save(
                 exam=exam,
@@ -1294,16 +1320,49 @@ class CoScholasticGradeDropdownViewSet(ModelViewSet):
     serializer_class = CoScholasticGradeDropdownSerializer
     http_method_names = ['get']
 
-# @api_view(['GET'])
-# @permission_classes([IsAuthenticated])
-# def update_marks_entry_expiry_datetime_in_exam_instance(request, exam_id):
-#     exam = Exam.objects.get(exam_id=exam_id)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def update_marks_entry_expiry_datetime_in_exam_instance(request, exam_id):
+    try:
+        exam = Exam.objects.get(exam_id=exam_id, is_active=True)
+    except Exam.DoesNotExist:
+        return Response({'exam_id': 'Invalid Exam ID'}, status=status.HTTP_400_BAD_REQUEST)
 
-#     marks_entry_expiry_datetime = request.query_params.get('marks_entry_expiry_datetime')
+    marks_entry_expiry_datetime_str = request.query_params.get('marks_entry_expiry_datetime')
+    if not marks_entry_expiry_datetime_str:
+        return Response({'marks_entry_expiry_datetime': 'marks_entry_expiry_datetime field is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-#     now = timezone.now()
-#     if timezone.is_naive(marks_entry_expiry_datetime):
-#         marks_entry_expiry_datetime = timezone.make_aware(marks_entry_expiry_datetime)
-        
+    # ✅ Convert string → datetime
+    try:
+        marks_entry_expiry_datetime = datetime.datetime.fromisoformat(marks_entry_expiry_datetime_str)
+    except ValueError:
+        return Response(
+            {'marks_entry_expiry_datetime': 'Invalid datetime format. Use ISO format: YYYY-MM-DDTHH:MM:SS'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # ✅ Make timezone-aware if it's naive
+    if timezone.is_naive(marks_entry_expiry_datetime):
+        marks_entry_expiry_datetime = timezone.make_aware(marks_entry_expiry_datetime)
+
+    now = timezone.now()
+    if marks_entry_expiry_datetime <= now:
+        raise serializers.ValidationError({
+            "marks_entry_expiry_datetime": "Marks entry expiry datetime must be in the future."
+        })
+
+    # ✅ Ensure expiry is after exam end date (exact date, not end of day)
+    if exam.end_date:
+        end_datetime = timezone.make_aware(datetime.datetime.combine(exam.end_date, datetime.time.min))
+        if marks_entry_expiry_datetime <= end_datetime:
+            raise serializers.ValidationError({
+                "marks_entry_expiry_datetime": "Marks entry expiry datetime must be after the exam end date."
+            })
+
+    exam.marks_entry_expiry_datetime = marks_entry_expiry_datetime
     
+    
+    exam.save(update_fields=['marks_entry_expiry_datetime'])
+
+    return Response({'message': 'Marks Entry Expiry Date Updated Successfully'}, status=status.HTTP_200_OK)
 

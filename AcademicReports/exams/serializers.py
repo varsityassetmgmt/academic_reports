@@ -280,8 +280,10 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
         read_only_fields = ('created_by', 'updated_by', 'is_active')
 
     def get_subject_skill_names(self, obj):
-        # Get all related subject skill names and join with comma
-        return ', '.join(obj.subject_skills.values_list('name', flat=True))
+        # Safely get related skill names if relation exists and not None
+        if hasattr(obj, 'subject_skills') and obj.subject_skills.exists():
+            return ', '.join(obj.subject_skills.values_list('name', flat=True))
+        return ''
     
     def validate(self, data):
         exam = data.get('exam') or getattr(self.instance, 'exam', None)
@@ -388,7 +390,7 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
             existing = existing.exclude(pk=self.instance.pk)
         if existing.exists():
             raise serializers.ValidationError({
-                "non_field_errors": "An exam instance for this subject and date already exists."
+                "non_field_errors": "An exam for this subject and date already exists."
             })
 
         return data
