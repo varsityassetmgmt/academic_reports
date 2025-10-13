@@ -201,6 +201,66 @@ class ExamInstance(models.Model):
                     models.Index(fields=["has_subject_co_scholastic_grade"]),
                     models.Index(fields=["exam", "subject", "is_active"]),
                 ]
+        
+
+    # def clean(self):
+    #     errors = {}
+
+          # ✅ Exam edit restriction
+        # if self.exam and not self.exam.is_editable:
+        #     errors["exam"] = "This Exam is locked. You cannot add or update ExamInstances."
+
+        # Prevent create/update if parent exam is not editable
+        # if self.exam and not getattr(self.exam, "is_editable", True):
+        #     errors["exam"] = "This Exam is locked. You cannot add or update ExamInstances."
+
+        # ✅ Validate exam and date range
+        # if self.exam and self.date:
+        #     if self.exam.start_date and self.exam.end_date:
+        #         if not (self.exam.start_date <= self.date <= self.exam.end_date):
+        #             errors["date"] = f"Exam date must be between {self.exam.start_date} and {self.exam.end_date}."
+        #     else:
+        #         errors["exam"] = "Selected exam does not have valid start and end dates."
+        
+        # if self.exam and self.date:
+        #     if not (self.exam.start_date <= self.date <= self.exam.end_date):
+        #         errors["date"] = f"Exam date must be between {self.exam.start_date} and {self.exam.end_date}."
+
+        # # ✅ Exam time validation
+        # if self.exam_start_time and self.exam_end_time:
+        #     if self.exam_start_time >= self.exam_end_time:
+        #         errors["exam_end_time"] = "Exam end time must be later than start time."
+
+        # # 🔹 External marks validation
+        # if self.has_external_marks:
+        #     if self.maximum_marks_external is None:
+        #         errors["maximum_marks_external"] = "This field is required when external marks are enabled."
+        #     if self.cut_off_marks_external is None:
+        #         errors["cut_off_marks_external"] = "This field is required when external marks are enabled."
+        #     elif self.maximum_marks_external is not None and self.cut_off_marks_external > self.maximum_marks_external:
+        #         errors["cut_off_marks_external"] = "Cut-off external marks cannot be greater than maximum external marks."
+
+        # # 🔹 Internal marks validation
+        # if self.has_internal_marks:
+        #     if self.maximum_marks_internal is None:
+        #         errors["maximum_marks_internal"] = "This field is required when internal marks are enabled."
+        #     if self.cut_off_marks_internal is None:
+        #         errors["cut_off_marks_internal"] = "This field is required when internal marks are enabled."
+        #     elif self.maximum_marks_internal is not None and self.cut_off_marks_internal > self.maximum_marks_internal:
+        #         errors["cut_off_marks_internal"] = "Cut-off internal marks cannot be greater than maximum internal marks."
+
+        # 🔹 Co-scholastic grade + subject skills validation
+        # if self.has_subject_co_scholastic_grade:
+        #     # Note: during `full_clean`, m2m fields aren't available yet, so handle it carefully
+        #     if not self.pk or not self.subject_skills.exists():
+        #         errors["subject_skills"] = "At least one subject skill is required when co-scholastic grade is enabled."
+
+        # if errors:
+        #     raise ValidationError(errors)
+
+    # def save(self, *args, **kwargs):
+    #     self.full_clean()  # ensures all validations above are applied
+    #     super().save(*args, **kwargs)
 
     def __str__(self):
         return f"({self.exam.name} - {self.subject.name})"
@@ -259,9 +319,7 @@ class ExamAttendanceStatus(models.Model):
 
 class GradeBoundary(models.Model):
     grade_boundary_id = models.BigAutoField(primary_key=True)
-    exam_type = models.ForeignKey(ExamType, on_delete=models.PROTECT, related_name="grade_bound_exam_type")
-    orientation = models.ForeignKey("students.Orientation", on_delete=models.PROTECT, related_name="grade_bound_orientation")
-    grade = models.CharField(max_length=10)  # e.g., 'A+', 'A', etc.
+    grade = models.CharField(max_length=10,unique=True)  # e.g., 'A+', 'A', etc.
     min_percentage = models.DecimalField(max_digits=5, decimal_places=2)  # e.g., 84.50
     max_percentage = models.DecimalField(max_digits=5, decimal_places=2)  # e.g., 100.00
     remarks = models.CharField(max_length=100, null=True, blank=True)  # e.g., 'Excellent', 'Good', etc.
@@ -269,26 +327,24 @@ class GradeBoundary(models.Model):
 
     class Meta:
         ordering = ['-min_percentage']  # Highest to lowest for easier matching
-        unique_together = ('exam_type', 'orientation', 'grade')  # Ensure uniqueness for each combination
-        # indexes = [
-        #             models.Index(fields=["exam_type", "orientation"]),
-        #             models.Index(fields=["min_percentage", "max_percentage"]),
-        #         ]
+       
+        indexes = [
+            models.Index(fields=["min_percentage", "max_percentage"]),
+        ]
+        verbose_name_plural = "Grade Boundaries"
 
     def __str__(self):
-        return f"{self.grade} ({self.exam_type.name} - {self.orientation.name})"
+        return f"{self.grade} ({self.min_percentage}% - {self.max_percentage}%)"
 
     @staticmethod
-    def get_grade_for_percentage(exam_type, orientation, percentage):
+    def get_grade_for_percentage(percentage):
         """
-        Returns the grade for a given percentage for a specific exam type and orientation.
-        If no matching grade boundary is found, it returns None.
+        Returns the GradeBoundary object for the given percentage.
         """
         return GradeBoundary.objects.filter(
-            exam_type=exam_type,
-            orientation=orientation,
             min_percentage__lte=percentage,
-            max_percentage__gte=percentage
+            max_percentage__gte=percentage,
+            is_active=True
         ).first()
 
 
@@ -351,6 +407,9 @@ class ExamResult(models.Model):
 
     is_active = models.BooleanField(default=True)
 
+    # 🔥 New Field — Grade as FK
+    grade = models.ForeignKey("GradeBoundary", on_delete=models.SET_NULL, null=True, blank=True,related_name="exam_results_grade")
+
     class Meta:
         constraints = [
         models.UniqueConstraint(
@@ -380,32 +439,59 @@ class ExamResult(models.Model):
         ]
     
     def save(self, *args, **kwargs):
-        total_max = (self.exam_instance.maximum_marks_external or 0) + (self.exam_instance.maximum_marks_internal or 0)
-        obtained = (self.external_marks or 0) + (self.internal_marks or 0)
-        self.total_marks = obtained
-        if total_max > 0:
-            self.percentage = (obtained / total_max) * 100
+    
+    # --- Compute obtained & total marks ---
+        external = self.external_marks or 0
+        internal = self.internal_marks or 0
+        self.total_marks = external + internal
 
-        
+        # --- Compute percentage safely ---
+        max_external = getattr(self.exam_instance, "maximum_marks_external", 0) or 0
+        max_internal = getattr(self.exam_instance, "maximum_marks_internal", 0) or 0
+        total_max = max_external + max_internal
+
+        if total_max > 0:
+            self.percentage = (self.total_marks / total_max) * 100
+        else:
+            self.percentage = None
+
+        # --- Assign grade automatically ---
+        if self.percentage is not None:
+            self.grade = GradeBoundary.get_grade_for_percentage(self.percentage)
+        else:
+            self.grade = None
+
+        # --- Default exam attendance ---
         if not self.exam_attendance:
-            try:
-                self.exam_attendance = ExamAttendanceStatus.objects.get( exam_attendance_status_id = 1 )
-            except ExamAttendanceStatus.DoesNotExist:
-                pass   
+            default_status = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=1).first()
+            if default_status:
+                self.exam_attendance = default_status
+
+        # --- Save record ---
         super().save(*args, **kwargs)
+
+    # def save(self, *args, **kwargs):
+    #     total_max = (self.exam_instance.maximum_marks_external or 0) + (self.exam_instance.maximum_marks_internal or 0)
+    #     obtained = (self.external_marks or 0) + (self.internal_marks or 0)
+    #     self.total_marks = obtained
+    #     if total_max > 0:
+    #         self.percentage = (obtained / total_max) * 100
+
+    #     if self.percentage is not None:
+    #         self.grade = GradeBoundary.get_grade_for_percentage(self.percentage)
+        
+    #     if not self.exam_attendance:
+    #         try:
+    #             self.exam_attendance = ExamAttendanceStatus.objects.get( exam_attendance_status_id = 1 )
+    #         except ExamAttendanceStatus.DoesNotExist:
+    #             pass   
+    #     super().save(*args, **kwargs)
 
 
   
     def __str__(self):
         return f"{self.student} - {self.exam_instance.subject.name}"
     
-# class SkillResultValue(models.Model):
-#     id = models.BigAutoField(primary_key=True)
-#     name = models.CharField(max_length=50, unique=True)
-#     description = models.CharField(max_length=200, blank=True, null=True)
-
-#     def __str__(self):
-#         return self.name
 
 
 class ExamSkillResult(models.Model):
@@ -444,6 +530,7 @@ class StudentExamSummary(models.Model):
     student = models.ForeignKey("students.Student", on_delete=models.PROTECT, related_name='exam_summary_student')
     exam = models.ForeignKey(Exam, on_delete=models.PROTECT, related_name='exam_summary_exam')
     
+
     total_subjects_marks = models.DecimalField(max_digits=7,decimal_places=2,blank=True,null=True) 
     percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     
