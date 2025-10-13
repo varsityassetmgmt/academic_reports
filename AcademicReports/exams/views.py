@@ -238,13 +238,13 @@ class ExamViewSet(ModelViewSet):
         exam_type = validated_data.get("exam_type")
 
         if not name or not str(name).strip():
-            raise serializers.ValidationError({"name": "Exam name is required."})
+            return Response({"name": "Exam name is required."}, status=status.HTTP_400_BAD_REQUEST)
         if not exam_type:
-            raise serializers.ValidationError({"exam_type": "Exam Type is required."})
+            return Response({"exam_type": "Exam Type is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
-            raise NotFound("Current academic year not found.")
+            return Response({"academic_year": "Current academic year not found."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Check duplicate
         if Exam.objects.filter(
@@ -252,9 +252,7 @@ class ExamViewSet(ModelViewSet):
             academic_year=current_academic_year,
             exam_type=exam_type,
         ).exists():
-            raise serializers.ValidationError({
-                "name": "An exam with this name, year, and type already exists."
-            })
+            return Response({"name": "An exam with this name, year, and type already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             with transaction.atomic():
@@ -264,7 +262,7 @@ class ExamViewSet(ModelViewSet):
                     updated_by=self.request.user
                 )
         except IntegrityError:
-            raise ValidationError({'detail': 'Duplicate exam entry or integrity constraint violated.'})
+            return Response({"detail": "Duplicate exam entry or integrity constraint violated."}, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
@@ -315,7 +313,7 @@ class ExamInstanceViewSet(ModelViewSet):
     def get_exam_id(self):
         exam_id = self.kwargs.get('exam_id')
         if not exam_id:
-            raise ValidationError({"exam_id": "This field is required in the URL."})
+            return Response({"exam_id": "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
         return exam_id
 
     def get_queryset(self):
@@ -330,22 +328,22 @@ class ExamInstanceViewSet(ModelViewSet):
         exam_id = self.get_exam_id()
         exam = get_object_or_404(Exam, pk=exam_id)
         if not exam.is_editable:
-            raise ValidationError({"non_field_errors": "This Exam is already published — creation/edit not allowed."})
+            return Response({"non_field_errors": "This Exam is already published — creation/edit not allowed."}, status=status.HTTP_400_BAD_REQUEST)
         subject = serializer.validated_data.get("subject")
         # date = serializer.validated_data.get("date")
         if ExamInstance.objects.filter(subject=subject, exam=exam).exists():
-            raise ValidationError({"non_field_errors": "An exam for this subject and date already exists."})
+            return Response({"non_field_errors": "An exam for this subject already exists."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             with transaction.atomic():
                 serializer.save(exam=exam, created_by=self.request.user, updated_by=self.request.user)
         except IntegrityError:
-            raise ValidationError({'detail': 'Duplicate exam instance or integrity constraint violated.'})
+            return Response({"detail": "Duplicate exam instance or integrity constraint violated."}, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_update(self, serializer):
         exam_id = self.get_exam_id()
         exam = get_object_or_404(Exam, pk=exam_id)
         if not exam.is_editable:
-            raise ValidationError({"non_field_errors": "This Exam is already published — editing is not allowed."})
+            return Response({"non_field_errors": "This Exam is already published — creation/edit not allowed."}, status=status.HTTP_400_BAD_REQUEST)
         serializer.save(exam=exam, updated_by=self.request.user)
 
 
@@ -438,7 +436,7 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
         """
         exam_instance_id = self.kwargs.get('exam_instance_id')
         if not exam_instance_id:
-            raise ValidationError({"exam_instance_id": "This field is required in the URL."})
+            return Response({"exam_instance_id": "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
         return exam_instance_id
 
     def get_queryset(self):
@@ -458,8 +456,7 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
                     updated_by=self.request.user
                 )
         except IntegrityError:
-            raise ValidationError({'detail': 'Duplicate skill entry or integrity constraint violated.'})
-
+            return Response({"detail": "Duplicate skill entry or integrity constraint violated."}, status=status.HTTP_400_BAD_REQUEST)
     def perform_update(self, serializer):
         exam_instance_id = self.get_exam_instance_id()
         serializer.save(
