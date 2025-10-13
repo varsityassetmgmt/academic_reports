@@ -9,6 +9,7 @@ router.register(r'examtype_dropdown', ExamTypeDropdownViewSet, basename='examtyp
 router.register(r'exam_dropdown', ExamDropdownViewSet, basename='exam_dropdown')
 router.register(r'examinstance_dropdown', ExamInstanceDropdownViewSet, basename='examinstance_dropdown')
 router.register(r'examattendancestatus_dropdown', ExamAttendanceStatusDropdownViewSet, basename='examattendancestatus_dropdown')
+router.register(r'co_scholastic_grade_dropdown', CoScholasticGradeDropdownViewSet, basename='co_scholastic_grade_dropdown')
 
 router.register(r'subject', SubjectViewSet, basename='subject')
 router.register(r'subjectskill', SubjectSkillViewSet, basename='subjectskill')
@@ -22,6 +23,8 @@ router.register(r'branch_wise_exam_result_status', BranchWiseExamResultStatusVie
 # router.register(r'subject_dropdown_for_exam_instance', SubjectDropdownForExamInstanceViewSet, basename='subject_dropdown_for_exam_instance')
 router.register(r'subjectskill_dropdown_for_exam_instance', SubjectSkillDropdownForExamInstanceViewSet, basename='subjectskill_dropdown_for_exam_instance')
 
+router.register(r'edit_exam_results', EditExamResultsViewSet, basename='edit_exam_results')
+router.register(r'edit_exam_skill_result', EditExamSkillResultViewSet, basename='edit_exam_skill_result')
 
 urlpatterns = [
 
@@ -44,10 +47,11 @@ urlpatterns = [
         path('exam_subject_skill_instance/<int:exam_instance_id>/<int:pk>/',ExamSubjectSkillInstanceViewSet.as_view({'get': 'retrieve', 'put': 'update'}),name='exam_subject_skill_instance_retrieve'),
 
         path('create_exam_results/', create_exam_results, name='create_exam_results'),
-        path('edit_exam_results/<int:exam_result_id>/', edit_exam_results, name='edit_exam_results'),
-        path('edit_exam_skill_result/<int:exam_skill_result_id>/', edit_exam_skill_result, name='edit_exam_skill_result'),
+        # path('edit_exam_results/<int:exam_result_id>/', edit_exam_results, name='edit_exam_results'),
+        # path('edit_exam_skill_result/<int:exam_skill_result_id>/', edit_exam_skill_result, name='edit_exam_skill_result'),
+
+        path('update_marks_entry_expiry_datetime_in_exam_instance/<exam_id>/', update_marks_entry_expiry_datetime_in_exam_instance, name='update_marks_entry_expiry_datetime_in_exam_instance'),
 
 
 
-    
 ]+ router.urls

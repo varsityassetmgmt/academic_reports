@@ -101,16 +101,24 @@ class ExamSerializer(serializers.ModelSerializer):
     def validate(self, data):
         # ---- 1. Prevent editing published exams ----
         if self.instance and self.instance.is_editable is False:
-            raise serializers.ValidationError({"non_field_errors":"This Exam is Already Published, Edit is not allowed."})
+            raise serializers.ValidationError({"non_field_errors": "This Exam is already published, editing is not allowed."})
 
         # ---- 2. Duplicate name validation ----
-        name = self.initial_data.get('name')
+        # fallback to instance values when updating
+        name = self.initial_data.get('name') or getattr(self.instance, 'name', None)
         if not name or str(name).strip() == "":
             raise serializers.ValidationError({"name": "Exam name is required."})
 
-        academic_year = self.initial_data.get('academic_year')
-        
-        exam_type = self.initial_data.get('exam_type')
+
+
+        academic_year = (
+            self.initial_data.get('academic_year')
+            or (self.instance.academic_year_id if self.instance else None)
+        )
+        exam_type = (
+            self.initial_data.get('exam_type')
+            or (self.instance.exam_type_id if self.instance else None)
+        )
 
         if academic_year and exam_type:
             qs = Exam.objects.filter(
@@ -126,57 +134,142 @@ class ExamSerializer(serializers.ModelSerializer):
                 })
 
         # ---- 3. Date validation (start < end) ----
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
+        start_date = data.get('start_date') or getattr(self.instance, 'start_date', None)
+        end_date = data.get('end_date') or getattr(self.instance, 'end_date', None)
+
         if start_date and end_date and end_date < start_date:
             raise serializers.ValidationError({"end_date": "End date cannot be earlier than start date."})
 
         # ---- 4. Marks entry expiry datetime checks ----
-        marks_entry_expiry_datetime = data.get('marks_entry_expiry_datetime')
+        marks_entry_expiry_datetime = (
+            data.get('marks_entry_expiry_datetime')
+            or getattr(self.instance, 'marks_entry_expiry_datetime', None)
+        )
         if not marks_entry_expiry_datetime:
-            raise serializers.ValidationError({"endmarks_entry_expiry_datetime_date": " Marks entry expiry datetime must be selected.."})
-        if marks_entry_expiry_datetime:
-            from django.utils import timezone
-            now = timezone.now()
-            if timezone.is_naive(marks_entry_expiry_datetime):
-                marks_entry_expiry_datetime = timezone.make_aware(marks_entry_expiry_datetime)
+            raise serializers.ValidationError({
+                "marks_entry_expiry_datetime": "Marks entry expiry datetime must be selected."
+            })
 
-            # 4a. Expiry must be in future
-            if marks_entry_expiry_datetime <= now:
+        now = timezone.now()
+        if timezone.is_naive(marks_entry_expiry_datetime):
+            marks_entry_expiry_datetime = timezone.make_aware(marks_entry_expiry_datetime)
+
+        # 4a. Expiry must be in future
+        if marks_entry_expiry_datetime <= now:
+            raise serializers.ValidationError({
+                "marks_entry_expiry_datetime": "Marks entry expiry datetime must be in the future."
+            })
+
+        # 4b. Expiry must be AFTER exam end date
+        if end_date:
+            end_of_day = timezone.make_aware(
+                datetime.datetime.combine(end_date, datetime.time.max)
+            )
+            if marks_entry_expiry_datetime <= end_of_day:
                 raise serializers.ValidationError({
-                    "marks_entry_expiry_datetime": "Marks entry expiry datetime must be in the future."
+                    "marks_entry_expiry_datetime": "Marks entry expiry datetime must be after the exam end date."
                 })
 
-            # 4b. Expiry must be AFTER exam end date
-            if end_date:
-                # Convert end_date to datetime for proper comparison
-                end_of_day = timezone.make_aware(
-                    datetime.datetime.combine(end_date, datetime.time.max)
-                )
-                if marks_entry_expiry_datetime <= end_of_day:
-                    raise serializers.ValidationError({
-                        "marks_entry_expiry_datetime": "Marks entry expiry datetime must be after the exam end date."
-                    })
+        # ---- 5. M2M Field Validation ----
+        # only validate during creation, not on update
+        if not self.instance:
+            m2m_fields = {
+                "branches": self.initial_data.get('branches', []),
+                "states": self.initial_data.get('states', []),
+                "zones": self.initial_data.get('zones', []),
+                "orientations": self.initial_data.get('orientations', []),
+                "academic_devisions": self.initial_data.get('academic_devisions', []),
+                "student_classes": self.initial_data.get('student_classes', []),
+            }
 
-        # ---- 5. Many-to-Many Field Validation ----
-        m2m_fields = {
-            "branches": self.initial_data.get('branches', []),
-            "states": self.initial_data.get('states', []),
-            "zones": self.initial_data.get('zones', []),
-            "orientations": self.initial_data.get('orientations', []),
-            "academic_devisions": self.initial_data.get('academic_devisions', []),
-            "student_classes": self.initial_data.get('student_classes', []),
-        }
+            m2m_errors = {}
+            for field_name, field_value in m2m_fields.items():
+                if not field_value:
+                    m2m_errors[field_name] = f"At least one {field_name.replace('_', ' ')} must be selected."
 
-        m2m_errors = {}
-        for field_name, field_value in m2m_fields.items():
-            if not field_value:
-                m2m_errors[field_name] = f"At least one {field_name.replace('_', ' ')} must be selected."
-
-        if m2m_errors:
-            raise serializers.ValidationError(m2m_errors)
+            if m2m_errors:
+                raise serializers.ValidationError(m2m_errors)
 
         return data
+
+    # def validate(self, data):
+    #     # ---- 1. Prevent editing published exams ----
+    #     if self.instance and self.instance.is_editable is False:
+    #         raise serializers.ValidationError({"non_field_errors":"This Exam is Already Published, Edit is not allowed."})
+
+    #     # ---- 2. Duplicate name validation ----
+    #     name = self.initial_data.get('name')
+    #     if not name or str(name).strip() == "":
+    #         raise serializers.ValidationError({"name": "Exam name is required."})
+
+    #     academic_year = self.initial_data.get('academic_year')
+    #     exam_type = self.initial_data.get('exam_type')
+
+    #     if academic_year and exam_type:
+    #         qs = Exam.objects.filter(
+    #             name__iexact=name.strip(),
+    #             academic_year_id=academic_year,
+    #             exam_type_id=exam_type
+    #         )
+    #         if self.instance:
+    #             qs = qs.exclude(pk=self.instance.pk)
+    #         if qs.exists():
+    #             raise serializers.ValidationError({
+    #                 "name": "An exam with this name, year, and type already exists."
+    #             })
+
+    #     # ---- 3. Date validation (start < end) ----
+    #     start_date = data.get('start_date')
+    #     end_date = data.get('end_date')
+    #     if start_date and end_date and end_date < start_date:
+    #         raise serializers.ValidationError({"end_date": "End date cannot be earlier than start date."})
+
+    #     # ---- 4. Marks entry expiry datetime checks ----
+    #     marks_entry_expiry_datetime = data.get('marks_entry_expiry_datetime')
+    #     if not marks_entry_expiry_datetime:
+    #         raise serializers.ValidationError({"endmarks_entry_expiry_datetime_date": " Marks entry expiry datetime must be selected.."})
+    #     if marks_entry_expiry_datetime:
+    #         from django.utils import timezone
+    #         now = timezone.now()
+    #         if timezone.is_naive(marks_entry_expiry_datetime):
+    #             marks_entry_expiry_datetime = timezone.make_aware(marks_entry_expiry_datetime)
+
+    #         # 4a. Expiry must be in future
+    #         if marks_entry_expiry_datetime <= now:
+    #             raise serializers.ValidationError({
+    #                 "marks_entry_expiry_datetime": "Marks entry expiry datetime must be in the future."
+    #             })
+
+    #         # 4b. Expiry must be AFTER exam end date
+    #         if end_date:
+    #             # Convert end_date to datetime for proper comparison
+    #             end_of_day = timezone.make_aware(
+    #                 datetime.datetime.combine(end_date, datetime.time.max)
+    #             )
+    #             if marks_entry_expiry_datetime <= end_of_day:
+    #                 raise serializers.ValidationError({
+    #                     "marks_entry_expiry_datetime": "Marks entry expiry datetime must be after the exam end date."
+    #                 })
+
+    #     # ---- 5. Many-to-Many Field Validation ----
+    #     m2m_fields = {
+    #         "branches": self.initial_data.get('branches', []),
+    #         "states": self.initial_data.get('states', []),
+    #         "zones": self.initial_data.get('zones', []),
+    #         "orientations": self.initial_data.get('orientations', []),
+    #         "academic_devisions": self.initial_data.get('academic_devisions', []),
+    #         "student_classes": self.initial_data.get('student_classes', []),
+    #     }
+
+    #     m2m_errors = {}
+    #     for field_name, field_value in m2m_fields.items():
+    #         if not field_value:
+    #             m2m_errors[field_name] = f"At least one {field_name.replace('_', ' ')} must be selected."
+
+    #     if m2m_errors:
+    #         raise serializers.ValidationError(m2m_errors)
+
+    #     return data
 
 # ==================== ExamInstance ====================
 class ExamInstanceSerializer(serializers.ModelSerializer):
@@ -189,8 +282,10 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
         read_only_fields = ('created_by', 'updated_by', 'is_active')
 
     def get_subject_skill_names(self, obj):
-        # Get all related subject skill names and join with comma
-        return ', '.join(obj.subject_skills.values_list('name', flat=True))
+        # Safely get related skill names if relation exists and not None
+        if hasattr(obj, 'subject_skills') and obj.subject_skills.exists():
+            return ', '.join(obj.subject_skills.values_list('name', flat=True))
+        return ''
     
     def validate(self, data):
         exam = data.get('exam') or getattr(self.instance, 'exam', None)
@@ -260,7 +355,7 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
             if (
                 data.get('cut_off_marks_external') is not None
                 and data.get('maximum_marks_external') is not None
-                and data['cut_off_marks_external'] >= data['maximum_marks_external']
+                and data['cut_off_marks_external'] > data['maximum_marks_external']
             ):
                 raise serializers.ValidationError({
                     "cut_off_marks_external": "Cut-off marks must be less than maximum marks for external."
@@ -279,7 +374,7 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
             if (
                 data.get('cut_off_marks_internal') is not None
                 and data.get('maximum_marks_internal') is not None
-                and data['cut_off_marks_internal'] >= data['maximum_marks_internal']
+                and data['cut_off_marks_internal'] > data['maximum_marks_internal']
             ):
                 raise serializers.ValidationError({
                     "cut_off_marks_internal": "Cut-off marks must be less than maximum marks for internal."
@@ -292,12 +387,12 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
             })
 
         # --- Prevent duplicate instance for same exam, subject, and date ---
-        existing = ExamInstance.objects.filter(exam=exam, subject=subject, date=exam_date)
+        existing = ExamInstance.objects.filter(exam=exam, subject=subject)
         if self.instance:
             existing = existing.exclude(pk=self.instance.pk)
         if existing.exists():
             raise serializers.ValidationError({
-                "non_field_errors": "An exam instance for this subject and date already exists."
+                "non_field_errors": "An exam for this subject and date already exists."
             })
 
         return data
@@ -337,19 +432,58 @@ class ExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
                 "result_types": "At least one of external marks, internal marks, or co-scholastic grade must be selected."
             })
 
-        # ✅ 3. Marks validation
+        # # ✅ 3. Marks validation
+        # if has_external:
+        #     max_external = data.get('maximum_marks_external', getattr(self.instance, 'maximum_marks_external', None))
+        #     if max_external is None:
+        #         raise serializers.ValidationError({
+        #             "maximum_marks_external": "Required if external marks are enabled."
+        #         })
+        # if has_internal:
+        #     max_internal = data.get('maximum_marks_internal', getattr(self.instance, 'maximum_marks_internal', None))
+        #     if max_internal is None:
+        #         raise serializers.ValidationError({
+        #             "maximum_marks_internal": "Required if internal marks are enabled."
+        #         })
+
+        # --- External marks validations ---
         if has_external:
-            max_external = data.get('maximum_marks_external', getattr(self.instance, 'maximum_marks_external', None))
-            if max_external is None:
+            if not data.get('maximum_marks_external'):
                 raise serializers.ValidationError({
-                    "maximum_marks_external": "Required if external marks are enabled."
+                    "maximum_marks_external": "This field is required when external marks are enabled."
                 })
+            if not data.get('cut_off_marks_external'):
+                raise serializers.ValidationError({
+                    "cut_off_marks_external": "This field is required when external marks are enabled."
+                })
+            if (
+                data.get('cut_off_marks_external') is not None
+                and data.get('maximum_marks_external') is not None
+                and data['cut_off_marks_external'] > data['maximum_marks_external']
+            ):
+                raise serializers.ValidationError({
+                    "cut_off_marks_external": "Cut-off marks must be less than maximum marks for external."
+                })
+
+        # --- Internal marks validations ---
         if has_internal:
-            max_internal = data.get('maximum_marks_internal', getattr(self.instance, 'maximum_marks_internal', None))
-            if max_internal is None:
+            if not data.get('maximum_marks_internal'):
                 raise serializers.ValidationError({
-                    "maximum_marks_internal": "Required if internal marks are enabled."
+                    "maximum_marks_internal": "This field is required when internal marks are enabled."
                 })
+            if not data.get('cut_off_marks_internal'):
+                raise serializers.ValidationError({
+                    "cut_off_marks_internal": "This field is required when internal marks are enabled."
+                })
+            if (
+                data.get('cut_off_marks_internal') is not None
+                and data.get('maximum_marks_internal') is not None
+                and data['cut_off_marks_internal'] > data['maximum_marks_internal']
+            ):
+                raise serializers.ValidationError({
+                    "cut_off_marks_internal": "Cut-off marks must be less than maximum marks for internal."
+                })
+
 
         return data
 
@@ -608,17 +742,24 @@ class EditExamResultSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
-        external_marks = attrs.get('external_marks')
-        internal_marks = attrs.get('internal_marks')
-        exam_result_id = attrs.get('exam_result_id')
+        instance = self.instance
+        exam_instance = instance.exam_instance
+        marks_entry_expiry_datetime = exam_instance.exam.marks_entry_expiry_datetime
 
-        exam_instance = self.instance.exam_instance
+        if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
+            raise serializers.ValidationError({
+                'marks_entry_expiry_datetime': 'Marks Entry Time is Expired'
+            })
+
+        # ✅ If marks are not being updated, skip marks logic entirely
+        if 'external_marks' not in attrs and 'internal_marks' not in attrs:
+            return attrs
 
         # Default attendance = Present
         attendance_obj = None
 
-        # Define valid absent keywords
-        ABSENT_VALUES = ['AB', 'ABSENT', '', 'A', 'a']
+        # Define valid absent/dropout keywords
+        ABSENT_VALUES = ['AB', 'ABSENT', 'A', 'a']
         DROPOUT_VALUES = ['DR', 'DROPOUT', 'Drop', 'D', 'd']
 
         def parse_marks(value, field_name):
@@ -628,54 +769,59 @@ class EditExamResultSerializer(serializers.ModelSerializer):
 
             str_val = str(value).strip().upper()
 
-            # Handle Absent
             if str_val in ABSENT_VALUES:
                 return "ABSENT"
-            
             if str_val in DROPOUT_VALUES:
                 return "DROPOUT"
 
-            # Handle numeric
             try:
                 return Decimal(str(value))
             except (InvalidOperation, TypeError, ValueError):
-                raise serializers.ValidationError({field_name: f"Invalid input for {field_name}. Must be a number or 'AB' or 'DR'."})
+                raise serializers.ValidationError({
+                    field_name: f"Invalid input for {field_name}. Must be a number or 'AB' or 'DR'."
+                })
 
-        ext_value = parse_marks(external_marks, "external_marks")
-        int_value = parse_marks(internal_marks, "internal_marks")
+        # ✅ Safely fetch values (only process ones included in the request)
+        external_marks = attrs.get('external_marks', instance.external_marks)
+        internal_marks = attrs.get('internal_marks', instance.internal_marks)
 
-        # Determine attendance based on marks
+        ext_value = parse_marks(external_marks, "external_marks") if 'external_marks' in attrs else instance.external_marks
+        int_value = parse_marks(internal_marks, "internal_marks") if 'internal_marks' in attrs else instance.internal_marks
+
+        # Determine attendance
         if ext_value == "ABSENT" or int_value == "ABSENT":
-            # Absent case → nullify marks
-            attrs['external_marks'] = None
-            attrs['internal_marks'] = None
-            try:
-                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=2)  # Absent
-            except ExamAttendanceStatus.DoesNotExist:
-                pass
+            if 'external_marks' in attrs:
+                attrs['external_marks'] = None
+            if 'internal_marks' in attrs:
+                attrs['internal_marks'] = None
+            attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=2).first()  # Absent
 
-        elif ext_value == 'DROPOUT' or int_value == 'DROPOUT':
-            attrs['external_marks'] = None
-            attrs['internal_marks'] = None
-            try:
-                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=3)  # Dropout
-            except ExamAttendanceStatus.DoesNotExist:
-                pass
+        elif ext_value == "DROPOUT" or int_value == "DROPOUT":
+            if 'external_marks' in attrs:
+                attrs['external_marks'] = None
+            if 'internal_marks' in attrs:
+                attrs['internal_marks'] = None
+            attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=3).first()  # Dropout
+
         else:
-            if isinstance(ext_value, Decimal) and exam_instance.cut_off_marks_external is not None:
-                if ext_value > exam_instance.cut_off_marks_external:
-                    raise serializers.ValidationError({'external_marks': 'External Marks must be less than Cut off Marks'})
+            # ✅ Range validation (only if those fields are being updated)
+            if 'external_marks' in attrs and isinstance(ext_value, Decimal):
+                if exam_instance.cut_off_marks_external is not None and ext_value > exam_instance.cut_off_marks_external:
+                    raise serializers.ValidationError({
+                        'external_marks': 'External Marks must be less than Cut off Marks'
+                    })
 
-            if isinstance(int_value, Decimal) and exam_instance.cut_off_marks_internal is not None:
-                if int_value > exam_instance.cut_off_marks_internal:
-                    raise serializers.ValidationError({'internal_marks': 'Internal Marks must be less than Cut off Marks'})
-                
-            attrs['external_marks'] = ext_value
-            attrs['internal_marks'] = int_value
-            try:
-                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=1)  # Present
-            except ExamAttendanceStatus.DoesNotExist:
-                pass
+            if 'internal_marks' in attrs and isinstance(int_value, Decimal):
+                if exam_instance.cut_off_marks_internal is not None and int_value > exam_instance.cut_off_marks_internal:
+                    raise serializers.ValidationError({
+                        'internal_marks': 'Internal Marks must be less than Cut off Marks'
+                    })
+
+            if 'external_marks' in attrs:
+                attrs['external_marks'] = ext_value
+            if 'internal_marks' in attrs:
+                attrs['internal_marks'] = int_value
+            attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=1).first()  # Present
 
         if attendance_obj:
             attrs['exam_attendance'] = attendance_obj
@@ -721,10 +867,14 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "ExamSubjectSkillInstance not found for this skill and exam."
             )
+        
+        marks_entry_expiry_datetime = skill_instance.exam_instance.exam.marks_entry_expiry_datetime
+        if marks_entry_expiry_datetime and timezone.now() > marks_entry_expiry_datetime:
+            raise serializers.ValidationError({'marks_entry_expiry_datetime': 'Marks Entry Time is Expired'})
 
         # Attendance handling
         attendance_obj = None
-        ABSENT_VALUES = ['AB', 'ABSENT', '', 'A', 'a']
+        ABSENT_VALUES = ['AB', 'ABSENT', 'A', 'a']
         DROPOUT_VALUES = ['DR', 'DROPOUT', 'Drop', 'D', 'd']
 
         def parse_marks(value, field_name, cut_off):
@@ -760,21 +910,21 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
         # Determine attendance
         if ext_value == "ABSENT" or int_value == "ABSENT":
             attrs['external_marks'] = None
-            attrs['internal_marks'] = None
             try:
                 attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=2)  # Absent
             except ExamAttendanceStatus.DoesNotExist:
                 pass
         elif ext_value == "DROPOUT" or int_value == "DROPOUT":
             attrs['external_marks'] = None
-            attrs['internal_marks'] = None
             try:
                 attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=3)  # Dropout
             except ExamAttendanceStatus.DoesNotExist:
                 pass
         else:
-            attrs['external_marks'] = ext_value
-            attrs['internal_marks'] = int_value
+            if 'external_marks' in attrs:
+                attrs['external_marks'] = ext_value
+            if 'internal_marks' in attrs:
+                attrs['internal_marks'] = int_value
             try:
                 attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=1)  # Present
             except ExamAttendanceStatus.DoesNotExist:
@@ -789,3 +939,8 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
         attrs['marks_obtained'] = total
 
         return attrs
+
+class CoScholasticGradeDropdownSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoScholasticGrade
+        fields =['id','name',]
