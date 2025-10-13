@@ -233,44 +233,112 @@ class ExamViewSet(ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        validated_data = serializer.validated_data
-        name = validated_data.get("name")
-        exam_type = validated_data.get("exam_type")
-
-        # Basic validations
-        if not name or not str(name).strip():
-            # return Response({"name": "Exam name is required."}, status=status.HTTP_400_BAD_REQUEST)
-            raise ValidationError({"name": "Exam name is required."})
-        if not exam_type:
-            # return Response({"exam_type": "Exam Type is required."}, status=status.HTTP_400_BAD_REQUEST)
-            raise ValidationError({"exam_type": "Exam Type is required."})
-
-        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
-        if not current_academic_year:
-            # return Response({"academic_year": "Current academic year not found."}, status=status.HTTP_400_BAD_REQUEST)
-            raise ValidationError({"academic_year": "Current academic year not found."})
-
-        # Duplicate check
-        if Exam.objects.filter(
-            name__iexact=name.strip(),
-            academic_year=current_academic_year,
-            exam_type=exam_type,
-        ).exists():
-            raise ValidationError({"name": "An exam with this name, year, and type already exists."})
-
-        # ✅ Save only if all validations pass
+        """
+        Wrap creation in a DB transaction and catch duplicate constraint errors
+        """
         try:
             with transaction.atomic():
-                serializer.save(
-                    academic_year=current_academic_year,
-                    created_by=self.request.user,
-                    updated_by=self.request.user
-                )
-        except IntegrityError:
-            raise ValidationError({"detail": "Duplicate exam entry or integrity constraint violated."})
+                serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        except IntegrityError as e:
+            # Handle unique constraint violation gracefully
+            if 'unique_exam_per_year_type' in str(e):
+                raise serializers.ValidationError({
+                    "name": "An exam with this name, academic year, and exam type already exists."
+                })
+            # Handle academic_year auto-selection issues
+            if 'academic_year_id' in str(e):
+                raise serializers.ValidationError({
+                    "academic_year": "Valid academic year not found or inactive."
+                })
+            raise serializers.ValidationError({
+                "non_field_errors": "A database integrity error occurred."
+            })
 
     def perform_update(self, serializer):
-        serializer.save(updated_by=self.request.user)
+        """
+        Prevent IntegrityError on updates too
+        """
+        try:
+            with transaction.atomic():
+                serializer.save(updated_by=self.request.user)
+        except IntegrityError as e:
+            if 'unique_exam_per_year_type' in str(e):
+                raise serializers.ValidationError({
+                    "name": "An exam with this name, academic year, and exam type already exists."
+                })
+            raise serializers.ValidationError({
+                "non_field_errors": "A database integrity error occurred during update."
+            })
+
+    def create(self, request, *args, **kwargs):
+        """
+        Override create to return consistent 400 instead of 500
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            self.perform_create(serializer)
+        except serializers.ValidationError as e:
+            return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Override update for safe IntegrityError handling
+        """
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        try:
+            self.perform_update(serializer)
+        except serializers.ValidationError as e:
+            return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    # def perform_create(self, serializer):
+    #     validated_data = serializer.validated_data
+    #     name = validated_data.get("name")
+    #     exam_type = validated_data.get("exam_type")
+
+    #     # === Validation checks ===
+    #     if not name or not str(name).strip():
+    #         raise ValidationError({"name": "Exam name is required."})
+
+    #     if not exam_type:
+    #         raise ValidationError({"exam_type": "Exam Type is required."})
+
+    #     current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+    #     if not current_academic_year:
+    #         raise ValidationError({"academic_year": "Current academic year not found."})
+
+    #     # === Prevent duplicates ===
+    #     if Exam.objects.filter(
+    #         name__iexact=name.strip(),
+    #         academic_year=current_academic_year,
+    #         exam_type=exam_type,
+    #     ).exists():
+    #         raise ValidationError({"name": "An exam with this name, year, and type already exists."})
+
+    #     # === Safe transaction save ===
+    #     try:
+    #         with transaction.atomic():
+    #             serializer.save(
+    #                 academic_year=current_academic_year,
+    #                 created_by=self.request.user,
+    #                 updated_by=self.request.user
+    #             )
+    #     except IntegrityError:
+    #         # This catches DB constraint violations gracefully
+    #         raise ValidationError({"detail": "Duplicate exam entry or integrity constraint violated."})
+
+    # def perform_update(self, serializer):
+    #     try:
+    #         with transaction.atomic():
+    #             serializer.save(updated_by=self.request.user)
+    #     except IntegrityError:
+    #         raise ValidationError({"detail": "Exam update failed due to a database constraint violation."})
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -338,14 +406,16 @@ class ExamInstanceViewSet(ModelViewSet):
 
         subject = serializer.validated_data.get("subject")
 
+        # Check for duplicates at application level first
         if ExamInstance.objects.filter(subject=subject, exam=exam).exists():
-            raise ValidationError({"non_field_errors": "An exam for this subject already exists."})
+            raise ValidationError({"subject": "An exam for this subject already exists for this exam."})
 
         try:
             with transaction.atomic():
                 serializer.save(exam=exam, created_by=self.request.user, updated_by=self.request.user)
         except IntegrityError:
-            raise ValidationError({"detail": "Duplicate exam instance or integrity constraint violated."})
+            # Catch DB-level constraint violation and raise as 400
+            raise ValidationError({"non_field_errors": "An exam for this subject already exists (database constraint)."})
 
     def perform_update(self, serializer):
         exam_id = self.get_exam_id()
