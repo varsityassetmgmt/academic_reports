@@ -908,21 +908,21 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
         # Determine attendance
         if ext_value == "ABSENT" or int_value == "ABSENT":
             attrs['external_marks'] = None
-            attrs['internal_marks'] = None
             try:
                 attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=2)  # Absent
             except ExamAttendanceStatus.DoesNotExist:
                 pass
         elif ext_value == "DROPOUT" or int_value == "DROPOUT":
             attrs['external_marks'] = None
-            attrs['internal_marks'] = None
             try:
                 attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=3)  # Dropout
             except ExamAttendanceStatus.DoesNotExist:
                 pass
         else:
-            attrs['external_marks'] = ext_value
-            attrs['internal_marks'] = int_value
+            if 'external_marks' in attrs:
+                attrs['external_marks'] = ext_value
+            if 'internal_marks' in attrs:
+                attrs['internal_marks'] = int_value
             try:
                 attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=1)  # Present
             except ExamAttendanceStatus.DoesNotExist:
