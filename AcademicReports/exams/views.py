@@ -256,7 +256,7 @@ class ExamViewSet(ModelViewSet):
             academic_year=current_academic_year,
             exam_type=exam_type,
         ).exists():
-            return Response({"name": "An exam with this name, year, and type already exists."}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({"name": "An exam with this name, year, and type already exists."})
 
         # ✅ Save only if all validations pass
         try:
@@ -339,7 +339,7 @@ class ExamInstanceViewSet(ModelViewSet):
         subject = serializer.validated_data.get("subject")
 
         if ExamInstance.objects.filter(subject=subject, exam=exam).exists():
-            return Response({"non_field_errors": "An exam for this subject already exists."}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({"non_field_errors": "An exam for this subject already exists."})
 
         try:
             with transaction.atomic():
