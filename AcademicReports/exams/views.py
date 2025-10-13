@@ -322,35 +322,23 @@ class ExamInstanceViewSet(ModelViewSet):
 
     # ✅ No need to revalidate serializer here
     def perform_create(self, serializer):
-        validated_data = serializer.validated_data
-        subject = validated_data.get("subject")
         exam_id = self.get_exam_id()
         exam = get_object_or_404(Exam, pk=exam_id)
-        if exam.is_editable==False:
-            return Response({
-                "non_field_errors":"This Exam is Already Published, Edit is not allowed."            })
-        if ExamInstance.objects.filter(
-            subject=subject,
-            exam=exam
-        ).exists():
-            return Response({
-                "non_field_errors": "An exam for this subject and date already exists."
-            })
-        if exam.is_editable== False:
-            serializer.save(
-                exam=exam,
-                created_by=self.request.user,
-                updated_by=self.request.user
-            )
+        if not exam.is_editable:
+            raise ValidationError({"non_field_errors": "This Exam is already published — creation/edit not allowed."})
+        subject = serializer.validated_data.get("subject")
+        # date = serializer.validated_data.get("date")
+        if ExamInstance.objects.filter(subject=subject, exam=exam).exists():
+            raise ValidationError({"non_field_errors": "An exam for this subject and date already exists."})
+        serializer.save(exam=exam, created_by=self.request.user, updated_by=self.request.user)
 
     def perform_update(self, serializer):
         exam_id = self.get_exam_id()
         exam = get_object_or_404(Exam, pk=exam_id)
-        if exam.is_editable== False:
-            serializer.save(
-                exam=exam,
-                updated_by=self.request.user
-            )
+        if not exam.is_editable:
+            raise ValidationError({"non_field_errors": "This Exam is already published — editing is not allowed."})
+        serializer.save(exam=exam, updated_by=self.request.user)
+
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
