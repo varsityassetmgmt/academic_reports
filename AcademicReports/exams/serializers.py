@@ -944,3 +944,205 @@ class CoScholasticGradeDropdownSerializer(serializers.ModelSerializer):
     class Meta:
         model = CoScholasticGrade
         fields =['id','name',]
+
+
+
+#===============================================================  Create Exam Instance  =========================================================================
+
+# # serializers.py
+# from rest_framework import serializers
+# from .models import ExamInstance, SubjectSkill
+
+# class CreateExamInstanceSerializer(serializers.ModelSerializer):
+#     # Use PK related fields so API accepts integer IDs
+#     exam = serializers.PrimaryKeyRelatedField(queryset=Exam.objects.all())
+#     subject = serializers.PrimaryKeyRelatedField(queryset=Subject.objects.all())
+#     subject_skills = serializers.PrimaryKeyRelatedField(queryset=SubjectSkill.objects.all(), many=True, required=False)
+
+#     class Meta:
+#         model = ExamInstance
+#         fields = '__all__'
+
+#     def validate(self, attrs):
+#         exam = attrs.get('exam') or (self.instance.exam if self.instance else None)
+#         subject = attrs.get('subject') or (self.instance.subject if self.instance else None)
+#         date = attrs.get('date') or (self.instance.date if self.instance else None)
+#         start = attrs.get('exam_start_time') or (self.instance.exam_start_time if self.instance else None)
+#         end = attrs.get('exam_end_time') or (self.instance.exam_end_time if self.instance else None)
+#         subject_skills = attrs.get('subject_skills', [])
+#         has_co_scholastic = attrs.get('has_subject_co_scholastic_grade', False)
+
+#         has_external = attrs.get('has_external_marks', False)
+#         max_external = attrs.get('maximum_marks_external')
+#         cut_off_external = attrs.get('cut_off_marks_external')
+#         has_internal = attrs.get('has_internal_marks', False)
+#         max_internal = attrs.get('maximum_marks_internal')
+#         cut_off_internal = attrs.get('cut_off_marks_internal')
+
+#         # Validate co-scholastic grade + subject_skills
+#         if has_co_scholastic and not subject_skills:
+#             raise serializers.ValidationError({
+#                 "subject_skills": "At least one subject skill is required when co-scholastic grade is enabled."
+#             })
+        
+#         # exam edit check
+#         if exam and not getattr(exam, "is_editable", True):
+#             raise serializers.ValidationError({"exam": f"'{exam.name}' is locked. Cannot add or update ExamInstances."})
+        
+#         # required exam+subject
+#         if not exam or not subject:
+#             raise serializers.ValidationError("Exam and Subject are required.")
+
+#         # date within exam
+#         if date and (not (exam.start_date <= date <= exam.end_date)):
+#             raise serializers.ValidationError({"date": f"Exam date must be between {exam.start_date} and {exam.end_date}."})
+
+#         # time check
+#         if start and end and start >= end:
+#             raise serializers.ValidationError({"exam_end_time": "Exam end time must be later than start time."})
+
+#         # unique check: on create exclude nothing, on update exclude instance
+#         qs = ExamInstance.objects.filter(exam=exam, subject=subject)
+#         if self.instance:
+#             qs = qs.exclude(pk=self.instance.pk)
+#         if qs.exists():
+#             raise serializers.ValidationError("An ExamInstance with this Exam and Subject already exists.")
+        
+#         # External marks validation
+#         if has_external:
+#             if max_external is None:
+#                 raise serializers.ValidationError("This max external marks is required when external marks are enabled.")
+#             if cut_off_external is None:
+#                 raise serializers.ValidationError("This cut off external is required when external marks are enabled.")
+#             elif max_external is not None and cut_off_external > max_external:
+#                 raise serializers.ValidationError("Cut-off external marks cannot be greater than maximum external marks.")
+            
+#         # Internal marks validation
+#         if has_internal:
+#             if max_internal is None:
+#                 raise serializers.ValidationError("Maximum internal marks  required when internal marks are enabled.")
+                
+#             if cut_off_internal is None:
+#                 raise serializers.ValidationError("cut off insternal marks  is required when internal marks are enabled.")
+#             elif max_internal is not None and cut_off_internal > max_internal:
+#                 raise serializers.ValidationError("Cut-off internal marks cannot be greater than maximum internal marks.")
+    
+#         return attrs
+
+#     def create(self, validated_data):
+#         subject_skills = validated_data.pop('subject_skills', [])
+#         instance = super().create(validated_data)
+#         if subject_skills:
+#             instance.subject_skills.set(subject_skills)
+#         return instance
+
+#     def update(self, instance, validated_data):
+#         subject_skills = validated_data.pop('subject_skills', None)
+#         instance = super().update(instance, validated_data)
+#         if subject_skills is not None:
+#             instance.subject_skills.set(subject_skills)
+#         return instance
+
+
+
+# serializers.py
+from rest_framework import serializers
+from .models import ExamInstance, SubjectSkill, Exam, Subject
+
+
+class CreateExamInstanceSerializer(serializers.ModelSerializer):
+    exam = serializers.PrimaryKeyRelatedField(queryset=Exam.objects.all())
+    subject = serializers.PrimaryKeyRelatedField(queryset=Subject.objects.all())
+    subject_skills = serializers.PrimaryKeyRelatedField(
+        queryset=SubjectSkill.objects.all(), many=True, required=False
+    )
+
+    class Meta:
+        model = ExamInstance
+        fields = '__all__'
+
+    def validate(self, attrs):
+        exam = attrs.get('exam') or (self.instance.exam if self.instance else None)
+        subject = attrs.get('subject') or (self.instance.subject if self.instance else None)
+        date = attrs.get('date') or (self.instance.date if self.instance else None)
+        start = attrs.get('exam_start_time') or (self.instance.exam_start_time if self.instance else None)
+        end = attrs.get('exam_end_time') or (self.instance.exam_end_time if self.instance else None)
+        subject_skills = attrs.get('subject_skills', [])
+        has_subject_skills = attrs.get('has_subject_skills', False)
+
+        has_external = attrs.get('has_external_marks', False)
+        max_external = attrs.get('maximum_marks_external')
+        cut_off_external = attrs.get('cut_off_marks_external')
+
+        has_internal = attrs.get('has_internal_marks', False)
+        max_internal = attrs.get('maximum_marks_internal')
+        cut_off_internal = attrs.get('cut_off_marks_internal')
+
+        errors = {}
+
+        # ✅ Co-scholastic grade + subject_skills validation
+        if has_subject_skills and not subject_skills:
+            errors["subject_skills"] = "At least one subject skill must be selected when co-scholastic grading is enabled."
+
+        # ✅ Exam edit check
+        if exam and not getattr(exam, "is_editable", True):
+            errors["exam"] = f"Exam '{exam.name}' is locked. You cannot add or update exam instances for this exam."
+
+        # ✅ Required exam and subject check
+        if not exam:
+            errors["exam"] = "Exam selection is required."
+        if not subject:
+            errors["subject"] = "Subject selection is required."
+
+        # ✅ Date within exam range
+        if exam and date:
+            if not (exam.start_date <= date <= exam.end_date):
+                errors["date"] = f"The exam date ({date}) must be between {exam.start_date} and {exam.end_date}."
+
+        # ✅ Start < End time
+        if start and end and start >= end:
+            errors["exam_end_time"] = "Exam end time must be later than the start time."
+
+        # ✅ Unique exam + subject constraint
+        qs = ExamInstance.objects.filter(exam=exam, subject=subject)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            errors["subject"] = f"An exam instance already exists for subject '{subject}' under '{exam}'."
+
+        # ✅ External marks validation
+        if has_external:
+            if max_external is None:
+                errors["maximum_marks_external"] = "Maximum external marks are required when external marks are enabled."
+            if cut_off_external is None:
+                errors["cut_off_marks_external"] = "Cut-off external marks are required when external marks are enabled."
+            elif max_external is not None and cut_off_external > max_external:
+                errors["cut_off_marks_external"] = "Cut-off external marks cannot exceed the maximum external marks."
+
+        # ✅ Internal marks validation
+        if has_internal:
+            if max_internal is None:
+                errors["maximum_marks_internal"] = "Maximum internal marks are required when internal marks are enabled."
+            if cut_off_internal is None:
+                errors["cut_off_marks_internal"] = "Cut-off internal marks are required when internal marks are enabled."
+            elif max_internal is not None and cut_off_internal > max_internal:
+                errors["cut_off_marks_internal"] = "Cut-off internal marks cannot exceed the maximum internal marks."
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return attrs
+
+    def create(self, validated_data):
+        subject_skills = validated_data.pop('subject_skills', [])
+        instance = super().create(validated_data)
+        if subject_skills:
+            instance.subject_skills.set(subject_skills)
+        return instance
+
+    def update(self, instance, validated_data):
+        subject_skills = validated_data.pop('subject_skills', None)
+        instance = super().update(instance, validated_data)
+        if subject_skills is not None:
+            instance.subject_skills.set(subject_skills)
+        return instance

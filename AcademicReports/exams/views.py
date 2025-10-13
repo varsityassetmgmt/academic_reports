@@ -1444,3 +1444,67 @@ def update_marks_entry_expiry_datetime_in_exam_instance(request, exam_id):
 
     return Response({'message': 'Marks Entry Expiry Date Updated Successfully'}, status=status.HTTP_200_OK)
 
+
+
+
+#=========================================================================================================================================================
+#==========================================    create exam instance     ==================================================================================
+#=========================================================================================================================================================
+
+# from rest_framework.decorators import api_view, permission_classes
+# from rest_framework.permissions import IsAuthenticated
+# from rest_framework.response import Response
+# from rest_framework import status
+# from .models import ExamInstance
+# from .serializers import ExamInstanceSerializer
+
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated])
+# def create_exam_instance(request):
+ 
+#     serializer = CreateExamInstanceSerializer(data=request.data)
+#     if serializer.is_valid():
+#         exam_id = serializer.validated_data.get('exam_id')
+#         subject_id = serializer.validated_data.get('subject_id')
+
+#         if not exam_id and  not subject_id:
+#             return Response({"error": "Exam and subjects are requiered."},status=status.HTTP_400_BAD_REQUEST)
+
+
+#         # ✅ Check for duplicate combination (exam + subject)
+#         if ExamInstance.objects.filter(exam_id=exam_id, subject_id=subject_id).exists():
+#             return Response({"error": "An ExamInstance with this Exam and Subject already exists."},status=status.HTTP_400_BAD_REQUEST)
+
+#         # ✅ Save and assign created_by
+#         serializer.save(subject_id = subject_id, created_by=request.user,updated_by = request.user)
+#         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+#     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_exam_instance(request):
+    serializer = CreateExamInstanceSerializer(data=request.data)
+    if serializer.is_valid():
+        # serializer.validate already ensures exam is editable and uniqueness
+        serializer.save(created_by=request.user, updated_by=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_exam_instance(request, pk):
+    instance = get_object_or_404(ExamInstance, exam_instance_id = pk)
+    # block update if exam is not editable (quick guard)
+    if instance.exam and not getattr(instance.exam, "is_editable", True):
+        return Response({"error": f"'{instance.exam.name}' is locked. You cannot update this ExamInstance."},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    serializer = CreateExamInstanceSerializer(instance, data=request.data, partial=False)
+    if serializer.is_valid():
+        serializer.save(updated_by=request.user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
