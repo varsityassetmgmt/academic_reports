@@ -803,13 +803,13 @@ class EditExamResultSerializer(serializers.ModelSerializer):
             if 'external_marks' in attrs and isinstance(ext_value, Decimal):
                 if exam_instance.cut_off_marks_external is not None and ext_value > exam_instance.cut_off_marks_external:
                     raise serializers.ValidationError({
-                        'external_marks': 'External Marks must be less than Cut off Marks ({exam_instance.cut_off_marks_external}) '
+                        'external_marks': f'External Marks must be less than Cut off Marks ({exam_instance.cut_off_marks_external}) '
                     })
 
             if 'internal_marks' in attrs and isinstance(int_value, Decimal):
                 if exam_instance.cut_off_marks_internal is not None and int_value > exam_instance.cut_off_marks_internal:
                     raise serializers.ValidationError({
-                        'internal_marks': 'Internal Marks must be less than Cut off Marks ({exam_instance.cut_off_marks_internal}) '
+                        'internal_marks': f'Internal Marks must be less than Cut off Marks ({exam_instance.cut_off_marks_internal}) '
                     })
 
             if 'external_marks' in attrs:
@@ -923,13 +923,13 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             if 'external_marks' in attrs and isinstance(ext_value, Decimal):
                 if skill_instance.cut_off_marks_external is not None and ext_value > skill_instance.cut_off_marks_external:
                     raise serializers.ValidationError({
-                        'external_marks': 'External Marks must be less than Cut off Marks ({skill_instance.cut_off_marks_external}) '
+                        'external_marks': f'External Marks must be less than Cut off Marks ({skill_instance.cut_off_marks_external}) '
                     })
 
             if 'internal_marks' in attrs and isinstance(int_value, Decimal):
                 if skill_instance.cut_off_marks_internal is not None and int_value > skill_instance.cut_off_marks_internal:
                     raise serializers.ValidationError({
-                        'internal_marks': 'Internal Marks must be less than Cut off Marks ({skill_instance.cut_off_marks_internal}) '
+                        'internal_marks': f'Internal Marks must be less than Cut off Marks ({skill_instance.cut_off_marks_internal}) '
                     })
 
             if 'external_marks' in attrs:
