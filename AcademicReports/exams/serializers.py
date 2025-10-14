@@ -605,10 +605,12 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
     academic_year_name = serializers.CharField(source='academic_year.name', read_only=True)
     branch_name = serializers.CharField(source='branch.name', read_only=True)
     exam_name = serializers.CharField(source='exam.name', read_only=True)
+    exam_type_name = serializers.CharField(source='exam.exam_type.name')
     status_name = serializers.CharField(source='status.name', read_only=True)
     finalized_by_username = serializers.CharField(source='finalized_by.username', read_only=True)
     marks_entry_expiry_datetime_display = serializers.DateTimeField(source='marks_entry_expiry_datetime', format="%Y-%m-%d %H:%M:%S", read_only = True )
     finalized_at_display = serializers.DateTimeField(source='finalized_at', format="%Y-%m-%d %H:%M:%S", read_only = True )
+    no_of_pending_vs_total_sections = serializers.SerializerMethodField()
 
     class Meta:
         model = BranchWiseExamResultStatus
@@ -620,6 +622,7 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'branch_name',
             'exam',
             'exam_name',
+            'exam_type_name',
             'status',
             'status_name',
             'finalized_at',
@@ -635,6 +638,7 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'progress_card_pending_sections',
             'is_visible',
             'updated_at',
+            'no_of_pending_vs_total_sections',
         ]
         read_only_fields = [
             'id',
@@ -652,6 +656,11 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'updated_at',
             'finalized_at',
         ]
+
+    def get_no_of_pending_vs_total_sections(self, obj):
+        pending = obj.number_of_sections_pending or 0
+        total = obj.total_sections or 0
+        return f'{pending}/{total}'
 
     def validate(self, data):
         marks_entry_expiry_datetime = data.get('marks_entry_expiry_datetime')
@@ -888,7 +897,7 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             })
 
         # ✅ 2. Marks entry expiry validation (branch-wise)
-        branch = skill_instance.exam_instance.student.branch
+        branch = skill_result.exam_result.student.branch
         branch_status = BranchWiseExamResultStatus.objects.filter(exam=exam, branch=branch).first()
         marks_entry_expiry_datetime = getattr(branch_status, 'marks_entry_expiry_datetime', None)
 
