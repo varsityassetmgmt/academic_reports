@@ -1019,8 +1019,8 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             return dec_val
 
         # ✅ Safely fetch values (only process ones included in the request)
-        external_marks = attrs.get('external_marks', instance.external_marks)
-        internal_marks = attrs.get('internal_marks', instance.internal_marks)
+        external_marks = attrs.get('external_marks', skill_instance.external_marks)
+        internal_marks = attrs.get('internal_marks', skill_instance.internal_marks)
 
         # --- Parsing values ---
         ext_value = parse_external_marks(external_marks, "external_marks", skill_instance.cut_off_marks_external)
