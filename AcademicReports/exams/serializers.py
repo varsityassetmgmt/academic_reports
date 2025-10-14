@@ -785,10 +785,10 @@ class EditExamResultSerializer(serializers.ModelSerializer):
         ABSENT_VALUES = ['AB', 'ABSENT', 'A', 'a']
         DROPOUT_VALUES = ['DR', 'DROPOUT', 'Drop', 'D', 'd']
 
-        def parse_marks(value, field_name):
-            """Parse and validate mark values."""
+        def parse_external_marks(value, field_name, cut_off):
+            """Allow AB / DR / numeric for external marks"""
             if value in [None, ""]:
-                return None  # empty input → None
+                return None
 
             str_val = str(value).strip().upper()
 
@@ -797,28 +797,73 @@ class EditExamResultSerializer(serializers.ModelSerializer):
             if str_val in DROPOUT_VALUES:
                 return "DROPOUT"
 
+            # Convert to Decimal
             try:
-                return Decimal(str(value))
-            except (InvalidOperation, TypeError, ValueError):
-                raise serializers.ValidationError({
-                    field_name: f"Invalid input for {field_name}. Must be a number or 'AB' or 'DR'."
-                })
+                dec_val = Decimal(value)
+            except (TypeError, InvalidOperation):
+                raise serializers.ValidationError(
+                    {field_name: f"Invalid value for {field_name}. Must be numeric, 'AB', or 'DR'."}
+                )
+
+            if cut_off is not None and dec_val > cut_off:
+                raise serializers.ValidationError(
+                    {field_name: f"{field_name} cannot exceed cut-off ({cut_off})."}
+                )
+            return dec_val
+
+        def parse_internal_marks(value, field_name, cut_off):
+            """Allow ONLY numeric or null/blank for internal marks"""
+            if value in [None, ""]:
+                return None
+
+            str_val = str(value).strip()
+
+            # 🚫 Reject '.', empty, or alphabetic entries
+            if str_val in ["", "."]:
+                raise serializers.ValidationError(
+                    {field_name: f"Invalid value for {field_name}. Only numeric values are allowed."}
+                )
+
+            if not str_val.replace('.', '', 1).isdigit():
+                raise serializers.ValidationError(
+                    {field_name: f"Invalid value for {field_name}. Only numeric values are allowed."}
+                )
+
+            # ✅ Convert safely to Decimal
+            try:
+                dec_val = Decimal(value)
+            except (TypeError, InvalidOperation):
+                raise serializers.ValidationError(
+                    {field_name: f"Invalid numeric value for {field_name}."}
+                )
+
+            if cut_off is not None and dec_val > cut_off:
+                raise serializers.ValidationError(
+                    {field_name: f"{field_name} cannot exceed cut-off ({cut_off})."}
+                )
+            return dec_val
 
         # ✅ Safely fetch values (only process ones included in the request)
         external_marks = attrs.get('external_marks', instance.external_marks)
         internal_marks = attrs.get('internal_marks', instance.internal_marks)
 
-        ext_value = parse_marks(external_marks, "external_marks") if 'external_marks' in attrs else instance.external_marks
-        int_value = parse_marks(internal_marks, "internal_marks") if 'internal_marks' in attrs else instance.internal_marks
+        # --- Parsing values ---
+        ext_value = parse_external_marks(external_marks, "external_marks", skill_instance.cut_off_marks_external)
+        int_value = parse_internal_marks(internal_marks, "internal_marks", skill_instance.cut_off_marks_internal)
 
-        # Determine attendance
-        if ext_value == "ABSENT" or int_value == "ABSENT":
+        # --- Attendance determination ---
+        if ext_value == "ABSENT":
             attrs['external_marks'] = None
-            attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=2).first()  # Absent
-
-        elif ext_value == "DROPOUT" or int_value == "DROPOUT":
+            try:
+                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=2)  # Absent
+            except ExamAttendanceStatus.DoesNotExist:
+                pass
+        elif ext_value == "DROPOUT":
             attrs['external_marks'] = None
-            attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=3).first()  # Dropout
+            try:
+                attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=3)  # Dropout
+            except ExamAttendanceStatus.DoesNotExist:
+                pass
 
         else:
             # ✅ Range validation (only if those fields are being updated)
@@ -915,20 +960,19 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
         ABSENT_VALUES = ['AB', 'ABSENT', 'A', 'a']
         DROPOUT_VALUES = ['DR', 'DROPOUT', 'Drop', 'D', 'd']
 
-        def parse_marks(value, field_name, cut_off):
+        def parse_external_marks(value, field_name, cut_off):
+            """Allow AB / DR / numeric for external marks"""
             if value in [None, ""]:
                 return None
 
             str_val = str(value).strip().upper()
 
-            # Handle Absent
             if str_val in ABSENT_VALUES:
                 return "ABSENT"
-            
             if str_val in DROPOUT_VALUES:
                 return "DROPOUT"
 
-            # Convert numeric
+            # Convert to Decimal
             try:
                 dec_val = Decimal(value)
             except (TypeError, InvalidOperation):
@@ -942,17 +986,54 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
                 )
             return dec_val
 
-        ext_value = parse_marks(external_marks, "external_marks", skill_instance.cut_off_marks_external)
-        int_value = parse_marks(internal_marks, "internal_marks", skill_instance.cut_off_marks_internal)
+        def parse_internal_marks(value, field_name, cut_off):
+            """Allow ONLY numeric or null/blank for internal marks"""
+            if value in [None, ""]:
+                return None
 
-        # Determine attendance
-        if ext_value == "ABSENT" or int_value == "ABSENT":
+            str_val = str(value).strip()
+
+            # 🚫 Reject '.', empty, or alphabetic entries
+            if str_val in ["", "."]:
+                raise serializers.ValidationError(
+                    {field_name: f"Invalid value for {field_name}. Only numeric values are allowed."}
+                )
+
+            if not str_val.replace('.', '', 1).isdigit():
+                raise serializers.ValidationError(
+                    {field_name: f"Invalid value for {field_name}. Only numeric values are allowed."}
+                )
+
+            # ✅ Convert safely to Decimal
+            try:
+                dec_val = Decimal(value)
+            except (TypeError, InvalidOperation):
+                raise serializers.ValidationError(
+                    {field_name: f"Invalid numeric value for {field_name}."}
+                )
+
+            if cut_off is not None and dec_val > cut_off:
+                raise serializers.ValidationError(
+                    {field_name: f"{field_name} cannot exceed cut-off ({cut_off})."}
+                )
+            return dec_val
+
+        # ✅ Safely fetch values (only process ones included in the request)
+        external_marks = attrs.get('external_marks', instance.external_marks)
+        internal_marks = attrs.get('internal_marks', instance.internal_marks)
+
+        # --- Parsing values ---
+        ext_value = parse_external_marks(external_marks, "external_marks", skill_instance.cut_off_marks_external)
+        int_value = parse_internal_marks(internal_marks, "internal_marks", skill_instance.cut_off_marks_internal)
+
+        # --- Attendance determination ---
+        if ext_value == "ABSENT":
             attrs['external_marks'] = None
             try:
                 attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=2)  # Absent
             except ExamAttendanceStatus.DoesNotExist:
                 pass
-        elif ext_value == "DROPOUT" or int_value == "DROPOUT":
+        elif ext_value == "DROPOUT":
             attrs['external_marks'] = None
             try:
                 attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=3)  # Dropout
@@ -1193,3 +1274,8 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
         if subject_skills is not None:
             instance.subject_skills.set(subject_skills)
         return instance
+
+class ExamStatusDropDropDownSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExamStatus
+        fields = ['id', 'name']

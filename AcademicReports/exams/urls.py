@@ -25,6 +25,7 @@ router.register(r'subjectskill_dropdown_for_exam_instance', SubjectSkillDropdown
 
 router.register(r'edit_exam_results', EditExamResultsViewSet, basename='edit_exam_results')
 router.register(r'edit_exam_skill_result', EditExamSkillResultViewSet, basename='edit_exam_skill_result')
+router.register(r'exam_status_dropdown', ExamStatusDropDownViewset, basename='exam_status_dropdown')
 
 urlpatterns = [
 

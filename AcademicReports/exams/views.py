@@ -1782,3 +1782,9 @@ def marks_entry_expired_datetime_status(request):
         'marks_entry_expiry_datetime': expiry_datetime,
         'marks_entry_expiry_datetime_human': human_readable
     })
+
+class ExamStatusDropDownViewset(ModelViewSet):
+    queryset = ExamStatus.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ExamStatusDropDropDownSerializer
+    http_method_names = ['get']
