@@ -1146,7 +1146,7 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
-            errors["subject"] = f"An exam instance already exists for subject '{subject}' under '{exam}'."
+            errors["subject"] = f"An exam instance already exists for this subject in the selected exam."
 
         # ✅ External marks validation
         if has_external:
