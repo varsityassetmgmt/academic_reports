@@ -1773,4 +1773,12 @@ def marks_entry_expired_datetime_status(request):
         return Response({'section_wise_exam_result_status_id': "Invalid id"},
                         status=status.HTTP_400_BAD_REQUEST)
     
-    return Response({'marks_entry_expiry_datetime': section_status.marks_entry_expiry_datetime})
+    expiry_datetime = section_status.marks_entry_expiry_datetime
+
+    # Convert to human-readable format
+    human_readable = expiry_datetime.strftime('%Y-%m-%d %H:%M:%S') if expiry_datetime else None
+
+    return Response({
+        'marks_entry_expiry_datetime': expiry_datetime,
+        'marks_entry_expiry_datetime_human': human_readable
+    })
