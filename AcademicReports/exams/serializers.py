@@ -287,115 +287,115 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
             return ', '.join(obj.subject_skills.values_list('name', flat=True))
         return ''
     
-    def validate(self, data):
-        exam = data.get('exam') or getattr(self.instance, 'exam', None)
-        subject = data.get('subject')
-        exam_date = data.get('date')
-        start_time = data.get('exam_start_time')
-        end_time = data.get('exam_end_time')
-        subject_skills = data.get('subject_skills') or []
+    # def validate(self, data):
+    #     exam = data.get('exam') or getattr(self.instance, 'exam', None)
+    #     subject = data.get('subject')
+    #     exam_date = data.get('date')
+    #     start_time = data.get('exam_start_time')
+    #     end_time = data.get('exam_end_time')
+    #     subject_skills = data.get('subject_skills') or []
 
-        # --- Prevent editing a published exam ---
-        if self.instance and self.instance.exam and not self.instance.exam.is_editable:
-            raise serializers.ValidationError({"non_field_errors":"This Exam is Already Published, Edit is not allowed."})
+    #     # --- Prevent editing a published exam ---
+    #     if self.instance and self.instance.exam and not self.instance.exam.is_editable:
+    #         raise serializers.ValidationError({"non_field_errors":"This Exam is Already Published, Edit is not allowed."})
 
-        # --- Validate exam date range ---
-        if exam and exam_date:
-            if not (exam.start_date <= exam_date <= exam.end_date):
-                raise serializers.ValidationError({
-                    "date": f"Exam date must be between {exam.start_date} and {exam.end_date}."
-                })
+    #     # --- Validate exam date range ---
+    #     if exam and exam_date:
+    #         if not (exam.start_date <= exam_date <= exam.end_date):
+    #             raise serializers.ValidationError({
+    #                 "date": f"Exam date must be between {exam.start_date} and {exam.end_date}."
+    #             })
 
-        # --- Validate time logic ---
-        if start_time and not end_time:
-            raise serializers.ValidationError({"exam_end_time": "End time is required if start time is provided."})
-        if end_time and not start_time:
-            raise serializers.ValidationError({"exam_start_time": "Start time is required if end time is provided."})
-        if start_time and end_time and end_time <= start_time:
-            raise serializers.ValidationError({"exam_end_time": "End time must be after start time."})
+    #     # --- Validate time logic ---
+    #     if start_time and not end_time:
+    #         raise serializers.ValidationError({"exam_end_time": "End time is required if start time is provided."})
+    #     if end_time and not start_time:
+    #         raise serializers.ValidationError({"exam_start_time": "Start time is required if end time is provided."})
+    #     if start_time and end_time and end_time <= start_time:
+    #         raise serializers.ValidationError({"exam_end_time": "End time must be after start time."})
 
-        # --- Validate subject belongs to exam's classes ---
-        if exam and subject:
-            exam_classes = exam.student_classes.all()
-            subject_classes = subject.class_names.all()
-            if exam_classes.exists() and subject_classes.exists():
-                if not any(cls in subject_classes for cls in exam_classes):
-                    raise serializers.ValidationError({
-                        "subject": "Selected subject does not belong to any of the exam's classes."
-                    })
+    #     # --- Validate subject belongs to exam's classes ---
+    #     if exam and subject:
+    #         exam_classes = exam.student_classes.all()
+    #         subject_classes = subject.class_names.all()
+    #         if exam_classes.exists() and subject_classes.exists():
+    #             if not any(cls in subject_classes for cls in exam_classes):
+    #                 raise serializers.ValidationError({
+    #                     "subject": "Selected subject does not belong to any of the exam's classes."
+    #                 })
 
-        # --- Validate subject_skills belong to subject ---
-        for skill in subject_skills:
-            if skill.subject != subject:
-                raise serializers.ValidationError({
-                    "subject_skills": f"Skill '{skill.name}' does not belong to subject '{subject.name}'."
-                })
+    #     # --- Validate subject_skills belong to subject ---
+    #     for skill in subject_skills:
+    #         if skill.subject != subject:
+    #             raise serializers.ValidationError({
+    #                 "subject_skills": f"Skill '{skill.name}' does not belong to subject '{subject.name}'."
+    #             })
 
-        # --- Validate at least one result type selected ---
-        has_external = data.get('has_external_marks')
-        has_internal = data.get('has_internal_marks')
-        has_skills = data.get('has_subject_skills')
-        has_coscholastic = data.get('has_subject_co_scholastic_grade')
+    #     # --- Validate at least one result type selected ---
+    #     has_external = data.get('has_external_marks')
+    #     has_internal = data.get('has_internal_marks')
+    #     has_skills = data.get('has_subject_skills')
+    #     has_coscholastic = data.get('has_subject_co_scholastic_grade')
 
-        if not (has_external or has_internal or has_coscholastic):
-            raise serializers.ValidationError({
-                "result_types": "At least one of external marks, internal marks, or co-scholastic grade must be selected."
-            })
+    #     if not (has_external or has_internal or has_coscholastic):
+    #         raise serializers.ValidationError({
+    #             "result_types": "At least one of external marks, internal marks, or co-scholastic grade must be selected."
+    #         })
 
-        # --- External marks validations ---
-        if has_external:
-            if not data.get('maximum_marks_external'):
-                raise serializers.ValidationError({
-                    "maximum_marks_external": "This field is required when external marks are enabled."
-                })
-            if not data.get('cut_off_marks_external'):
-                raise serializers.ValidationError({
-                    "cut_off_marks_external": "This field is required when external marks are enabled."
-                })
-            if (
-                data.get('cut_off_marks_external') is not None
-                and data.get('maximum_marks_external') is not None
-                and data['cut_off_marks_external'] > data['maximum_marks_external']
-            ):
-                raise serializers.ValidationError({
-                    "cut_off_marks_external": "Cut-off marks must be less than maximum marks for external."
-                })
+    #     # --- External marks validations ---
+    #     if has_external:
+    #         if not data.get('maximum_marks_external'):
+    #             raise serializers.ValidationError({
+    #                 "maximum_marks_external": "This field is required when external marks are enabled."
+    #             })
+    #         if not data.get('cut_off_marks_external'):
+    #             raise serializers.ValidationError({
+    #                 "cut_off_marks_external": "This field is required when external marks are enabled."
+    #             })
+    #         if (
+    #             data.get('cut_off_marks_external') is not None
+    #             and data.get('maximum_marks_external') is not None
+    #             and data['cut_off_marks_external'] > data['maximum_marks_external']
+    #         ):
+    #             raise serializers.ValidationError({
+    #                 "cut_off_marks_external": "Cut-off marks must be less than maximum marks for external."
+    #             })
 
-        # --- Internal marks validations ---
-        if has_internal:
-            if not data.get('maximum_marks_internal'):
-                raise serializers.ValidationError({
-                    "maximum_marks_internal": "This field is required when internal marks are enabled."
-                })
-            if not data.get('cut_off_marks_internal'):
-                raise serializers.ValidationError({
-                    "cut_off_marks_internal": "This field is required when internal marks are enabled."
-                })
-            if (
-                data.get('cut_off_marks_internal') is not None
-                and data.get('maximum_marks_internal') is not None
-                and data['cut_off_marks_internal'] > data['maximum_marks_internal']
-            ):
-                raise serializers.ValidationError({
-                    "cut_off_marks_internal": "Cut-off marks must be less than maximum marks for internal."
-                })
+    #     # --- Internal marks validations ---
+    #     if has_internal:
+    #         if not data.get('maximum_marks_internal'):
+    #             raise serializers.ValidationError({
+    #                 "maximum_marks_internal": "This field is required when internal marks are enabled."
+    #             })
+    #         if not data.get('cut_off_marks_internal'):
+    #             raise serializers.ValidationError({
+    #                 "cut_off_marks_internal": "This field is required when internal marks are enabled."
+    #             })
+    #         if (
+    #             data.get('cut_off_marks_internal') is not None
+    #             and data.get('maximum_marks_internal') is not None
+    #             and data['cut_off_marks_internal'] > data['maximum_marks_internal']
+    #         ):
+    #             raise serializers.ValidationError({
+    #                 "cut_off_marks_internal": "Cut-off marks must be less than maximum marks for internal."
+    #             })
 
-        # --- Subject skills required if has_subject_skills=True ---
-        if has_skills and not subject_skills:
-            raise serializers.ValidationError({
-                "subject_skills": "At least one subject skill must be selected when 'has_subject_skills' is enabled."
-            })
+    #     # --- Subject skills required if has_subject_skills=True ---
+    #     if has_skills and not subject_skills:
+    #         raise serializers.ValidationError({
+    #             "subject_skills": "At least one subject skill must be selected when 'has_subject_skills' is enabled."
+    #         })
 
-        # --- Prevent duplicate instance for same exam, subject, and date ---
-        existing = ExamInstance.objects.filter(exam=exam, subject=subject)
-        if self.instance:
-            existing = existing.exclude(pk=self.instance.pk)
-        if existing.exists():
-            raise serializers.ValidationError({
-                "non_field_errors": "An exam for this subject and date already exists."
-            })
+    #     # --- Prevent duplicate instance for same exam, subject, and date ---
+    #     existing = ExamInstance.objects.filter(exam=exam, subject=subject)
+    #     if self.instance:
+    #         existing = existing.exclude(pk=self.instance.pk)
+    #     if existing.exists():
+    #         raise serializers.ValidationError({
+    #             "non_field_errors": "An exam for this subject and date already exists."
+    #         })
 
-        return data
+    #     return data
 
 
 # ==================== Exam Skill Instance ====================
