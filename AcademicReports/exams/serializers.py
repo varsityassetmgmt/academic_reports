@@ -1193,3 +1193,8 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
         if subject_skills is not None:
             instance.subject_skills.set(subject_skills)
         return instance
+
+class ExamStatusDropDropDownSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExamStatus
+        fields = ['id', 'name']
