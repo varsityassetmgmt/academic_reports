@@ -55,7 +55,7 @@ urlpatterns = [
                 
 
  
-        path('create_exam_instance/', create_exam_instance, name='create_exam_instance'),
+        path('create_exam_instance/<int:exam_id>/', create_exam_instance, name='create_exam_instance'),
         path('update_exam_instance/<int:pk>/', update_exam_instance, name='update_exam_instance'),
  
 

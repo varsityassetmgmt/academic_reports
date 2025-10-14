@@ -1634,12 +1634,24 @@ def update_marks_entry_expiry_datetime_in_exam_instance(request, exam_id):
 
 
 
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated])
+# def create_exam_instance(request):
+#     serializer = CreateExamInstanceSerializer(data=request.data)
+#     if serializer.is_valid():
+#         # serializer.validate already ensures exam is editable and uniqueness
+#         serializer.save(created_by=request.user, updated_by=request.user)
+#         return Response(serializer.data, status=status.HTTP_201_CREATED)
+#     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def create_exam_instance(request):
-    serializer = CreateExamInstanceSerializer(data=request.data)
+def create_exam_instance(request, exam_id):  # take exam_id from URL
+    data = request.data.copy()       # make a mutable copy of request data
+    data['exam'] = exam_id           # inject exam_id into serializer data
+
+    serializer = CreateExamInstanceSerializer(data=data)
     if serializer.is_valid():
-        # serializer.validate already ensures exam is editable and uniqueness
         serializer.save(created_by=request.user, updated_by=request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
