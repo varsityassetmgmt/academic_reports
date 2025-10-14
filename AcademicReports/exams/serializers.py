@@ -848,8 +848,8 @@ class EditExamResultSerializer(serializers.ModelSerializer):
         internal_marks = attrs.get('internal_marks', instance.internal_marks)
 
         # --- Parsing values ---
-        ext_value = parse_external_marks(external_marks, "external_marks", instance.cut_off_marks_external)
-        int_value = parse_internal_marks(internal_marks, "internal_marks", instance.cut_off_marks_internal)
+        ext_value = parse_external_marks(external_marks, "external_marks", exam_instance.cut_off_marks_external)
+        int_value = parse_internal_marks(internal_marks, "internal_marks", exam_instance.cut_off_marks_internal)
 
         # --- Attendance determination ---
         if ext_value == "ABSENT":
@@ -1023,8 +1023,8 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
         internal_marks = attrs.get('internal_marks', skill_result.internal_marks)
 
         # --- Parsing values ---
-        ext_value = parse_external_marks(external_marks, "external_marks", skill_result.cut_off_marks_external)
-        int_value = parse_internal_marks(internal_marks, "internal_marks", skill_result.cut_off_marks_internal)
+        ext_value = parse_external_marks(external_marks, "external_marks", skill_instance.cut_off_marks_external)
+        int_value = parse_internal_marks(internal_marks, "internal_marks", skill_instance.cut_off_marks_internal)
 
         # --- Attendance determination ---
         if ext_value == "ABSENT":
