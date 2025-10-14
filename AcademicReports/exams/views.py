@@ -1159,7 +1159,6 @@ def create_exam_results(request):
                             if skill_result and skill_result.exam_attendance and skill_result.exam_attendance.exam_attendance_status_id == 1
                             else (skill_result.exam_attendance.short_code if skill_result and skill_result.exam_attendance else None)
                         ),
-                        'external_marks': skill_result.external_marks if skill_result else None,
                         'max_cut_off_marks_internal': skill_instance.cut_off_marks_internal if skill_instance else 0,
                         'internal_marks': skill_result.internal_marks if skill_result else None,
                         'co_scholastic_grade': skill_result.co_scholastic_grade.id if skill_result and skill_result.co_scholastic_grade else None,
