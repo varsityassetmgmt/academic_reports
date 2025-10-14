@@ -886,7 +886,7 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             })
 
         # ✅ 2. Marks entry expiry validation (branch-wise)
-        branch = skill_instance.exam_instance.student.branch
+        branch = skill_result.exam_result.student.branch
         branch_status = BranchWiseExamResultStatus.objects.filter(exam=exam, branch=branch).first()
         marks_entry_expiry_datetime = getattr(branch_status, 'marks_entry_expiry_datetime', None)
 
