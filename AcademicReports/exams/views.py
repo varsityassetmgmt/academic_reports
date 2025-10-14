@@ -108,9 +108,12 @@ class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
 
         if not class_names.exists():
             return Subject.objects.none()
-
+        
+        if exam_instance_id:
+            exam_subjects = ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True).exclude(exam_instance_id=exam_instance_id)
+        else:
         # Subjects already assigned in active ExamInstances
-        exam_subjects = ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True)
+            exam_subjects =  ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True)
 
         # ✅ Base queryset: subjects matching all classes
         subjects_qs = Subject.objects.filter(
@@ -120,26 +123,28 @@ class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
             class_count=Count('class_names', filter=Q(class_names__in=class_names), distinct=True)
         ).filter(
             class_count=class_names.count()
-        )
+        ).exclude(subject_id__in=exam_subjects).distinct().order_by('name')
 
-        # ✅ If editing an ExamInstance, include its subject even if already used
-        if exam_instance_id:
-            current_instance = ExamInstance.objects.filter(
-                exam_instance_id=exam_instance_id,
-                exam=exam,
-                is_active=True
-            ).select_related('subject').first()
+        return subjects_qs
 
-            if current_instance and current_instance.subject:
-                subjects_qs = subjects_qs.filter(
-                    Q(subject_id__notin=exam_subjects) | Q(subject_id=current_instance.subject.subject_id)
-                )
-            else:
-                subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
-        else:
-            subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
+        # # ✅ If editing an ExamInstance, include its subject even if already used
+        # if exam_instance_id:
+        #     current_instance = ExamInstance.objects.filter(
+        #         exam_instance_id=exam_instance_id,
+        #         exam=exam,
+        #         is_active=True
+        #     ).select_related('subject').first()
 
-        return subjects_qs.distinct().order_by('name')
+        #     if current_instance and current_instance.subject:
+        #         subjects_qs = subjects_qs.filter(
+        #             Q(subject_id__notin=exam_subjects) | Q(subject_id=current_instance.subject.subject_id)
+        #         )
+        #     else:
+        #         subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
+        # else:
+        #     subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
+
+        # return subjects_qs.distinct().order_by('name')
 
 
 
