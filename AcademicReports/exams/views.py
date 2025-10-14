@@ -1152,7 +1152,13 @@ def create_exam_results(request):
                         'has_internal_marks': skill_instance.has_internal_marks if skill_instance else False,
                         'has_subject_co_scholastic_grade': skill_instance.has_subject_co_scholastic_grade if skill_instance else False,
                         'exam_skill_result_id': skill_result.exam_skill_result_id if skill_result else None,
+                        'exam_attendance': skill_result.exam_attendance.exam_attendance_status_id if skill_result and skill_result.exam_attendance else None,
                         'max_cut_off_marks_external' : skill_instance.cut_off_marks_external if skill_instance else 0,
+                        'external_marks': (
+                            skill_result.external_marks
+                            if skill_result and skill_result.exam_attendance and skill_result.exam_attendance.exam_attendance_status_id == 1
+                            else (skill_result.exam_attendance.short_code if skill_result and skill_result.exam_attendance else None)
+                        ),
                         'external_marks': skill_result.external_marks if skill_result else None,
                         'max_cut_off_marks_internal': skill_instance.cut_off_marks_internal if skill_instance else 0,
                         'internal_marks': skill_result.internal_marks if skill_result else None,
@@ -1168,10 +1174,10 @@ def create_exam_results(request):
                 'exam_attendance': res.exam_attendance.exam_attendance_status_id if res and res.exam_attendance else None,
                 'max_cut_off_marks_external': instance.cut_off_marks_external,
                 'external_marks': (
-                    skill_result.external_marks
-                    if skill_result and skill_result.exam_attendance and skill_result.exam_attendance.exam_attendance_status_id == 1
-                    else (skill_result.exam_attendance.short_code if skill_result and skill_result.exam_attendance else None)
-                ),                    
+                    res.external_marks
+                    if res and res.exam_attendance and res.exam_attendance.exam_attendance_status_id == 1
+                    else (res.exam_attendance.short_code if res and res.exam_attendance else None)
+                ),
                 'max_cut_off_marks_internal': instance.cut_off_marks_internal,
                 'internal_marks': res.internal_marks if res else None,
                 'co_scholastic_grade': res.co_scholastic_grade.id if res and res.co_scholastic_grade else None,
