@@ -320,15 +320,15 @@ class ExamViewSet(ModelViewSet):
     serializer_class = ExamSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name', 'exam_type__name', 'academic_year__name']
+    search_fields = ['name', 'exam_type__name', 'academic_year__name', 'exam_status__name']
     filterset_fields = [
         'exam_type', 'is_visible', 'is_progress_card_visible',
         'is_active', 'academic_year', 'name', 'start_date',
-        'end_date', 'marks_entry_expiry_datetime',
+        'end_date', 'marks_entry_expiry_datetime', 'exam_status',
     ]
     ordering_fields = [
         'exam_type__name', 'start_date', 'end_date', 'name',
-        'is_visible', 'created_at', 'updated_at',
+        'is_visible', 'created_at', 'updated_at', 'exam_status__name',
         'academic_year', 'marks_entry_expiry_datetime',
     ]
     pagination_class = CustomPagination
@@ -506,34 +506,24 @@ class ExamInstanceViewSet(ModelViewSet):
             is_active=True
         ).order_by('date')
 
-    # ✅ No need to revalidate serializer here
-    def perform_create(self, serializer):
-        exam_id = self.get_exam_id()
-        exam = get_object_or_404(Exam, pk=exam_id)
+    # # ✅ Override list() to include overall exam info
+    # def list(self, request, *args, **kwargs):
+    #     queryset = self.filter_queryset(self.get_queryset())
+    #     page = self.paginate_queryset(queryset)
 
-        if not exam.is_editable:
-            raise ValidationError({"non_field_errors": "This Exam is already published — creation/edit not allowed."})
+    #     serializer = self.get_serializer(page, many=True)
 
-        subject = serializer.validated_data.get("subject")
+    #     # Get exam name once (all instances have same exam)
+    #     exam_name = None
+    #     if queryset.exists():
+    #         exam_name = queryset.first().exam.name
 
-        # Check for duplicates at application level first
-        if ExamInstance.objects.filter(subject=subject, exam=exam).exists():
-            raise ValidationError({"subject": "An exam for this subject already exists for this exam."})
+    #     paginated_data = self.get_paginated_response(serializer.data).data
 
-        try:
-            with transaction.atomic():
-                serializer.save(exam=exam, created_by=self.request.user, updated_by=self.request.user)
-        except IntegrityError:
-            # Catch DB-level constraint violation and raise as 400
-            raise ValidationError({"non_field_errors": "An exam for this subject already exists (database constraint)."})
+    #     # Inject exam_name into the overall response
+    #     paginated_data['exam_name'] = exam_name
 
-    def perform_update(self, serializer):
-        exam_id = self.get_exam_id()
-        exam = get_object_or_404(Exam, pk=exam_id)
-        if not exam.is_editable:
-            raise ValidationError({"non_field_errors": "This Exam is already published — creation/edit not allowed."})
-        serializer.save(exam=exam, updated_by=self.request.user)
-
+    #     return Response(paginated_data, status=status.HTTP_200_OK)
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -545,6 +535,35 @@ class ExamInstanceViewSet(ModelViewSet):
         else:
             permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
+
+    # ✅ No need to revalidate serializer here
+    # def perform_create(self, serializer):
+    #     exam_id = self.get_exam_id()
+    #     exam = get_object_or_404(Exam, pk=exam_id)
+
+    #     if not exam.is_editable:
+    #         raise ValidationError({"non_field_errors": "This Exam is already published — creation/edit not allowed."})
+
+    #     subject = serializer.validated_data.get("subject")
+
+    #     # Check for duplicates at application level first
+    #     if ExamInstance.objects.filter(subject=subject, exam=exam).exists():
+    #         raise ValidationError({"subject": "An exam for this subject already exists for this exam."})
+
+    #     try:
+    #         with transaction.atomic():
+    #             serializer.save(exam=exam, created_by=self.request.user, updated_by=self.request.user)
+    #     except IntegrityError:
+    #         # Catch DB-level constraint violation and raise as 400
+    #         raise ValidationError({"non_field_errors": "An exam for this subject already exists (database constraint)."})
+
+    # def perform_update(self, serializer):
+    #     exam_id = self.get_exam_id()
+    #     exam = get_object_or_404(Exam, pk=exam_id)
+    #     if not exam.is_editable:
+    #         raise ValidationError({"non_field_errors": "This Exam is already published — creation/edit not allowed."})
+    #     serializer.save(exam=exam, updated_by=self.request.user)
+
 
 # class ExamInstanceViewSet(ModelViewSet):
 #     serializer_class = ExamInstanceSerializer
@@ -1737,3 +1756,21 @@ def update_exam_instance(request, pk):
         serializer.save(updated_by=request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def marks_entry_expired_datetime_status(request):
+    section_status_id = request.query_params.get('section_wise_exam_result_status_id')
+    if not section_status_id:
+        return Response({'section_wise_exam_result_status_id': "This field is required in the URL."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        section_status = SectionWiseExamResultStatus.objects.select_related('exam', 'section').get(
+            id=section_status_id, is_active=True
+        )
+    except SectionWiseExamResultStatus.DoesNotExist:
+        return Response({'section_wise_exam_result_status_id': "Invalid id"},
+                        status=status.HTTP_400_BAD_REQUEST)
+    
+    return Response({'marks_entry_expiry_datetime': section_status.marks_entry_expiry_datetime})
