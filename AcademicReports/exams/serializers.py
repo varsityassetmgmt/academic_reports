@@ -1019,12 +1019,12 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             return dec_val
 
         # ✅ Safely fetch values (only process ones included in the request)
-        external_marks = attrs.get('external_marks', skill_instance.external_marks)
-        internal_marks = attrs.get('internal_marks', skill_instance.internal_marks)
+        external_marks = attrs.get('external_marks', skill_result.external_marks)
+        internal_marks = attrs.get('internal_marks', skill_result.internal_marks)
 
         # --- Parsing values ---
-        ext_value = parse_external_marks(external_marks, "external_marks", skill_instance.cut_off_marks_external)
-        int_value = parse_internal_marks(internal_marks, "internal_marks", skill_instance.cut_off_marks_internal)
+        ext_value = parse_external_marks(external_marks, "external_marks", skill_result.cut_off_marks_external)
+        int_value = parse_internal_marks(internal_marks, "internal_marks", skill_result.cut_off_marks_internal)
 
         # --- Attendance determination ---
         if ext_value == "ABSENT":
