@@ -15,6 +15,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError, NotFound
 from django.db import IntegrityError, transaction
+from django.db.models import Count, Q
 
 # ---------------- Subject ----------------
 class SubjectDropdownViewSet(ModelViewSet):
@@ -51,24 +52,67 @@ class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
     def get_queryset(self):
         exam_id = self.kwargs.get('exam_id')
         if not exam_id:
-            return Response({'exam_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({'exam_id': "This field is required in the URL."})
 
-        # ✅ Get the exam safely (avoids DoesNotExist errors)
-        exam = Exam.objects.filter(exam_id=exam_id, is_active=True).prefetch_related('student_classes').first()
-        if not exam:
-            return Response({'exam_id': f"Exam with ID {exam_id} not found or inactive."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # ✅ Fetch all subjects linked to the exam's classes
-        subjects = (
-            Subject.objects.filter(
-                is_active=True,
-                class_names__in=exam.student_classes.all()
-            )
-            .distinct()
-            .order_by('name')
+        exam = (
+            Exam.objects.filter(exam_id=exam_id, is_active=True)
+            .prefetch_related('student_classes')
+            .first()
         )
+        if not exam:
+            raise ValidationError({'exam_id': f"Exam with ID {exam_id} not found or inactive."})
+
+        class_names = exam.student_classes.all()
+        if not class_names.exists():
+            return Subject.objects.none()
+        
+        exam_subjects = ExamInstance.objects.filter(
+            exam=exam, is_active=True
+        ).values_list('subject__subject_id', flat=True)
+
+        # ✅ Get subjects that belong to ALL class_names (intersection)
+        subjects = Subject.objects.filter(
+            is_active=True,
+            class_names__in=class_names
+        ).annotate(
+            class_count=Count('class_names', filter=Q(class_names__in=class_names), distinct=True)
+        ).filter(
+            class_count=class_names.count()
+        ).exclude(subject_id__in=exam_subjects).distinct().order_by('name')
 
         return subjects
+
+
+# class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
+#     """
+#     Provides a dropdown list of subjects associated with the classes of a given Exam.
+#     URL pattern: /subject_dropdown_for_exam_instance/<exam_id>/
+#     """
+#     permission_classes = [IsAuthenticated]
+#     serializer_class = SubjectDropdownSerializer
+#     http_method_names = ['get']
+
+#     def get_queryset(self):
+#         exam_id = self.kwargs.get('exam_id')
+#         if not exam_id:
+#             return Response({'exam_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
+
+#         # ✅ Get the exam safely (avoids DoesNotExist errors)
+#         exam = Exam.objects.filter(exam_id=exam_id, is_active=True).prefetch_related('student_classes').first()
+#         if not exam:
+#             return Response({'exam_id': f"Exam with ID {exam_id} not found or inactive."}, status=status.HTTP_400_BAD_REQUEST)
+
+#         # ✅ Fetch all subjects linked to the exam's classes
+#         subjects = (
+#             Subject.objects.filter(
+#                 is_active=True,
+#                 class_names__in=exam.student_classes.all()
+#             )
+#             .distinct()
+#             .order_by('name')
+#         )
+
+#         return subjects
 
 
 # ---------------- SubjectSkill ----------------
