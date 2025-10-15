@@ -605,7 +605,7 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
     academic_year_name = serializers.CharField(source='academic_year.name', read_only=True)
     branch_name = serializers.CharField(source='branch.name', read_only=True)
     exam_name = serializers.CharField(source='exam.name', read_only=True)
-    exam_type_name = serializers.CharField(source='exam.exam_type.name')
+    exam_type_name = serializers.CharField(source='exam.exam_type.name', read_only=True)
     status_name = serializers.CharField(source='status.name', read_only=True)
     finalized_by_username = serializers.CharField(source='finalized_by.username', read_only=True)
     marks_entry_expiry_datetime_display = serializers.DateTimeField(source='marks_entry_expiry_datetime', format="%Y-%m-%d %H:%M:%S", read_only = True )
@@ -655,6 +655,7 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'is_visible',
             'updated_at',
             'finalized_at',
+            'no_of_pending_vs_total_sections',
         ]
 
     def get_no_of_pending_vs_total_sections(self, obj):
