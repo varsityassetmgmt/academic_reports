@@ -600,7 +600,6 @@ class ExamAttendanceStatusDropdownSerializer(serializers.ModelSerializer):
     def get_label(self, obj):
         return str(obj)
 
-# ---------------- ExamAttendanceStatus ----------------
 class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
     academic_year_name = serializers.CharField(source='academic_year.name', read_only=True)
     branch_name = serializers.CharField(source='branch.name', read_only=True)
@@ -927,8 +926,8 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             return attrs
 
         attendance_obj = None
-        ABSENT_VALUES = ['AB', 'ABSENT', 'A', 'a']
-        DROPOUT_VALUES = ['DR', 'DROPOUT', 'Drop', 'D', 'd']
+        ABSENT_VALUES = ['AB', 'ABSENT',]
+        DROPOUT_VALUES = ['DR', 'DROPOUT',]
 
         # --- Helper functions ---
         def parse_external_marks(value, field_name, cut_off):
@@ -1248,4 +1247,9 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
 class ExamStatusDropDropDownSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamStatus
+        fields = ['id', 'name']
+
+class ExamResultStatusDropdownSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExamResultStatus
         fields = ['id', 'name']
