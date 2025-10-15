@@ -605,7 +605,7 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
     academic_year_name = serializers.CharField(source='academic_year.name', read_only=True)
     branch_name = serializers.CharField(source='branch.name', read_only=True)
     exam_name = serializers.CharField(source='exam.name', read_only=True)
-    exam_type_name = serializers.CharField(source='exam.exam_type.name')
+    exam_type_name = serializers.CharField(source='exam.exam_type.name', read_only=True)
     status_name = serializers.CharField(source='status.name', read_only=True)
     finalized_by_username = serializers.CharField(source='finalized_by.username', read_only=True)
     marks_entry_expiry_datetime_display = serializers.DateTimeField(source='marks_entry_expiry_datetime', format="%Y-%m-%d %H:%M:%S", read_only = True )
@@ -655,6 +655,7 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'is_visible',
             'updated_at',
             'finalized_at',
+            'no_of_pending_vs_total_sections',
         ]
 
     def get_no_of_pending_vs_total_sections(self, obj):
@@ -1036,56 +1037,6 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             attrs['exam_attendance'] = attendance_obj
 
         return attrs
-
-        # # --- Safe value extraction ---
-        # external_marks = attrs.get('external_marks', skill_result.external_marks)
-        # internal_marks = attrs.get('internal_marks', skill_result.internal_marks)
-
-        # ext_value = parse_external_marks(external_marks, "external_marks", skill_instance.cut_off_marks_external)
-        # int_value = parse_internal_marks(internal_marks, "internal_marks", skill_instance.cut_off_marks_internal)
-
-        # # --- Attendance & Marks Update Logic ---
-        # if ext_value == "ABSENT":
-        #     attrs['external_marks'] = None
-        #     try:
-        #         attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=2)  # Absent
-        #     except ExamAttendanceStatus.DoesNotExist:
-        #         pass
-        # elif ext_value == "DROPOUT":
-        #     attrs['external_marks'] = None
-        #     try:
-        #         attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=3)  # Dropout
-        #     except ExamAttendanceStatus.DoesNotExist:
-        #         pass
-        # else:
-        #     # Range validations
-        #     if 'external_marks' in attrs and isinstance(ext_value, Decimal):
-        #         if skill_instance.cut_off_marks_external is not None and ext_value > skill_instance.cut_off_marks_external:
-        #             raise serializers.ValidationError({
-        #                 'external_marks': f'External Marks must be less than Cut off Marks ({skill_instance.cut_off_marks_external}).'
-        #             })
-
-        #     if 'internal_marks' in attrs and isinstance(int_value, Decimal):
-        #         if skill_instance.cut_off_marks_internal is not None and int_value > skill_instance.cut_off_marks_internal:
-        #             raise serializers.ValidationError({
-        #                 'internal_marks': f'Internal Marks must be less than Cut off Marks ({skill_instance.cut_off_marks_internal}).'
-        #             })
-
-        #     # ✅ Only update what’s passed in request
-        #     if 'external_marks' in attrs:
-        #         attrs['external_marks'] = ext_value
-        #     if 'internal_marks' in attrs:
-        #         attrs['internal_marks'] = int_value
-
-        #     try:
-        #         attendance_obj = ExamAttendanceStatus.objects.get(exam_attendance_status_id=1)  # Present
-        #     except ExamAttendanceStatus.DoesNotExist:
-        #         pass
-
-        # if attendance_obj:
-        #     attrs['exam_attendance'] = attendance_obj
-
-        # return attrs
 
 class CoScholasticGradeDropdownSerializer(serializers.ModelSerializer):
     class Meta:
