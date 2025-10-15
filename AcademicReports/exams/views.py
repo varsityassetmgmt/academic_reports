@@ -231,6 +231,13 @@ class ExamAttendanceStatusDropdownViewSet(ModelViewSet):
     serializer_class = ExamAttendanceStatusDropdownSerializer
     http_method_names = ['get']
 
+# ---------------- ExamResultStatus ----------------
+class ExamResultStatusDropdownViewSet(ModelViewSet):
+    queryset = ExamAttendanceStatus.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ExamResultStatusDropdownSerializer
+    http_method_names = ['get']
+
 # ==================== Subject ====================
 class SubjectViewSet(ModelViewSet):
     queryset = Subject.objects.filter(is_active=True).order_by('name')

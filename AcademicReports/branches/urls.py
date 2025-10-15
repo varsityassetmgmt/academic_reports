@@ -12,6 +12,7 @@ router.register(r'branch_dropdown', BranchDropdownViewSet, basename='branch_drop
 router.register(r'state_dropdown_for_exam', StateDropdownForExamViewSet, basename='state_dropdown_for_exam')
 router.register(r'zone_dropdown_for_exam', ZoneDropdownForExamViewSet, basename='zone_dropdown_for_exam')
 router.register(r'branch_dropdown_for_exam', BranchDropdownForExamViewSet, basename='branch_dropdown_for_exam')
+router.register(r'branch_dropdown_for_exam_results', BranchDropdownForExamResultsViewSet, basename='branch_dropdown_for_exam_results')
 
 
 
