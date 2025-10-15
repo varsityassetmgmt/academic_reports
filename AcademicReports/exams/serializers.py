@@ -419,6 +419,11 @@ class ExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
         # subject_skill = data.get('subject_skill') or getattr(self.instance, 'subject_skill', None)
         exam_instance = self.instance.exam_instance
         subject_skill = self.instance.subject_skill
+        exam = exam_instance.exam
+
+        # ✅ Exam edit check
+        if exam and not getattr(exam, "is_editable", True):
+            raise serializers.ValidationError({f"Exam '{exam.name}' is locked. You cannot add or update exam instances for this exam."})
 
         # ✅ 1. Ensure skill belongs to exam's subject
         if exam_instance and subject_skill and subject_skill.subject != exam_instance.subject:
@@ -664,12 +669,23 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         marks_entry_expiry_datetime = data.get('marks_entry_expiry_datetime')
+        end_date = self.instance.exam.end_date
 
         # Validate marks_entry_expiry_datetime is in the future
         if marks_entry_expiry_datetime and marks_entry_expiry_datetime <= timezone.localtime():
             raise serializers.ValidationError({
                 "marks_entry_expiry_datetime": "Marks entry expiry datetime must be greater than the current time."
             })
+        
+         # 4b. Expiry must be AFTER exam end date
+        if end_date:
+            end_of_day = timezone.make_aware(
+                datetime.datetime.combine(end_date, datetime.time.max)
+            )
+            if marks_entry_expiry_datetime <= end_of_day:
+                raise serializers.ValidationError({
+                    "marks_entry_expiry_datetime": "Marks entry expiry datetime must be after the exam end date."
+                })
 
         return data
 
@@ -739,17 +755,12 @@ class EditExamResultSerializer(serializers.ModelSerializer):
         model = ExamResult
         fields = [
             'exam_result_id',
-            'student',
-            'exam_instance',
-            'exam_attendance',
             'external_marks',
             'internal_marks',
             'co_scholastic_grade',
         ]
         read_only_fields = [
             'exam_result_id',
-            'student',
-            'exam_instance',
         ]
 
     def validate(self, attrs):
@@ -777,8 +788,8 @@ class EditExamResultSerializer(serializers.ModelSerializer):
         attendance_obj = None
 
         # Valid text markers
-        ABSENT_VALUES = ['AB', 'ABSENT', 'A', 'a']
-        DROPOUT_VALUES = ['DR', 'DROPOUT', 'Drop', 'D', 'd']
+        ABSENT_VALUES = ['AB']
+        DROPOUT_VALUES = ['DR']
 
         # ---------- Helper functions ----------
         def parse_external_marks(value, field_name, cut_off):
@@ -863,6 +874,22 @@ class EditExamResultSerializer(serializers.ModelSerializer):
             attrs['exam_attendance'] = attendance_obj
 
         return attrs
+    
+    #  # ---------- Custom representation ----------
+    # def to_representation(self, instance):
+    #     data = super().to_representation(instance)
+
+    #     attendance = instance.exam_attendance
+    #     is_present = attendance and attendance.exam_attendance_status_id == 1
+
+    #     data['external_marks'] = (
+    #         instance.external_marks if is_present
+    #         else (attendance.short_code if attendance else None)
+    #     )
+        
+    #     data['max_cut_off_marks_external'] = instance.cut_off_marks_external if instance else None
+
+    #     return data
 
 class EditExamSkillResultSerializer(serializers.ModelSerializer):
     external_marks = serializers.CharField(required=False, allow_null=True, allow_blank=True)
@@ -872,19 +899,12 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
         model = ExamSkillResult
         fields = [
             'exam_skill_result_id',
-            'exam_result',
-            'skill',
             'co_scholastic_grade',
-            'exam_attendance',
             'external_marks',
             'internal_marks',
-            'marks_obtained',
         ]
         read_only_fields = [
             'exam_skill_result_id',
-            'exam_result',
-            'skill',
-            'marks_obtained',
         ]
 
     def validate(self, attrs):
@@ -926,8 +946,8 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             return attrs
 
         attendance_obj = None
-        ABSENT_VALUES = ['AB', 'ABSENT',]
-        DROPOUT_VALUES = ['DR', 'DROPOUT',]
+        ABSENT_VALUES = ['AB']
+        DROPOUT_VALUES = ['DR']
 
         # --- Helper functions ---
         def parse_external_marks(value, field_name, cut_off):
@@ -1036,6 +1056,22 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             attrs['exam_attendance'] = attendance_obj
 
         return attrs
+
+    # # ==================== CUSTOM REPRESENTATION ====================
+    # def to_representation(self, instance):
+    #     data = super().to_representation(instance)
+
+    #     attendance = instance.exam_attendance
+    #     is_present = attendance and attendance.exam_attendance_status_id == 1
+
+    #     data['external_marks'] = (
+    #         instance.external_marks if is_present
+    #         else (attendance.short_code if attendance else None)
+    #     )
+        
+    #     data['max_cut_off_marks_external'] = instance.cut_off_marks_external if instance else None
+
+    #     return data
 
 class CoScholasticGradeDropdownSerializer(serializers.ModelSerializer):
     class Meta:
