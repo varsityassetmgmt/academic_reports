@@ -233,7 +233,7 @@ class ExamAttendanceStatusDropdownViewSet(ModelViewSet):
 
 # ---------------- ExamResultStatus ----------------
 class ExamResultStatusDropdownViewSet(ModelViewSet):
-    queryset = ExamResultStatus.objects.filter(is_active=True).order_by('name')
+    queryset = ExamResultStatus.objects.all().order_by('name')
     permission_classes = [IsAuthenticated]
     serializer_class = ExamResultStatusDropdownSerializer
     http_method_names = ['get']
