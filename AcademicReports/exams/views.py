@@ -233,7 +233,7 @@ class ExamAttendanceStatusDropdownViewSet(ModelViewSet):
 
 # ---------------- ExamResultStatus ----------------
 class ExamResultStatusDropdownViewSet(ModelViewSet):
-    queryset = ExamAttendanceStatus.objects.filter(is_active=True).order_by('name')
+    queryset = ExamResultStatus.objects.filter(is_active=True).order_by('name')
     permission_classes = [IsAuthenticated]
     serializer_class = ExamResultStatusDropdownSerializer
     http_method_names = ['get']
@@ -1796,3 +1796,26 @@ class ExamStatusDropDownViewset(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ExamStatusDropDropDownSerializer
     http_method_names = ['get']
+
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def finalize_section_results(request):
+#     section_status_id = request.query_params.get('section_wise_exam_result_status_id')
+#     if not section_status_id:
+#         return Response({'section_wise_exam_result_status_id': "This field is required in the URL."},
+#                         status=status.HTTP_400_BAD_REQUEST)
+    
+#     try:
+#         section_status = SectionWiseExamResultStatus.objects.select_related('exam', 'section').get(
+#             id=section_status_id, is_active=True
+#         )
+#     except SectionWiseExamResultStatus.DoesNotExist:
+#         return Response({'section_wise_exam_result_status_id': "Invalid id"},
+#                         status=status.HTTP_400_BAD_REQUEST)
+    
+#     if section_status.marks_completion_percentage<100:
+#         return Response({
+#             'Section Status' : f'Marks Entry is Not Completed ({section_status.marks_completion_percentage})'
+#         })
+#     elif:
+#         section_status
