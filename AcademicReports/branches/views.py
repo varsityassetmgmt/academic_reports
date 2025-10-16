@@ -5,6 +5,7 @@ from .serializers import *
 from .models import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from usermgmt.models import UserProfile
 
 # Create your views here.
 class AcademicDevisionDropdownViewSet(ModelViewSet):
@@ -84,10 +85,11 @@ class BranchDropdownViewSet(ModelViewSet):
         zone_ids_str = self.request.GET.get('zone_ids', '')    # e.g., "5,7"
 
         # ✅ Efficient branching logic
+        user = self.request.user
         if user.groups.filter(id=1).exists():  # Super admin or system user
-            branches = Branch.objects.filter(is_active=True)
+            queryset = Branch.objects.filter(is_active=True)
         else:
-            branches = (
+            queryset = (
                 UserProfile.objects.filter(user=user)
                 .values_list('branches', flat=True)
                 .distinct()
@@ -123,7 +125,16 @@ class BranchDropdownForExamViewSet(ModelViewSet):
         state_ids_str = self.request.GET.get('state_ids', '')  # e.g., "1,2,3"
         zone_ids_str = self.request.GET.get('zone_ids', '')    # e.g., "5,7"
 
-        queryset = Branch.objects.filter(is_active=True).order_by('name')
+        # ✅ Efficient branching logic
+        user = self.request.user
+        if user.groups.filter(id=1).exists():  # Super admin or system user
+            queryset = Branch.objects.filter(is_active=True)
+        else:
+            queryset = (
+                UserProfile.objects.filter(user=user)
+                .values_list('branches', flat=True)
+                .distinct()
+            )
 
         # Exclude branches based on state_ids
         if state_ids_str.strip():
@@ -155,7 +166,16 @@ class BranchDropdownForExamResultsViewSet(ModelViewSet):
         state_ids_str = self.request.GET.get('state_ids', '')  # e.g., "1,2,3"
         zone_ids_str = self.request.GET.get('zone_ids', '')    # e.g., "5,7"
 
-        queryset = Branch.objects.filter(is_active=True).order_by('name')
+        # ✅ Efficient branching logic
+        user = self.request.user
+        if user.groups.filter(id=1).exists():  # Super admin or system user
+            queryset = Branch.objects.filter(is_active=True)
+        else:
+            queryset = (
+                UserProfile.objects.filter(user=user)
+                .values_list('branches', flat=True)
+                .distinct()
+            )
 
         # Exclude branches based on state_ids
         if state_ids_str.strip():
