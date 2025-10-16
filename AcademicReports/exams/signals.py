@@ -275,7 +275,7 @@ def compute_section_wise_completion(exam, student):
         branch=student.branch,
         section=student.section,
         exam=exam,
-        status = status
+        status = status,
         defaults={'marks_completion_percentage': Decimal(round(percentage, 2))},
     )
 
