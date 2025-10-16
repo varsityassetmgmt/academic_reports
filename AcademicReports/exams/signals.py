@@ -262,6 +262,12 @@ def compute_section_wise_completion(exam, student):
     # --- COMPUTE ---
     completed = total_results - pending_results if total_results else 0
     percentage = (completed / total_results * 100) if total_results else 0
+    if percentage == 100 :
+        status = ExamResultStatus.objects.get(id=3)
+    elif percentage > 0:
+        status = ExamResultStatus.objects.get(id=2)
+    else:
+        status = ExamResultStatus.objects.get(id=1)
 
     # --- UPSERT INTO STATUS TABLE ---
     SectionWiseExamResultStatus.objects.update_or_create(
@@ -269,6 +275,7 @@ def compute_section_wise_completion(exam, student):
         branch=student.branch,
         section=student.section,
         exam=exam,
+        status = status
         defaults={'marks_completion_percentage': Decimal(round(percentage, 2))},
     )
 
