@@ -525,6 +525,17 @@ class ExamSkillResult(models.Model):
     def __str__(self):
         return f"{self.exam_result.student} - {self.skill.name}"
     
+    def save(self, *args, **kwargs):
+
+        # --- Default exam attendance ---
+        if not self.exam_attendance:
+            default_status = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=1).first()
+            if default_status:
+                self.exam_attendance = default_status
+
+        # --- Save record ---
+        super().save(*args, **kwargs)
+    
 class StudentExamSummary(models.Model):
     students_exam_summary_id = models.BigAutoField(primary_key=True)
     student = models.ForeignKey("students.Student", on_delete=models.PROTECT, related_name='exam_summary_student')
