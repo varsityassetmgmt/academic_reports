@@ -83,7 +83,15 @@ class BranchDropdownViewSet(ModelViewSet):
         state_ids_str = self.request.GET.get('state_ids', '')  # e.g., "1,2,3"
         zone_ids_str = self.request.GET.get('zone_ids', '')    # e.g., "5,7"
 
-        queryset = Branch.objects.filter(is_active=True).order_by('name')
+        # ✅ Efficient branching logic
+        if user.groups.filter(id=1).exists():  # Super admin or system user
+            branches = Branch.objects.filter(is_active=True)
+        else:
+            branches = (
+                UserProfile.objects.filter(user=user)
+                .values_list('branches', flat=True)
+                .distinct()
+            )
 
         # Exclude branches based on state_ids
         if state_ids_str.strip():
