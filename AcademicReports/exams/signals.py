@@ -216,6 +216,7 @@ def compute_section_wise_completion(exam, student):
 
         if ext:
             pending_results += subject_results.filter(
+                ~Q(exam_attendance__exam_attendance_status_id=1) |
                 Q(external_marks__isnull=True) | Q(external_marks=None)
             ).count()
         if intl:
@@ -248,6 +249,7 @@ def compute_section_wise_completion(exam, student):
 
                 if ext:
                     pending_results += skill_results.filter(
+                        ~Q(exam_attendance__exam_attendance_status_id=1) |
                         Q(external_marks__isnull=True) | Q(external_marks=None)
                     ).count()
                 if intl:
