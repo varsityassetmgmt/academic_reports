@@ -214,17 +214,17 @@ def compute_section_wise_completion(exam, student):
             pending_results += subject_results.filter(
                 exam_attendance__exam_attendance_status_id=1
             ).filter(
-                Q(external_marks__isnull=True) | Q(external_marks='') | Q(external_marks=None)
+                Q(external_marks__isnull=True) | Q(external_marks=None)
             ).count()
 
         if intl:
             pending_results += subject_results.filter(
-                Q(internal_marks__isnull=True) | Q(internal_marks='') | Q(internal_marks=None)
+                Q(internal_marks__isnull=True) | Q(internal_marks=None)
             ).count()
 
         if grade:
             pending_results += subject_results.filter(
-                Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade='') | Q(co_scholastic_grade=None)
+                Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
             ).count()
 
         # --- SKILL LEVEL ---
@@ -250,17 +250,17 @@ def compute_section_wise_completion(exam, student):
                     pending_results += skill_results.filter(
                         exam_attendance__exam_attendance_status_id=1
                     ).filter(
-                        Q(external_marks__isnull=True) | Q(external_marks='') | Q(external_marks=None)
+                        Q(external_marks__isnull=True) | Q(external_marks=None)
                     ).count()
 
                 if intl:
                     pending_results += skill_results.filter(
-                        Q(internal_marks__isnull=True) | Q(internal_marks='') | Q(internal_marks=None)
+                        Q(internal_marks__isnull=True) | Q(internal_marks=None)
                     ).count()
 
                 if grade:
                     pending_results += skill_results.filter(
-                        Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade='') | Q(co_scholastic_grade=None)
+                        Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
                     ).count()
 
     # --- COMPUTE ---
