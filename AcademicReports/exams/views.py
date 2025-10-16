@@ -243,7 +243,7 @@ class SubjectViewSet(ModelViewSet):
     queryset = Subject.objects.filter(is_active=True).order_by('name')
     serializer_class = SubjectSerializer
     http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['name', 'display_name', 'description']  # text fields to search
     filterset_fields = ['academic_devisions', 'class_names', 'is_active']  # FK/many2many and boolean
     ordering_fields = ['name', 'display_name', 'created_at', 'updated_at']  # fields users can order by
@@ -271,7 +271,7 @@ class SubjectSkillViewSet(ModelViewSet):
     queryset = SubjectSkill.objects.filter(is_active=True).order_by('subject')
     serializer_class = SubjectSkillSerializer
     http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['name', 'subject__name']  # searchable text fields
     filterset_fields = ['subject', 'is_active']  # FK and boolean fields
     ordering_fields = ['name', 'subject__name', 'created_at', 'updated_at']  # sortable fields
@@ -299,7 +299,7 @@ class ExamTypeViewSet(ModelViewSet):
     queryset = ExamType.objects.filter(is_active=True).order_by('name')
     serializer_class = ExamTypeSerializer
     http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['name', 'description']       # text search
     filterset_fields = ['is_active']             # boolean filter
     ordering_fields = ['name', 'created_at', 'updated_at']  # sortable fields
@@ -326,7 +326,7 @@ class ExamTypeViewSet(ModelViewSet):
 class ExamViewSet(ModelViewSet):
     serializer_class = ExamSerializer
     http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['name', 'exam_type__name', 'academic_year__name', 'exam_status__name']
     filterset_fields = [
         'exam_type', 'is_visible', 'is_progress_card_visible',
@@ -346,7 +346,7 @@ class ExamViewSet(ModelViewSet):
             raise NotFound("Current academic year not found.")
         return (
             Exam.objects.filter(academic_year=current_academic_year, is_active=True)
-            .order_by('-exam_id', 'is_visible')
+            .order_by('is_visible', '-exam_id')
         )
 
     def perform_create(self, serializer):
@@ -473,7 +473,7 @@ class ExamViewSet(ModelViewSet):
 class ExamInstanceViewSet(ModelViewSet):
     serializer_class = ExamInstanceSerializer
     http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter,OrderingFilter]
     search_fields = [
         'subject__name',
         'exam__name',
@@ -616,7 +616,7 @@ class ExamInstanceViewSet(ModelViewSet):
 class ExamSubjectSkillInstanceViewSet(ModelViewSet):
     serializer_class = ExamSubjectSkillInstanceSerializer
     http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter,OrderingFilter]
 
     search_fields = [
         'subject_skill__name',              # search by skill name
@@ -739,7 +739,7 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
 class BranchWiseExamResultStatusViewSet(ModelViewSet):
     serializer_class = BranchWiseExamResultStatusSerializer
     http_method_names = ['get', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter,OrderingFilter]
     pagination_class = CustomPagination
     search_fields = [
         'academic_year__name',
@@ -819,7 +819,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
     """
     serializer_class = SectionWiseExamResultStatusSerializer
     http_method_names = ['get']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     pagination_class = CustomPagination
 
     search_fields = [
@@ -1799,7 +1799,7 @@ def marks_entry_expired_datetime_status(request):
     })
 
 class ExamStatusDropDownViewset(ModelViewSet):
-    queryset = ExamStatus.objects.filter(is_active=True).order_by('name')
+    queryset = ExamStatus.objects.filter(is_active=True).order_by('id')
     permission_classes = [IsAuthenticated]
     serializer_class = ExamStatusDropDropDownSerializer
     http_method_names = ['get']
