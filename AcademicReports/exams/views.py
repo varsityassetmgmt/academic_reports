@@ -747,6 +747,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'exam__name',
         'status__name',
         'exam__exam_type__name',
+        'is_progress_card_downloaded',
     ]
 
     filterset_fields = [
@@ -756,6 +757,8 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'status',
         'is_visible',
         'is_active',
+        'exam__exam_type',
+        'is_progress_card_downloaded',
     ]
 
     ordering_fields = [
@@ -767,6 +770,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'marks_completion_percentage',
         'updated_at',
         'exam__exam_type__name',
+        'is_progress_card_downloaded',
     ]
 
     def get_queryset(self):
@@ -824,6 +828,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         'section__class_name__name',     
         'section__orientation__name',     
         'status__name',
+        'is_progress_card_downloaded',
     ]
 
     filterset_fields = [
@@ -834,6 +839,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         'status',
         'is_visible',
         'is_active',
+        'is_progress_card_downloaded',
     ]
 
     ordering_fields = [
@@ -845,6 +851,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         'marks_entry_expiry_datetime',
         'marks_completion_percentage',
         'updated_at',
+        'is_progress_card_downloaded',
     ]
 
 
@@ -1797,25 +1804,46 @@ class ExamStatusDropDownViewset(ModelViewSet):
     serializer_class = ExamStatusDropDropDownSerializer
     http_method_names = ['get']
 
-# @api_view(['GET'])
-# @permission_classes([IsAuthenticated])
-# def finalize_section_results(request):
-#     section_status_id = request.query_params.get('section_wise_exam_result_status_id')
-#     if not section_status_id:
-#         return Response({'section_wise_exam_result_status_id': "This field is required in the URL."},
-#                         status=status.HTTP_400_BAD_REQUEST)
-    
-#     try:
-#         section_status = SectionWiseExamResultStatus.objects.select_related('exam', 'section').get(
-#             id=section_status_id, is_active=True
-#         )
-#     except SectionWiseExamResultStatus.DoesNotExist:
-#         return Response({'section_wise_exam_result_status_id': "Invalid id"},
-#                         status=status.HTTP_400_BAD_REQUEST)
-    
-#     if section_status.marks_completion_percentage<100:
-#         return Response({
-#             'Section Status' : f'Marks Entry is Not Completed ({section_status.marks_completion_percentage})'
-#         })
-#     elif:
-#         section_status
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def finalize_section_results(request):
+    section_status_id = request.query_params.get('section_wise_exam_result_status_id')
+    if not section_status_id:
+        return Response(
+            {'section_wise_exam_result_status_id': "This field is required in the URL."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        section_status = SectionWiseExamResultStatus.objects.get(
+            id=section_status_id, is_active=True
+        )
+    except SectionWiseExamResultStatus.DoesNotExist:
+        return Response(
+            {'section_wise_exam_result_status_id': "Invalid id"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if section_status.marks_completion_percentage != 100:
+        return Response({
+            'Section Status': f'Marks Entry Not Completed ({section_status.marks_completion_percentage}%)'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        finalized_status = ExamResultStatus.objects.get(id=4)
+    except ExamResultStatus.DoesNotExist:
+        return Response(
+            {'status': "ExamResultStatus with id=3 not found."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Finalize section result
+    section_status.finalized_by = request.user
+    section_status.finalized_at = timezone.now()
+    section_status.status = finalized_status
+    section_status.save(update_fields=['finalized_by', 'finalized_at', 'status'])
+
+    return Response({
+        'message': f'Section "{section_status.section.name}" results finalized successfully.'
+    }, status=status.HTTP_200_OK)
