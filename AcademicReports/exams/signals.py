@@ -303,7 +303,6 @@ def update_section_wise_status_on_skill_result(sender, instance, **kwargs):
     student = instance.exam_result.student
     compute_section_wise_completion(exam, student)
 
-
 @receiver(post_save, sender=SectionWiseExamResultStatus)
 def update_branch_wise_result_status(sender, instance, **kwargs):
     branch_sections = SectionWiseExamResultStatus.objects.filter(
@@ -339,16 +338,28 @@ def update_branch_wise_result_status(sender, instance, **kwargs):
     else:
         status = ExamResultStatus.objects.get(id=1)
 
+    defaults = {
+        'marks_completion_percentage': Decimal(round(avg_percentage, 2)),
+        'status': status,
+        'total_sections': total_sections,
+        'number_of_sections_completed': number_of_sections_completed,
+        'number_of_sections_pending': number_of_sections_pending,
+    }
+
+    # --- If all sections are finalized, finalize branch as well ---
+    if branch_sections.filter(status_id=4).count() == total_sections:
+        finalized_by = instance.finalized_by
+        finalized_at = instance.finalized_at
+        defaults.update({
+            'status': ExamResultStatus.objects.get(id=4),
+            'finalized_by': finalized_by,
+            'finalized_at': finalized_at,
+        })
+
     # --- Update or create branch-wise record ---
     BranchWiseExamResultStatus.objects.update_or_create(
         academic_year=instance.academic_year,
         branch=instance.branch,
         exam=instance.exam,
-        defaults={
-            'marks_completion_percentage': Decimal(round(avg_percentage, 2)),
-            'status': status,
-            'total_sections': total_sections,
-            'number_of_sections_completed': number_of_sections_completed,
-            'number_of_sections_pending': number_of_sections_pending,
-        },
+        defaults=defaults,
     )

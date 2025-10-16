@@ -57,7 +57,7 @@ urlpatterns = [
         path('create_exam_instance/<int:exam_id>/', create_exam_instance, name='create_exam_instance'),
         path('update_exam_instance/<int:pk>/', update_exam_instance, name='update_exam_instance'),
 
-        path('marks_entry_expired_datetime_status/', marks_entry_expired_datetime_status, name='marks_entry_expired_datetime_status')
- 
+        path('marks_entry_expired_datetime_status/', marks_entry_expired_datetime_status, name='marks_entry_expired_datetime_status'),
+        path('finalize_section_results/', finalize_section_results, name='finalize_section_results'),
 
 ]+ router.urls
