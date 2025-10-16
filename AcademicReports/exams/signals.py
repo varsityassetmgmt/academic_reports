@@ -183,11 +183,6 @@ def update_skill_totals_after_delete(sender, instance, **kwargs):
     # print(f"Updated SectionWiseExamResultStatus: {section_status} -> {completion_percentage:.2f}% completed")
 
 def compute_section_wise_completion(exam, student):
-    from exams.models import (
-        ExamInstance, ExamResult, ExamSkillResult, ExamSubjectSkillInstance
-    )
-    from students.models import Student
-    from exams.models import SectionWiseExamResultStatus
 
     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
     students = Student.objects.filter(
@@ -215,17 +210,21 @@ def compute_section_wise_completion(exam, student):
         total_results += subject_results.count() * enabled_components
 
         if ext:
+            # Pending only if attended and marks missing
             pending_results += subject_results.filter(
-                ~Q(exam_attendance__exam_attendance_status_id=1) |
-                Q(external_marks__isnull=True) | Q(external_marks=None)
+                exam_attendance__exam_attendance_status_id=1
+            ).filter(
+                Q(external_marks__isnull=True) | Q(external_marks='') | Q(external_marks=None)
             ).count()
+
         if intl:
             pending_results += subject_results.filter(
-                Q(internal_marks__isnull=True) | Q(internal_marks=None)
+                Q(internal_marks__isnull=True) | Q(internal_marks='') | Q(internal_marks=None)
             ).count()
+
         if grade:
             pending_results += subject_results.filter(
-                Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
+                Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade='') | Q(co_scholastic_grade=None)
             ).count()
 
         # --- SKILL LEVEL ---
@@ -249,29 +248,34 @@ def compute_section_wise_completion(exam, student):
 
                 if ext:
                     pending_results += skill_results.filter(
-                        ~Q(exam_attendance__exam_attendance_status_id=1) |
-                        Q(external_marks__isnull=True) | Q(external_marks=None)
+                        exam_attendance__exam_attendance_status_id=1
+                    ).filter(
+                        Q(external_marks__isnull=True) | Q(external_marks='') | Q(external_marks=None)
                     ).count()
+
                 if intl:
                     pending_results += skill_results.filter(
-                        Q(internal_marks__isnull=True) | Q(internal_marks=None)
+                        Q(internal_marks__isnull=True) | Q(internal_marks='') | Q(internal_marks=None)
                     ).count()
+
                 if grade:
                     pending_results += skill_results.filter(
-                        Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
+                        Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade='') | Q(co_scholastic_grade=None)
                     ).count()
 
     # --- COMPUTE ---
     completed = total_results - pending_results if total_results else 0
     percentage = (completed / total_results * 100) if total_results else 0
-    if percentage == 100 :
+
+    # --- STATUS ASSIGN ---
+    if percentage == 100:
         status = ExamResultStatus.objects.get(id=3)
     elif percentage > 0:
         status = ExamResultStatus.objects.get(id=2)
     else:
         status = ExamResultStatus.objects.get(id=1)
 
-    # --- UPSERT INTO STATUS TABLE ---
+    # --- UPSERT ---
     SectionWiseExamResultStatus.objects.update_or_create(
         academic_year=exam.academic_year,
         branch=student.branch,
@@ -285,11 +289,13 @@ def compute_section_wise_completion(exam, student):
 
     return percentage
 
+
 @receiver(post_save, sender=ExamResult)
 def update_section_wise_status_on_exam_result(sender, instance, **kwargs):
     exam = instance.exam_instance.exam
     student = instance.student
     compute_section_wise_completion(exam, student)
+
 
 @receiver(post_save, sender=ExamSkillResult)
 def update_section_wise_status_on_skill_result(sender, instance, **kwargs):
