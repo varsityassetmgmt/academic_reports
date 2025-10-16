@@ -89,11 +89,13 @@ class BranchDropdownViewSet(ModelViewSet):
         if user.groups.filter(id=1).exists():  # Super admin or system user
             queryset = Branch.objects.filter(is_active=True)
         else:
-            queryset = (
+            branches = (
                 UserProfile.objects.filter(user=user)
-                .values_list('branches', flat=True)
+                .values_list('branches__branch_id', flat=True)
                 .distinct()
             )
+            queryset = Branch.objects.filter(is_active=True, branch_id__in=branches)
+
 
         # Exclude branches based on state_ids
         if state_ids_str.strip():
@@ -130,11 +132,13 @@ class BranchDropdownForExamViewSet(ModelViewSet):
         if user.groups.filter(id=1).exists():  # Super admin or system user
             queryset = Branch.objects.filter(is_active=True)
         else:
-            queryset = (
+            branches = (
                 UserProfile.objects.filter(user=user)
-                .values_list('branches', flat=True)
+                .values_list('branches__branch_id', flat=True)
                 .distinct()
             )
+            queryset = Branch.objects.filter(is_active=True, branch_id__in=branches)
+
 
         # Exclude branches based on state_ids
         if state_ids_str.strip():
@@ -171,11 +175,13 @@ class BranchDropdownForExamResultsViewSet(ModelViewSet):
         if user.groups.filter(id=1).exists():  # Super admin or system user
             queryset = Branch.objects.filter(is_active=True)
         else:
-            queryset = (
+            branches = (
                 UserProfile.objects.filter(user=user)
-                .values_list('branches', flat=True)
+                .values_list('branches__branch_id', flat=True)
                 .distinct()
             )
+            queryset = Branch.objects.filter(is_active=True, branch_id__in=branches)
+
 
         # Exclude branches based on state_ids
         if state_ids_str.strip():
