@@ -2096,9 +2096,9 @@ class ExportSectionExamResultsViewSet(APIView):
                 # --- Skill-level marks ---
                 if instance.has_subject_skills:
                     for skill in instance.subject_skills.all():
-                        skill_instance = ExamSubjectSkillInstance.objects.filter(
+                        skill_instance = ExamSubjectSkillInstance.objects.get(
                             exam_instance=instance, subject_skill=skill, is_active=True
-                        ).first()
+                            )
                         if (skill_instance.has_external_marks or skill_instance.has_internal_marks or skill_instance.has_subject_co_scholastic_grade):
 
                             skill_result = ExamSkillResult.objects.filter(
