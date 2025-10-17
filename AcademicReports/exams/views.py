@@ -16,6 +16,11 @@ from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError, NotFound
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
+from usermgmt.authentication import QueryParameterTokenAuthentication
+from rest_framework.authentication import SessionAuthentication
+from django.http import StreamingHttpResponse, HttpResponse
+import csv
+import io
 
 # ---------------- Subject ----------------
 class SubjectDropdownViewSet(ModelViewSet):
@@ -1847,3 +1852,133 @@ def finalize_section_results(request):
     return Response({
         'message': f'Section "{section_status.section.name}" results finalized successfully.'
     }, status=status.HTTP_200_OK)
+
+class ExportBranchWiseExamResultStatusViewSet(APIView):
+    authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+
+    search_fields = [
+        'academic_year__name',
+        'branch__name',
+        'exam__name',
+        'status__name',
+        'exam__exam_type__name',
+        'is_progress_card_downloaded',
+    ]
+
+    filterset_fields = [
+        'academic_year',
+        'branch',
+        'exam',
+        'status',
+        'is_visible',
+        'is_active',
+        'exam__exam_type',
+        'is_progress_card_downloaded',
+    ]
+
+    ordering_fields = [
+        'academic_year__name',
+        'branch__name',
+        'exam__name',
+        'status__name',
+        'marks_entry_expiry_datetime',
+        'marks_completion_percentage',
+        'updated_at',
+        'exam__exam_type__name',
+        'is_progress_card_downloaded',
+    ]
+
+    filename = "Branch Wise Exam Results Marks Entry Status.csv"
+    chunk_size = 1000
+
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+
+        # ✅ Efficient branching logic
+        if user.groups.filter(id=1).exists():  # Super admin or system user
+            branches = Branch.objects.filter(is_active=True)
+        else:
+            branches = (
+                UserProfile.objects.filter(user=user)
+                .values_list('branches', flat=True)
+                .distinct()
+            )
+
+        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+        if not current_academic_year:
+            raise NotFound("Current academic year not found.")
+
+        # ✅ Avoid returning inactive or invalid records
+        queryset = (
+            BranchWiseExamResultStatus.objects.filter(
+                is_active=True,
+                branch__in=branches,
+                academic_year=current_academic_year,
+            )
+            .select_related('academic_year', 'branch', 'exam', 'status')  # optimization
+            .order_by('-updated_at')
+        )
+
+        for backend in self.filter_backends:
+            queryset = backend().filter_queryset(request, queryset, self)
+
+        response = StreamingHttpResponse(
+            self.generate_csv(queryset), content_type="text/csv"
+        )
+        response["Content-Disposition"] = f'attachment; filename="{self.filename}"'
+        return response
+    
+    def generate_csv(self, queryset):
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+
+        header = [ 'Sl.No.',
+            "Academic Year", "Branch", "Exam Type", "Exam", "Status", "Marks Entry Expiry Date ",
+            "Total Sections", "Pending Sections", "Completed Sections", "Marks Completion Percentage",
+        ]
+
+        writer.writerow(header)
+        buffer.seek(0)
+        yield buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate(0)
+
+        sl_no = 1
+        total = queryset.count()
+        chunk_size = self.chunk_size
+
+        # for obj in queryset.iterator(chunk_size=self.chunk_size):
+        for start in range(0, total, chunk_size):
+            chunk = queryset[start:start + chunk_size]
+            for obj in chunk:
+                academic_year = getattr(obj.academic_year, 'name', 'N/A') if obj.academic_year else 'N/A'
+                branch = getattr(obj.branch, 'name' ,'N/A') if obj.branch else "N/A"
+                exam_type = getattr(obj.exam.exam_type, 'name', 'N/A') if obj.exam.exam_type else 'N/A'
+                exam = getattr(obj.exam, 'name', 'N/A') if obj.exam else 'N/A'
+                status = getattr(obj.status, 'name')if obj.status else 'N/A'
+                marks_entry_expiry_datetime = timezone.localtime(obj.marks_entry_expiry_datetime).strftime("%Y-%m-%d %H:%M:%S") if obj.marks_entry_expiry_datetime else ""
+
+                row = [
+                    sl_no,
+                    academic_year,
+                    branch,
+                    exam_type,
+                    exam,
+                    status,
+                    marks_entry_expiry_datetime,
+                    obj.total_sections,
+                    obj.number_of_sections_pending,
+                    obj.number_of_sections_completed,
+                    obj.marks_completion_percentage,
+                ]
+
+                writer.writerow(row)
+                buffer.seek(0)
+                yield buffer.getvalue()
+                buffer.seek(0)
+                buffer.truncate(0)
+                sl_no += 1
+
+
