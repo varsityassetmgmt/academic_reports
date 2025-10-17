@@ -2050,9 +2050,15 @@ class ExportSectionExamResultsViewSet(APIView):
                 ).select_related('co_scholastic_grade', 'exam_attendance').first()
 
                 # --- Subject-level marks ---
-                marks['external_marks'].append(
-                    exam_result.external_marks if (exam_result and instance.has_external_marks) else ''
-                )
+                if exam_result.exam_attendance.exam_attendance_status_id ==1:
+                    marks['external_marks'].append(
+                        exam_result.external_marks if (exam_result and instance.has_external_marks) else ''
+                    )
+                else:
+                    marks['external_marks'].append(
+                        exam_result.exam_attendance.short_code if (exam_result and instance.has_external_marks) else ''
+                    )
+
                 marks['internal_marks'].append(
                     exam_result.internal_marks if (exam_result and instance.has_internal_marks) else ''
                 )
@@ -2074,9 +2080,14 @@ class ExportSectionExamResultsViewSet(APIView):
                         ).select_related('co_scholastic_grade', 'exam_attendance').first()
 
                         if skill_result:
-                            marks['external_marks'].append(
-                                skill_result.external_marks if skill_instance.has_external_marks else ''
-                            )
+                            if skill_result.exam_attendance.exam_attendance_status_id ==1:
+                                marks['external_marks'].append(
+                                    skill_result.external_marks if skill_instance.has_external_marks else ''
+                                )
+                            else:
+                                marks['external_marks'].append(
+                                    skill_result.exam_attendance.short_code if (skill_result and skill_instance.has_external_marks) else ''
+                                )
                             marks['internal_marks'].append(
                                 skill_result.internal_marks if skill_instance.has_internal_marks else ''
                             )
