@@ -1983,6 +1983,7 @@ class ExportBranchWiseExamResultStatusViewSet(APIView):
                 sl_no += 1
 
 
+
 class ExportSectionExamResultsViewSet(APIView):
     authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
@@ -2006,7 +2007,7 @@ class ExportSectionExamResultsViewSet(APIView):
                             status=status.HTTP_400_BAD_REQUEST)
 
         exam = section_status.exam
-        exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).prefetch_related('subject_skills')
+        exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
         students = Student.objects.filter(
             section=section_status.section,
             is_active=True,
@@ -2020,18 +2021,18 @@ class ExportSectionExamResultsViewSet(APIView):
         return response
 
     def generate_csv(self, students, exam_instances):
+        """Generate CSV content dynamically in a streaming fashion."""
         buffer = io.StringIO()
         writer = csv.writer(buffer)
 
-        # ===== Precompute columns =====
-        columns = []  # list of tuples: ('instance'/'skill', obj)
+        # ===== Dynamic Header =====
+        dynamic_headers = []
         enable_external_marks = False
         enable_internal_marks = False
         enable_grade = False
-
         for instance in exam_instances:
-            if instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade:
-                columns.append(('instance', instance))
+            if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
+                dynamic_headers.append(instance.subject.name)
                 if instance.has_external_marks:
                     enable_external_marks = True
                 if instance.has_internal_marks:
@@ -2041,88 +2042,95 @@ class ExportSectionExamResultsViewSet(APIView):
             if instance.has_subject_skills:
                 for skill in instance.subject_skills.all():
                     skill_instance = ExamSubjectSkillInstance.objects.filter(
-                        exam_instance=instance, subject_skill=skill, is_active=True
-                    ).first()
-                    if skill_instance and (skill_instance.has_external_marks or skill_instance.has_internal_marks or skill_instance.has_subject_co_scholastic_grade):
-                        columns.append(('skill', skill_instance))
-                        if skill_instance.has_external_marks:
+                            exam_instance=instance, subject_skill=skill, is_active=True
+                        ).first()
+                    if (skill_instance.has_external_marks or skill_instance.has_internal_marks or skill_instance.has_subject_co_scholastic_grade):
+                        dynamic_headers.append(skill.name)
+                        if instance.has_external_marks:
                             enable_external_marks = True
-                        if skill_instance.has_internal_marks:
+                        if instance.has_internal_marks:
                             enable_internal_marks = True
-                        if skill_instance.has_subject_co_scholastic_grade:
+                        if instance.has_subject_co_scholastic_grade:
                             enable_grade = True
 
-        # ===== Write CSV header =====
-        header = ['Sl.No.', 'Student Name', 'SCS Number', 'Marks Type']
-        for col_type, obj in columns:
-            if col_type == 'instance':
-                header.append(obj.subject.name)
-            else:
-                header.append(obj.subject_skill.name)
+        header = ['Sl.No.', 'Student Name', 'SCS Number', 'Marks Type'] + dynamic_headers
         writer.writerow(header)
         yield from self._flush_buffer(buffer, writer)
 
-        # ===== Pre-fetch all results to reduce DB hits =====
-        exam_results = ExamResult.objects.filter(
-            student__in=students,
-            exam_instance__in=exam_instances,
-            is_active=True
-        ).select_related('co_scholastic_grade', 'exam_attendance')
-
-        # Map exam results by (student_id, exam_instance_id)
-        exam_results_map = {(res.student_id, res.exam_instance_id): res for res in exam_results}
-
-        # Pre-fetch all skill results
-        skill_results = ExamSkillResult.objects.filter(
-            exam_result__in=exam_results,
-            skill__in=[c[1].subject_skill for c in columns if c[0] == 'skill'],
-        ).select_related('co_scholastic_grade', 'exam_attendance')
-
-        # Map skill results by (exam_result_id, skill_instance_id)
-        skill_results_map = {(res.exam_result_id, res.skill_id): res for res in skill_results}
-
-        # ===== Write data rows =====
+        # ===== Write Data =====
         for sl_no, student in enumerate(students, start=1):
             marks = {}
             if enable_external_marks:
-                marks['external_marks'] = []
+                marks['external_marks']= []
             if enable_internal_marks:
-                marks['internal_marks'] = []
+                marks['internal_marks']=[]
             if enable_grade:
-                marks['grade'] = []
+                marks['grade']=[]
 
-            for col_type, obj in columns:
-                if col_type == 'instance':
-                    exam_result = exam_results_map.get((student.id, obj.id))
-                    # External marks
+            for instance in exam_instances:
+                exam_result = ExamResult.objects.filter(
+                        student=student, exam_instance=instance, is_active=True
+                    ).select_related('co_scholastic_grade', 'exam_attendance').first()
+
+                if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
+                    # --- Subject-level marks ---
                     if enable_external_marks:
-                        if exam_result and exam_result.exam_attendance.exam_attendance_status_id == 1:
-                            marks['external_marks'].append(exam_result.external_marks if obj.has_external_marks else '')
+                        if exam_result.exam_attendance.exam_attendance_status_id ==1:
+                            marks['external_marks'].append(
+                                exam_result.external_marks if (exam_result and instance.has_external_marks) else ''
+                            )
                         else:
-                            marks['external_marks'].append(exam_result.exam_attendance.short_code if exam_result and obj.has_external_marks else '')
-                    # Internal marks
+                            marks['external_marks'].append(
+                                exam_result.exam_attendance.short_code if (exam_result and instance.has_external_marks) else ''
+                            )
                     if enable_internal_marks:
-                        marks['internal_marks'].append(exam_result.internal_marks if exam_result and obj.has_internal_marks else '')
-                    # Grade
+                        marks['internal_marks'].append(
+                            exam_result.internal_marks if (exam_result and instance.has_internal_marks) else ''
+                        )
                     if enable_grade:
                         marks['grade'].append(
-                            exam_result.co_scholastic_grade.name if (exam_result and obj.has_subject_co_scholastic_grade and exam_result.co_scholastic_grade) else ''
+                            exam_result.co_scholastic_grade.name
+                            if (exam_result and instance.has_subject_co_scholastic_grade and exam_result.co_scholastic_grade)
+                            else ''
                         )
-                else:  # skill
-                    parent_result = exam_results_map.get((student.id, obj.exam_instance.id))
-                    skill_result = skill_results_map.get((parent_result.id, obj.id)) if parent_result else None
+                # --- Skill-level marks ---
+                if instance.has_subject_skills:
+                    for skill in instance.subject_skills.all():
+                        skill_instance = ExamSubjectSkillInstance.objects.filter(
+                            exam_instance=instance, subject_skill=skill, is_active=True
+                        ).first()
+                        if (skill_instance.has_external_marks or skill_instance.has_internal_marks or skill_instance.has_subject_co_scholastic_grade):
 
-                    if enable_external_marks:
-                        if skill_result and skill_result.exam_attendance.exam_attendance_status_id == 1:
-                            marks['external_marks'].append(skill_result.external_marks if obj.has_external_marks else '')
-                        else:
-                            marks['external_marks'].append(skill_result.exam_attendance.short_code if skill_result and obj.has_external_marks else '')
-                    if enable_internal_marks:
-                        marks['internal_marks'].append(skill_result.internal_marks if skill_result and obj.has_internal_marks else '')
-                    if enable_grade:
-                        marks['grade'].append(skill_result.co_scholastic_grade.name if skill_result and obj.has_subject_co_scholastic_grade and skill_result.co_scholastic_grade else '')
+                            skill_result = ExamSkillResult.objects.filter(
+                                exam_result=exam_result, skill=skill
+                            ).select_related('co_scholastic_grade', 'exam_attendance').first()
 
-            # Write each type of marks row
+                            if skill_result:
+                                if enable_external_marks:
+                                    if skill_result.exam_attendance.exam_attendance_status_id ==1:
+                                        marks['external_marks'].append(
+                                            skill_result.external_marks if skill_instance.has_external_marks else ''
+                                        )
+                                    else:
+                                        marks['external_marks'].append(
+                                            skill_result.exam_attendance.short_code if (skill_result and skill_instance.has_external_marks) else ''
+                                        )
+                                if enable_internal_marks:
+                                    marks['internal_marks'].append(
+                                        skill_result.internal_marks if skill_instance.has_internal_marks else ''
+                                    )
+                                if enable_grade:
+                                    marks['grade'].append(
+                                        skill_result.co_scholastic_grade.name
+                                        if (skill_instance.has_subject_co_scholastic_grade and skill_result.co_scholastic_grade)
+                                        else ''
+                                    )
+                            else:
+                                marks['external_marks'].append('')
+                                marks['internal_marks'].append('')
+                                marks['grade'].append('')
+
+            # --- Write all 3 rows for each student ---
             for mark_type, mark_values in marks.items():
                 row = [
                     sl_no,
@@ -2140,3 +2148,141 @@ class ExportSectionExamResultsViewSet(APIView):
         yield data
         buffer.seek(0)
         buffer.truncate(0)
+
+
+# class ExportSectionExamResultsViewSet(APIView):
+#     authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
+#     permission_classes = [IsAuthenticated]
+#     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+
+#     filename = "Section_Exam_Results.csv"
+#     chunk_size = 500
+
+#     def get(self, request, *args, **kwargs):
+#         section_status_id = request.query_params.get('section_wise_exam_result_status_id')
+#         if not section_status_id:
+#             return Response({'section_wise_exam_result_status_id': "This field is required in the URL."},
+#                             status=status.HTTP_400_BAD_REQUEST)
+
+#         try:
+#             section_status = SectionWiseExamResultStatus.objects.select_related('exam', 'section').get(
+#                 id=section_status_id, is_active=True
+#             )
+#         except SectionWiseExamResultStatus.DoesNotExist:
+#             return Response({'section_wise_exam_result_status_id': "Invalid id"},
+#                             status=status.HTTP_400_BAD_REQUEST)
+
+#         exam = section_status.exam
+#         exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+#         students = Student.objects.filter(
+#             section=section_status.section,
+#             is_active=True,
+#             academic_year=exam.academic_year,
+#         ).exclude(admission_status__admission_status_id=3)
+
+#         response = StreamingHttpResponse(
+#             self.generate_csv(students, exam_instances), content_type="text/csv"
+#         )
+#         response["Content-Disposition"] = f'attachment; filename="{self.filename}"'
+#         return response
+
+#     def generate_csv(self, students, exam_instances):
+#         """Generate CSV content dynamically in a streaming fashion."""
+#         buffer = io.StringIO()
+#         writer = csv.writer(buffer)
+
+#         # ===== Dynamic Header =====
+#         dynamic_headers = []
+#         for instance in exam_instances:
+#             dynamic_headers.append(instance.subject.name)
+#             if instance.has_subject_skills:
+#                 for skill in instance.subject_skills.all():
+#                     dynamic_headers.append(skill.name)
+
+#         header = ['Sl.No.', 'Student Name', 'SCS Number', 'Marks Type'] + dynamic_headers
+#         writer.writerow(header)
+#         yield from self._flush_buffer(buffer, writer)
+
+#         # ===== Write Data =====
+#         for sl_no, student in enumerate(students, start=1):
+#             marks = {
+#                 'external_marks': [],
+#                 'internal_marks': [],
+#                 'grade': [],
+#             }
+
+#             for instance in exam_instances:
+#                 exam_result = ExamResult.objects.filter(
+#                     student=student, exam_instance=instance, is_active=True
+#                 ).select_related('co_scholastic_grade', 'exam_attendance').first()
+
+#                 # --- Subject-level marks ---
+#                 if exam_result.exam_attendance.exam_attendance_status_id ==1:
+#                     marks['external_marks'].append(
+#                         exam_result.external_marks if (exam_result and instance.has_external_marks) else ''
+#                     )
+#                 else:
+#                     marks['external_marks'].append(
+#                         exam_result.exam_attendance.short_code if (exam_result and instance.has_external_marks) else ''
+#                     )
+
+#                 marks['internal_marks'].append(
+#                     exam_result.internal_marks if (exam_result and instance.has_internal_marks) else ''
+#                 )
+#                 marks['grade'].append(
+#                     exam_result.co_scholastic_grade.name
+#                     if (exam_result and instance.has_subject_co_scholastic_grade and exam_result.co_scholastic_grade)
+#                     else ''
+#                 )
+
+#                 # --- Skill-level marks ---
+#                 if instance.has_subject_skills:
+#                     for skill in instance.subject_skills.all():
+#                         skill_instance = ExamSubjectSkillInstance.objects.filter(
+#                             exam_instance=instance, subject_skill=skill, is_active=True
+#                         ).first()
+
+#                         skill_result = ExamSkillResult.objects.filter(
+#                             exam_result=exam_result, skill=skill
+#                         ).select_related('co_scholastic_grade', 'exam_attendance').first()
+
+#                         if skill_result:
+#                             if skill_result.exam_attendance.exam_attendance_status_id ==1:
+#                                 marks['external_marks'].append(
+#                                     skill_result.external_marks if skill_instance.has_external_marks else ''
+#                                 )
+#                             else:
+#                                 marks['external_marks'].append(
+#                                     skill_result.exam_attendance.short_code if (skill_result and skill_instance.has_external_marks) else ''
+#                                 )
+#                             marks['internal_marks'].append(
+#                                 skill_result.internal_marks if skill_instance.has_internal_marks else ''
+#                             )
+#                             marks['grade'].append(
+#                                 skill_result.co_scholastic_grade.name
+#                                 if (skill_instance.has_subject_co_scholastic_grade and skill_result.co_scholastic_grade)
+#                                 else ''
+#                             )
+#                         else:
+#                             marks['external_marks'].append('')
+#                             marks['internal_marks'].append('')
+#                             marks['grade'].append('')
+
+#             # --- Write all 3 rows for each student ---
+#             for mark_type, mark_values in marks.items():
+#                 row = [
+#                     sl_no,
+#                     student.name,
+#                     student.SCS_Number,
+#                     mark_type.replace('_', ' ').title(),
+#                 ] + mark_values
+#                 writer.writerow(row)
+#                 yield from self._flush_buffer(buffer, writer)
+
+#     def _flush_buffer(self, buffer, writer):
+#         """Helper to flush the buffer and yield CSV data."""
+#         buffer.seek(0)
+#         data = buffer.getvalue()
+#         yield data
+#         buffer.seek(0)
+#         buffer.truncate(0)
