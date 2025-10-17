@@ -803,7 +803,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
                 academic_year=current_academic_year,
             )
             .select_related('academic_year', 'branch', 'exam', 'status')  # optimization
-            .order_by('-updated_at')
+            .order_by('-academic_year', 'marks_completion_percentage')
         )
         return queryset
 
@@ -890,7 +890,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
                 'exam',
                 'status',
             )
-            .order_by('-updated_at')  # show most recent first
+            .order_by('-section__class_name__class_sequence', 'section__name')  # show most recent first
         )
 
         return queryset
@@ -1889,6 +1889,7 @@ class ExportBranchWiseExamResultStatusViewSet(APIView):
         'exam__exam_type__name',
         'is_progress_card_downloaded',
     ]
+    ordering = ['-academic_year', 'marks_completion_percentage']
 
     filename = "Branch Wise Exam Results Marks Entry Status.csv"
     chunk_size = 1000
@@ -1935,8 +1936,8 @@ class ExportBranchWiseExamResultStatusViewSet(APIView):
         writer = csv.writer(buffer)
 
         header = [ 'Sl.No.',
-            "Academic Year", "Branch", "Exam Type", "Exam", "Status", "Marks Entry Expiry Date ",
-            "Total Sections", "Pending Sections", "Completed Sections", "Marks Completion Percentage",
+            "Academic Year", "Branch", "Exam Type", "Exam", "Status", "Marks Completion Percentage", 
+            "Total Sections", "Pending Sections", "Completed Sections", "Marks Entry Expiry Date ",
         ]
 
         writer.writerow(header)
@@ -1967,11 +1968,11 @@ class ExportBranchWiseExamResultStatusViewSet(APIView):
                     exam_type,
                     exam,
                     status,
-                    marks_entry_expiry_datetime,
+                    obj.marks_completion_percentage,
                     obj.total_sections,
                     obj.number_of_sections_pending,
                     obj.number_of_sections_completed,
-                    obj.marks_completion_percentage,
+                    marks_entry_expiry_datetime,
                 ]
 
                 writer.writerow(row)
@@ -1980,5 +1981,4 @@ class ExportBranchWiseExamResultStatusViewSet(APIView):
                 buffer.seek(0)
                 buffer.truncate(0)
                 sl_no += 1
-
 
