@@ -2332,7 +2332,7 @@ class BranchSectionsExamResultsXLSXView(APIView):
     authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
-    filename_template = "Branch_Exam_Results_{branch}_{exam}.xlsx"
+    filename_template = "{branch}_{exam}_Exam_Results_.xlsx"
 
     def get(self, request, *args, **kwargs):
         branch_wise_exam_result_status_id = request.query_params.get('branch_wise_exam_result_status_id')
@@ -2390,10 +2390,10 @@ class BranchSectionsExamResultsXLSXView(APIView):
             headers = ["SCS Number", "Student Name", "Marks Type"]
             for instance in exam_instances:
                 for skill in instance.subject_skills.all():
+                    headers.append(instance.subject.name)
                     si = skill_instance_map.get((instance.exam_instance_id, skill.id))
                     if si:
                         headers.append(f"{instance.subject.name} - {skill.name}")
-                headers.append(instance.subject.name)
             ws.append(headers)
             for col_idx, _ in enumerate(headers, 1):
                 ws.cell(row=1, column=col_idx).font = header_font
@@ -2406,7 +2406,15 @@ class BranchSectionsExamResultsXLSXView(APIView):
                     row = [student.SCS_Number, student.name, mark_type]
                     for instance in exam_instances:
                         exam_result = exam_result_map.get((student.student_id, instance.exam_instance_id))
-                        # Skills first
+                        value = ""
+                        if exam_result:
+                            if mark_type == "External" and instance.has_external_marks:
+                                value = str(exam_result.external_marks) if exam_result.external_marks is not None else ""
+                            elif mark_type == "Internal" and instance.has_internal_marks:
+                                value = str(exam_result.internal_marks) if exam_result.internal_marks is not None else ""
+                            elif mark_type == "Grade" and instance.has_subject_co_scholastic_grade:
+                                value = exam_result.co_scholastic_grade.name if exam_result.co_scholastic_grade else ""
+                        row.append(value)
                         for skill in instance.subject_skills.all():
                             si = skill_instance_map.get((instance.exam_instance_id, skill.id))
                             value = ""
@@ -2418,17 +2426,7 @@ class BranchSectionsExamResultsXLSXView(APIView):
                                     value = str(skill_result.internal_marks) if skill_result and skill_result.internal_marks is not None else ""
                                 elif mark_type == "Grade" and si.has_subject_co_scholastic_grade:
                                     value = skill_result.co_scholastic_grade.name if skill_result and skill_result.co_scholastic_grade else ""
-                            row.append(value)
-                        # Subject
-                        value = ""
-                        if exam_result:
-                            if mark_type == "External" and instance.has_external_marks:
-                                value = str(exam_result.external_marks) if exam_result.external_marks is not None else ""
-                            elif mark_type == "Internal" and instance.has_internal_marks:
-                                value = str(exam_result.internal_marks) if exam_result.internal_marks is not None else ""
-                            elif mark_type == "Grade" and instance.has_subject_co_scholastic_grade:
-                                value = exam_result.co_scholastic_grade.name if exam_result.co_scholastic_grade else ""
-                        row.append(value)
+                            row.append(value)                        
                     ws.append(row)
 
         # Save workbook to BytesIO
