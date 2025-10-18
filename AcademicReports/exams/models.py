@@ -201,66 +201,7 @@ class ExamInstance(models.Model):
                     models.Index(fields=["has_subject_co_scholastic_grade"]),
                     models.Index(fields=["exam", "subject", "is_active"]),
                 ]
-        
-
-    # def clean(self):
-    #     errors = {}
-
-          # ✅ Exam edit restriction
-        # if self.exam and not self.exam.is_editable:
-        #     errors["exam"] = "This Exam is locked. You cannot add or update ExamInstances."
-
-        # Prevent create/update if parent exam is not editable
-        # if self.exam and not getattr(self.exam, "is_editable", True):
-        #     errors["exam"] = "This Exam is locked. You cannot add or update ExamInstances."
-
-        # ✅ Validate exam and date range
-        # if self.exam and self.date:
-        #     if self.exam.start_date and self.exam.end_date:
-        #         if not (self.exam.start_date <= self.date <= self.exam.end_date):
-        #             errors["date"] = f"Exam date must be between {self.exam.start_date} and {self.exam.end_date}."
-        #     else:
-        #         errors["exam"] = "Selected exam does not have valid start and end dates."
-        
-        # if self.exam and self.date:
-        #     if not (self.exam.start_date <= self.date <= self.exam.end_date):
-        #         errors["date"] = f"Exam date must be between {self.exam.start_date} and {self.exam.end_date}."
-
-        # # ✅ Exam time validation
-        # if self.exam_start_time and self.exam_end_time:
-        #     if self.exam_start_time >= self.exam_end_time:
-        #         errors["exam_end_time"] = "Exam end time must be later than start time."
-
-        # # 🔹 External marks validation
-        # if self.has_external_marks:
-        #     if self.maximum_marks_external is None:
-        #         errors["maximum_marks_external"] = "This field is required when external marks are enabled."
-        #     if self.cut_off_marks_external is None:
-        #         errors["cut_off_marks_external"] = "This field is required when external marks are enabled."
-        #     elif self.maximum_marks_external is not None and self.cut_off_marks_external > self.maximum_marks_external:
-        #         errors["cut_off_marks_external"] = "Cut-off external marks cannot be greater than maximum external marks."
-
-        # # 🔹 Internal marks validation
-        # if self.has_internal_marks:
-        #     if self.maximum_marks_internal is None:
-        #         errors["maximum_marks_internal"] = "This field is required when internal marks are enabled."
-        #     if self.cut_off_marks_internal is None:
-        #         errors["cut_off_marks_internal"] = "This field is required when internal marks are enabled."
-        #     elif self.maximum_marks_internal is not None and self.cut_off_marks_internal > self.maximum_marks_internal:
-        #         errors["cut_off_marks_internal"] = "Cut-off internal marks cannot be greater than maximum internal marks."
-
-        # 🔹 Co-scholastic grade + subject skills validation
-        # if self.has_subject_co_scholastic_grade:
-        #     # Note: during `full_clean`, m2m fields aren't available yet, so handle it carefully
-        #     if not self.pk or not self.subject_skills.exists():
-        #         errors["subject_skills"] = "At least one subject skill is required when co-scholastic grade is enabled."
-
-        # if errors:
-        #     raise ValidationError(errors)
-
-    # def save(self, *args, **kwargs):
-    #     self.full_clean()  # ensures all validations above are applied
-    #     super().save(*args, **kwargs)
+    
 
     def __str__(self):
         return f"({self.exam.name} - {self.subject.name})"
@@ -556,8 +497,6 @@ class StudentExamSummary(models.Model):
     all_india_rank = models.IntegerField(null=True, blank=True)
     is_active = models.BooleanField(default= True)
 
-    # class Meta:
-    #     unique_together = ('student', 'exam')
 
     class Meta:
         constraints = [
