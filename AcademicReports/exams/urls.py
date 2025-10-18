@@ -62,6 +62,6 @@ urlpatterns = [
 
         path('export_branch_wise_exam_result_status/', ExportBranchWiseExamResultStatusCSVViewSet.as_view(), name='export_branch_wise_exam_result_status'),
         path('export_section_exam_results/', ExportSectionExamResultsCSVViewSet.as_view(), name='export_section_exam_results'),
-        path('branch_section_exam_results/', BranchSectionsExamResultsXLSXView.as_view(), name='branch_section_exam_results'),
+        path('export_branch_section_exam_results/', BranchSectionsExamResultsXLSXView.as_view(), name='branch_section_exam_results'),
 
 ]+ router.urls
