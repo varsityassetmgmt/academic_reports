@@ -2278,13 +2278,18 @@ class ExportSectionExamResultsViewSet(APIView):
             for mark_type, mark_values in marks.items():
                 # ✅ Skip completely empty rows
                 if not any(mark_values):
-                    continue
-                row = [
+                    row = [
                     sl_no,
                     student.name,
                     student.SCS_Number,
-                    mark_type.replace('_', ' ').title(),
-                ] + mark_values
+                    ]
+                else:
+                    row = [
+                        sl_no,
+                        student.name,
+                        student.SCS_Number,
+                        mark_type.replace('_', ' ').title(),
+                    ] + mark_values
                 writer.writerow(row)
                 yield from self._flush_buffer(buffer, writer)
 
