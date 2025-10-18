@@ -2319,20 +2319,19 @@ class ExportSectionExamResultsCSVViewSet(APIView):
 #         buffer.truncate(0)
 
 #============================== Branch Exam Results Download ====================================
-
-
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
-from django.http import HttpResponse
+from django.http import StreamingHttpResponse
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 class BranchSectionsExamResultsXLSXView(APIView):
     authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
-    filename_template = "{branch}_{exam}_Exam_Results_.xlsx"
+    filename_template = "{branch}_{exam}_Exam_Results.xlsx"
 
     def get(self, request, *args, **kwargs):
         branch_wise_exam_result_status_id = request.query_params.get('branch_wise_exam_result_status_id')
@@ -2376,7 +2375,7 @@ class BranchSectionsExamResultsXLSXView(APIView):
         ).select_related('exam_attendance', 'co_scholastic_grade', 'skill')
         skill_result_map = {(sr.exam_result_id, sr.skill_id): sr for sr in skill_results_qs}
 
-        # Create workbook
+        # ✅ Create workbook
         wb = Workbook()
         wb.remove(wb.active)
         header_font = Font(bold=True)
@@ -2386,7 +2385,6 @@ class BranchSectionsExamResultsXLSXView(APIView):
             ws_title = f"{section.class_name.name}_{section.name}"[:31]
             ws = wb.create_sheet(title=ws_title)
 
-            # Build header
             headers = ["SCS Number", "Student Name", "Marks Type"]
             for instance in exam_instances:
                 headers.append(instance.subject.name)
@@ -2395,41 +2393,52 @@ class BranchSectionsExamResultsXLSXView(APIView):
                     if si:
                         headers.append(f"{instance.subject.name} - {skill.name}")
             ws.append(headers)
-            for col_idx, _ in enumerate(headers, 1):
-                ws.cell(row=1, column=col_idx).font = header_font
-                ws.cell(row=1, column=col_idx).alignment = center
 
-            students = Student.objects.filter(section=section, is_active=True).exclude(admission_status__admission_status_id=3)
+            for col_idx in range(1, len(headers) + 1):
+                cell = ws.cell(row=1, column=col_idx)
+                cell.font = header_font
+                cell.alignment = center
+
+            students = Student.objects.filter(
+                section=section, is_active=True
+            ).exclude(admission_status__admission_status_id=3)
+
             for student in students:
-                mark_types = ["External", "Internal", "Grade"]
-                for mark_type in mark_types:
+                for mark_type in ["External", "Internal", "Grade"]:
                     row = [student.SCS_Number, student.name, mark_type]
                     for instance in exam_instances:
                         exam_result = exam_result_map.get((student.student_id, instance.exam_instance_id))
                         value = ""
                         if exam_result:
                             if mark_type == "External" and instance.has_external_marks:
-                                value = str(exam_result.external_marks) if exam_result.external_marks is not None else ""
+                                if exam_result.exam_attendance and exam_result.exam_attendance.exam_attendance_status_id == 1:
+                                    value = str(exam_result.external_marks) if exam_result.external_marks is not None else ""
+                                elif exam_result.exam_attendance:
+                                    value = str(exam_result.exam_attendance.short_code or "")
                             elif mark_type == "Internal" and instance.has_internal_marks:
-                                value = str(exam_result.internal_marks) if exam_result.internal_marks is not None else ""
+                                value = str(exam_result.internal_marks or "")
                             elif mark_type == "Grade" and instance.has_subject_co_scholastic_grade:
                                 value = exam_result.co_scholastic_grade.name if exam_result.co_scholastic_grade else ""
                         row.append(value)
+
                         for skill in instance.subject_skills.all():
                             si = skill_instance_map.get((instance.exam_instance_id, skill.id))
                             value = ""
                             if exam_result and si:
                                 skill_result = skill_result_map.get((exam_result.exam_result_id, skill.id))
                                 if mark_type == "External" and si.has_external_marks:
-                                    value = str(skill_result.external_marks) if skill_result and skill_result.external_marks is not None else ""
+                                    if skill_result and skill_result.exam_attendance and skill_result.exam_attendance.exam_attendance_status_id == 1:
+                                        value = str(skill_result.external_marks or "")
+                                    elif skill_result and skill_result.exam_attendance:
+                                        value = str(skill_result.exam_attendance.short_code or "")
                                 elif mark_type == "Internal" and si.has_internal_marks:
-                                    value = str(skill_result.internal_marks) if skill_result and skill_result.internal_marks is not None else ""
+                                    value = str(skill_result.internal_marks or "")
                                 elif mark_type == "Grade" and si.has_subject_co_scholastic_grade:
                                     value = skill_result.co_scholastic_grade.name if skill_result and skill_result.co_scholastic_grade else ""
-                            row.append(value)                        
+                            row.append(value)
                     ws.append(row)
 
-        # Save workbook to BytesIO
+        # ✅ Save workbook to in-memory buffer
         output = io.BytesIO()
         wb.save(output)
         output.seek(0)
@@ -2438,10 +2447,11 @@ class BranchSectionsExamResultsXLSXView(APIView):
             branch=branch_status.branch.name.replace(" ", "_")[:20],
             exam=exam.name.replace(" ", "_")[:20],
         )
-        response = HttpResponse(
-            output.read(),
+
+        # ✅ Stream output — starts download immediately
+        response = StreamingHttpResponse(
+            output,
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
-
