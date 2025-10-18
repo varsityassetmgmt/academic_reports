@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'students',
     'exams',
     'apibridge',
+    'progresscard',
 
    
     
@@ -63,6 +64,10 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=12),
 
 }
+
+# # optional: explicit path to wkhtmltopdf executable (Windows example)
+# WKHTMLTOPDF_CMD = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+# # On linux/mac you can omit if wkhtmltopdf is in PATH
 
 
 REST_FRAMEWORK = {
@@ -173,11 +178,32 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR,'static/')
+# STATIC_URL = 'static/'
+# STATIC_ROOT = os.path.join(BASE_DIR,'static/')
+
+# STATIC_URL = '/static/'
+# STATIC_ROOT = os.path.join(BASE_DIR,'static')
+
+# STATIC_URL = '/static/'
+# STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "static"),  # If you have a project-level static folder
+]
+# STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")  # for collectstatic
+# If on Windows and wkhtmltopdf is installed in Program Files:
+# WKHTMLTOPDF_CMD = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+# On Linux you can omit WKHTMLTOPDF_CMD if wkhtmltopdf is in PATH
+WKHTMLTOPDF_CMD = (
+    r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+    if os.name == "nt"
+    else "/usr/bin/wkhtmltopdf"
+)
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -203,3 +229,5 @@ CELERY_RESULT_BACKEND = 'django-db'
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 #================================================ Celery Ends      ========================================================
+
+# WKHTMLTOPDF_CMD = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"  # Windows example
