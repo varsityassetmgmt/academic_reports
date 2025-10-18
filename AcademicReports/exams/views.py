@@ -16,6 +16,11 @@ from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError, NotFound
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
+from usermgmt.authentication import QueryParameterTokenAuthentication
+from rest_framework.authentication import SessionAuthentication
+from django.http import StreamingHttpResponse, HttpResponse
+import csv
+import io
 
 # ---------------- Subject ----------------
 class SubjectDropdownViewSet(ModelViewSet):
@@ -40,38 +45,43 @@ class SubjectDropdownViewSet(ModelViewSet):
 
 #         return subjects
 
+
+
+ 
 class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
     """
     Provides a dropdown list of subjects associated with the classes of a given Exam.
-    URL pattern: /subject_dropdown_for_exam_instance/<exam_id>/
+    Includes the subject of the current ExamInstance if `exam_instance_id` is provided (for update view).
+    URL pattern: /subject_dropdown_for_exam_instance/<exam_id>/?exam_instance_id=<id>
     """
     permission_classes = [IsAuthenticated]
     serializer_class = SubjectDropdownSerializer
     http_method_names = ['get']
-
+ 
     def get_queryset(self):
         exam_id = self.kwargs.get('exam_id')
+        exam_instance_id = self.request.query_params.get('exam_instance_id')  # ✅ optional for update
         if not exam_id:
             raise ValidationError({'exam_id': "This field is required in the URL."})
-
-        exam = (
-            Exam.objects.filter(exam_id=exam_id, is_active=True)
-            .prefetch_related('student_classes')
-            .first()
-        )
+ 
+        exam = (Exam.objects.filter(exam_id=exam_id, is_active=True).prefetch_related('student_classes').first())
+ 
         if not exam:
             raise ValidationError({'exam_id': f"Exam with ID {exam_id} not found or inactive."})
-
+ 
         class_names = exam.student_classes.all()
+ 
         if not class_names.exists():
             return Subject.objects.none()
-        
-        exam_subjects = ExamInstance.objects.filter(
-            exam=exam, is_active=True
-        ).values_list('subject__subject_id', flat=True)
-
-        # ✅ Get subjects that belong to ALL class_names (intersection)
-        subjects = Subject.objects.filter(
+       
+        if exam_instance_id:
+            exam_subjects = ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True).exclude(exam_instance_id=exam_instance_id)
+        else:
+        # Subjects already assigned in active ExamInstances
+            exam_subjects =  ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True)
+ 
+        # ✅ Base queryset: subjects matching all classes
+        subjects_qs = Subject.objects.filter(
             is_active=True,
             class_names__in=class_names
         ).annotate(
@@ -79,8 +89,8 @@ class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
         ).filter(
             class_count=class_names.count()
         ).exclude(subject_id__in=exam_subjects).distinct().order_by('name')
-
-        return subjects
+ 
+        return subjects_qs
 
 
 # class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
@@ -140,6 +150,26 @@ class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
 #             subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
 
 #         return subjects_qs.distinct().order_by('name')
+
+
+        # # ✅ If editing an ExamInstance, include its subject even if already used
+        # if exam_instance_id:
+        #     current_instance = ExamInstance.objects.filter(
+        #         exam_instance_id=exam_instance_id,
+        #         exam=exam,
+        #         is_active=True
+        #     ).select_related('subject').first()
+
+        #     if current_instance and current_instance.subject:
+        #         subjects_qs = subjects_qs.filter(
+        #             Q(subject_id__notin=exam_subjects) | Q(subject_id=current_instance.subject.subject_id)
+        #         )
+        #     else:
+        #         subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
+        # else:
+        #     subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
+
+        # return subjects_qs.distinct().order_by('name')
 
 
 
@@ -226,12 +256,19 @@ class ExamAttendanceStatusDropdownViewSet(ModelViewSet):
     serializer_class = ExamAttendanceStatusDropdownSerializer
     http_method_names = ['get']
 
+# ---------------- ExamResultStatus ----------------
+class ExamResultStatusDropdownViewSet(ModelViewSet):
+    queryset = ExamResultStatus.objects.all().order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ExamResultStatusDropdownSerializer
+    http_method_names = ['get']
+
 # ==================== Subject ====================
 class SubjectViewSet(ModelViewSet):
     queryset = Subject.objects.filter(is_active=True).order_by('name')
     serializer_class = SubjectSerializer
     http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['name', 'display_name', 'description']  # text fields to search
     filterset_fields = ['academic_devisions', 'class_names', 'is_active']  # FK/many2many and boolean
     ordering_fields = ['name', 'display_name', 'created_at', 'updated_at']  # fields users can order by
@@ -259,7 +296,7 @@ class SubjectSkillViewSet(ModelViewSet):
     queryset = SubjectSkill.objects.filter(is_active=True).order_by('subject')
     serializer_class = SubjectSkillSerializer
     http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['name', 'subject__name']  # searchable text fields
     filterset_fields = ['subject', 'is_active']  # FK and boolean fields
     ordering_fields = ['name', 'subject__name', 'created_at', 'updated_at']  # sortable fields
@@ -287,7 +324,7 @@ class ExamTypeViewSet(ModelViewSet):
     queryset = ExamType.objects.filter(is_active=True).order_by('name')
     serializer_class = ExamTypeSerializer
     http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['name', 'description']       # text search
     filterset_fields = ['is_active']             # boolean filter
     ordering_fields = ['name', 'created_at', 'updated_at']  # sortable fields
@@ -309,21 +346,21 @@ class ExamTypeViewSet(ModelViewSet):
             permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
 
-
+#
 # ==================== Exam ====================
 class ExamViewSet(ModelViewSet):
     serializer_class = ExamSerializer
     http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name', 'exam_type__name', 'academic_year__name']
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['name', 'exam_type__name', 'academic_year__name', 'exam_status__name']
     filterset_fields = [
         'exam_type', 'is_visible', 'is_progress_card_visible',
         'is_active', 'academic_year', 'name', 'start_date',
-        'end_date', 'marks_entry_expiry_datetime',
+        'end_date', 'marks_entry_expiry_datetime', 'exam_status',
     ]
     ordering_fields = [
         'exam_type__name', 'start_date', 'end_date', 'name',
-        'is_visible', 'created_at', 'updated_at',
+        'is_visible', 'created_at', 'updated_at', 'exam_status__name',
         'academic_year', 'marks_entry_expiry_datetime',
     ]
     pagination_class = CustomPagination
@@ -334,7 +371,7 @@ class ExamViewSet(ModelViewSet):
             raise NotFound("Current academic year not found.")
         return (
             Exam.objects.filter(academic_year=current_academic_year, is_active=True)
-            .order_by('-exam_id', 'is_visible')
+            .order_by('is_visible', '-exam_id')
         )
 
     def perform_create(self, serializer):
@@ -461,7 +498,7 @@ class ExamViewSet(ModelViewSet):
 class ExamInstanceViewSet(ModelViewSet):
     serializer_class = ExamInstanceSerializer
     http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter,OrderingFilter]
     search_fields = [
         'subject__name',
         'exam__name',
@@ -501,34 +538,24 @@ class ExamInstanceViewSet(ModelViewSet):
             is_active=True
         ).order_by('date')
 
-    # ✅ No need to revalidate serializer here
-    def perform_create(self, serializer):
-        exam_id = self.get_exam_id()
-        exam = get_object_or_404(Exam, pk=exam_id)
+    # # ✅ Override list() to include overall exam info
+    # def list(self, request, *args, **kwargs):
+    #     queryset = self.filter_queryset(self.get_queryset())
+    #     page = self.paginate_queryset(queryset)
 
-        if not exam.is_editable:
-            raise ValidationError({"non_field_errors": "This Exam is already published — creation/edit not allowed."})
+    #     serializer = self.get_serializer(page, many=True)
 
-        subject = serializer.validated_data.get("subject")
+    #     # Get exam name once (all instances have same exam)
+    #     exam_name = None
+    #     if queryset.exists():
+    #         exam_name = queryset.first().exam.name
 
-        # Check for duplicates at application level first
-        if ExamInstance.objects.filter(subject=subject, exam=exam).exists():
-            raise ValidationError({"subject": "An exam for this subject already exists for this exam."})
+    #     paginated_data = self.get_paginated_response(serializer.data).data
 
-        try:
-            with transaction.atomic():
-                serializer.save(exam=exam, created_by=self.request.user, updated_by=self.request.user)
-        except IntegrityError:
-            # Catch DB-level constraint violation and raise as 400
-            raise ValidationError({"non_field_errors": "An exam for this subject already exists (database constraint)."})
+    #     # Inject exam_name into the overall response
+    #     paginated_data['exam_name'] = exam_name
 
-    def perform_update(self, serializer):
-        exam_id = self.get_exam_id()
-        exam = get_object_or_404(Exam, pk=exam_id)
-        if not exam.is_editable:
-            raise ValidationError({"non_field_errors": "This Exam is already published — creation/edit not allowed."})
-        serializer.save(exam=exam, updated_by=self.request.user)
-
+    #     return Response(paginated_data, status=status.HTTP_200_OK)
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -540,6 +567,35 @@ class ExamInstanceViewSet(ModelViewSet):
         else:
             permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
+
+    # ✅ No need to revalidate serializer here
+    # def perform_create(self, serializer):
+    #     exam_id = self.get_exam_id()
+    #     exam = get_object_or_404(Exam, pk=exam_id)
+
+    #     if not exam.is_editable:
+    #         raise ValidationError({"non_field_errors": "This Exam is already published — creation/edit not allowed."})
+
+    #     subject = serializer.validated_data.get("subject")
+
+    #     # Check for duplicates at application level first
+    #     if ExamInstance.objects.filter(subject=subject, exam=exam).exists():
+    #         raise ValidationError({"subject": "An exam for this subject already exists for this exam."})
+
+    #     try:
+    #         with transaction.atomic():
+    #             serializer.save(exam=exam, created_by=self.request.user, updated_by=self.request.user)
+    #     except IntegrityError:
+    #         # Catch DB-level constraint violation and raise as 400
+    #         raise ValidationError({"non_field_errors": "An exam for this subject already exists (database constraint)."})
+
+    # def perform_update(self, serializer):
+    #     exam_id = self.get_exam_id()
+    #     exam = get_object_or_404(Exam, pk=exam_id)
+    #     if not exam.is_editable:
+    #         raise ValidationError({"non_field_errors": "This Exam is already published — creation/edit not allowed."})
+    #     serializer.save(exam=exam, updated_by=self.request.user)
+
 
 # class ExamInstanceViewSet(ModelViewSet):
 #     serializer_class = ExamInstanceSerializer
@@ -585,7 +641,7 @@ class ExamInstanceViewSet(ModelViewSet):
 class ExamSubjectSkillInstanceViewSet(ModelViewSet):
     serializer_class = ExamSubjectSkillInstanceSerializer
     http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter,OrderingFilter]
 
     search_fields = [
         'subject_skill__name',              # search by skill name
@@ -708,7 +764,7 @@ class ExamSubjectSkillInstanceViewSet(ModelViewSet):
 class BranchWiseExamResultStatusViewSet(ModelViewSet):
     serializer_class = BranchWiseExamResultStatusSerializer
     http_method_names = ['get', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter,OrderingFilter]
     pagination_class = CustomPagination
     search_fields = [
         'academic_year__name',
@@ -716,6 +772,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'exam__name',
         'status__name',
         'exam__exam_type__name',
+        'is_progress_card_downloaded',
     ]
 
     filterset_fields = [
@@ -725,6 +782,8 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'status',
         'is_visible',
         'is_active',
+        'exam__exam_type',
+        'is_progress_card_downloaded',
     ]
 
     ordering_fields = [
@@ -736,6 +795,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'marks_completion_percentage',
         'updated_at',
         'exam__exam_type__name',
+        'is_progress_card_downloaded',
     ]
 
     def get_queryset(self):
@@ -763,7 +823,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
                 academic_year=current_academic_year,
             )
             .select_related('academic_year', 'branch', 'exam', 'status')  # optimization
-            .order_by('-updated_at')
+            .order_by('-academic_year', 'marks_completion_percentage')
         )
         return queryset
 
@@ -784,7 +844,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
     """
     serializer_class = SectionWiseExamResultStatusSerializer
     http_method_names = ['get']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     pagination_class = CustomPagination
 
     search_fields = [
@@ -793,6 +853,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         'section__class_name__name',     
         'section__orientation__name',     
         'status__name',
+        'is_progress_card_downloaded',
     ]
 
     filterset_fields = [
@@ -803,6 +864,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         'status',
         'is_visible',
         'is_active',
+        'is_progress_card_downloaded',
     ]
 
     ordering_fields = [
@@ -814,6 +876,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         'marks_entry_expiry_datetime',
         'marks_completion_percentage',
         'updated_at',
+        'is_progress_card_downloaded',
     ]
 
 
@@ -847,7 +910,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
                 'exam',
                 'status',
             )
-            .order_by('-updated_at')  # show most recent first
+            .order_by('section__class_name__class_sequence', 'section__name')  # show most recent first
         )
 
         return queryset
@@ -935,6 +998,7 @@ def update_section_wise_exam_result_status_view(request):
                 is_visible=branch_status.is_visible,
                 is_progress_card_downloaded=branch_status.is_progress_card_downloaded,
                 is_active=True,
+                status = ExamResultStatus.objects.get(id=1),
             )
             for section in missing_sections
         ]
@@ -1732,3 +1796,754 @@ def update_exam_instance(request, pk):
         serializer.save(updated_by=request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def marks_entry_expired_datetime_status(request):
+    section_status_id = request.query_params.get('section_wise_exam_result_status_id')
+    if not section_status_id:
+        return Response({'section_wise_exam_result_status_id': "This field is required in the URL."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        section_status = SectionWiseExamResultStatus.objects.select_related('exam', 'section').get(
+            id=section_status_id, is_active=True
+        )
+    except SectionWiseExamResultStatus.DoesNotExist:
+        return Response({'section_wise_exam_result_status_id': "Invalid id"},
+                        status=status.HTTP_400_BAD_REQUEST)
+    
+    expiry_datetime = section_status.marks_entry_expiry_datetime
+
+    # Convert to human-readable format
+    human_readable = expiry_datetime.strftime('%Y-%m-%d %H:%M:%S') if expiry_datetime else None
+
+    return Response({
+        'marks_entry_expiry_datetime': expiry_datetime,
+        'marks_entry_expiry_datetime_human': human_readable
+    })
+
+class ExamStatusDropDownViewset(ModelViewSet):
+    queryset = ExamStatus.objects.filter(is_active=True).order_by('id')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ExamStatusDropDropDownSerializer
+    http_method_names = ['get']
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def finalize_section_results(request):
+    section_status_id = request.query_params.get('section_wise_exam_result_status_id')
+    if not section_status_id:
+        return Response(
+            {'section_wise_exam_result_status_id': "This field is required in the URL."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        section_status = SectionWiseExamResultStatus.objects.get(
+            id=section_status_id, is_active=True
+        )
+    except SectionWiseExamResultStatus.DoesNotExist:
+        return Response(
+            {'section_wise_exam_result_status_id': "Invalid id"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if section_status.marks_completion_percentage != 100:
+        return Response({
+            'Section Status': f'Marks Entry Not Completed ({section_status.marks_completion_percentage}%)'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        finalized_status = ExamResultStatus.objects.get(id=4)
+    except ExamResultStatus.DoesNotExist:
+        return Response(
+            {'status': "ExamResultStatus with id=3 not found."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Finalize section result
+    section_status.finalized_by = request.user
+    section_status.finalized_at = timezone.now()
+    section_status.status = finalized_status
+    section_status.save(update_fields=['finalized_by', 'finalized_at', 'status'])
+
+    return Response({
+        'message': f'Section "{section_status.section.name}" results finalized successfully.'
+    }, status=status.HTTP_200_OK)
+
+class ExportBranchWiseExamResultStatusCSVViewSet(APIView):
+    authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+
+    search_fields = [
+        'academic_year__name',
+        'branch__name',
+        'exam__name',
+        'status__name',
+        'exam__exam_type__name',
+        'is_progress_card_downloaded',
+    ]
+
+    filterset_fields = [
+        'academic_year',
+        'branch',
+        'exam',
+        'status',
+        'is_visible',
+        'is_active',
+        'exam__exam_type',
+        'is_progress_card_downloaded',
+    ]
+
+    ordering_fields = [
+        'academic_year__name',
+        'branch__name',
+        'exam__name',
+        'status__name',
+        'marks_entry_expiry_datetime',
+        'marks_completion_percentage',
+        'updated_at',
+        'exam__exam_type__name',
+        'is_progress_card_downloaded',
+    ]
+    ordering = ['-academic_year', 'marks_completion_percentage']
+
+    filename = "Branch Wise Exam Results Marks Entry Status.csv"
+    chunk_size = 1000
+
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+
+        # ✅ Efficient branching logic
+        if user.groups.filter(id=1).exists():  # Super admin or system user
+            branches = Branch.objects.filter(is_active=True)
+        else:
+            branches = (
+                UserProfile.objects.filter(user=user)
+                .values_list('branches', flat=True)
+                .distinct()
+            )
+
+        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+        if not current_academic_year:
+            raise NotFound("Current academic year not found.")
+
+        # ✅ Avoid returning inactive or invalid records
+        queryset = (
+            BranchWiseExamResultStatus.objects.filter(
+                is_active=True,
+                branch__in=branches,
+                academic_year=current_academic_year,
+            )
+            .select_related('academic_year', 'branch', 'exam', 'status')  # optimization
+            .order_by('-updated_at')
+        )
+
+        for backend in self.filter_backends:
+            queryset = backend().filter_queryset(request, queryset, self)
+
+        response = StreamingHttpResponse(
+            self.generate_csv(queryset), content_type="text/csv"
+        )
+        response["Content-Disposition"] = f'attachment; filename="{self.filename}"'
+        return response
+    
+    def generate_csv(self, queryset):
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+
+        header = [ 'Sl.No.',
+            "Academic Year", "Branch", "Exam Type", "Exam", "Status", "Marks Completion Percentage", 
+            "Total Sections", "Pending Sections", "Completed Sections", "Marks Entry Expiry Date ",
+        ]
+
+        writer.writerow(header)
+        buffer.seek(0)
+        yield buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate(0)
+
+        sl_no = 1
+        total = queryset.count()
+        chunk_size = self.chunk_size
+
+        # for obj in queryset.iterator(chunk_size=self.chunk_size):
+        for start in range(0, total, chunk_size):
+            chunk = queryset[start:start + chunk_size]
+            for obj in chunk:
+                academic_year = getattr(obj.academic_year, 'name', 'N/A') if obj.academic_year else 'N/A'
+                branch = getattr(obj.branch, 'name' ,'N/A') if obj.branch else "N/A"
+                exam_type = getattr(obj.exam.exam_type, 'name', 'N/A') if obj.exam.exam_type else 'N/A'
+                exam = getattr(obj.exam, 'name', 'N/A') if obj.exam else 'N/A'
+                status = getattr(obj.status, 'name')if obj.status else 'N/A'
+                marks_entry_expiry_datetime = timezone.localtime(obj.marks_entry_expiry_datetime).strftime("%Y-%m-%d %H:%M:%S") if obj.marks_entry_expiry_datetime else ""
+
+                row = [
+                    sl_no,
+                    academic_year,
+                    branch,
+                    exam_type,
+                    exam,
+                    status,
+                    obj.marks_completion_percentage,
+                    obj.total_sections,
+                    obj.number_of_sections_pending,
+                    obj.number_of_sections_completed,
+                    marks_entry_expiry_datetime,
+                ]
+
+                writer.writerow(row)
+                buffer.seek(0)
+                yield buffer.getvalue()
+                buffer.seek(0)
+                buffer.truncate(0)
+                sl_no += 1
+
+
+
+# ========================================= Working upto removing rows and columns ====================================
+
+import io
+import csv
+from django.http import StreamingHttpResponse
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+
+class ExportSectionExamResultsCSVViewSet(APIView):
+    authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+
+    filename_template = "{class_name}class _{section} Section_Exam_Results.csv"
+    chunk_size = 500
+
+    def get(self, request, *args, **kwargs):
+        section_status_id = request.query_params.get('section_wise_exam_result_status_id')
+        if not section_status_id:
+            return Response(
+                {'section_wise_exam_result_status_id': "This field is required in the URL."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # === Fetch section & exam info ===
+        section_status = (
+            SectionWiseExamResultStatus.objects
+            .select_related('exam', 'section__class_name')
+            .filter(id=section_status_id, is_active=True)
+            .first()
+        )
+        if not section_status:
+            return Response({'section_wise_exam_result_status_id': "Invalid ID"}, status=400)
+
+        exam = section_status.exam
+        section = section_status.section
+
+        # === Prefetch once ===
+        exam_instances = list(
+            ExamInstance.objects.filter(exam=exam, is_active=True)
+            .prefetch_related('subject_skills')
+        )
+
+        skill_instances_qs = ExamSubjectSkillInstance.objects.filter(
+            exam_instance__in=exam_instances, is_active=True
+        ).select_related('subject_skill', 'exam_instance')
+        skill_instance_map = {(si.exam_instance_id, si.subject_skill_id): si for si in skill_instances_qs}
+
+        students = list(
+            Student.objects.filter(
+                section=section,
+                is_active=True,
+                academic_year=exam.academic_year,
+            ).exclude(admission_status__admission_status_id=3)
+        )
+
+        student_ids = [s.student_id for s in students]
+        exam_results = list(
+            ExamResult.objects.filter(
+                student_id__in=student_ids,
+                exam_instance__in=exam_instances,
+                is_active=True,
+            ).select_related('exam_attendance', 'co_scholastic_grade')
+        )
+        exam_result_map = {(er.student_id, er.exam_instance_id): er for er in exam_results}
+
+        exam_result_ids = [er.exam_result_id for er in exam_results]
+        skill_results = list(
+            ExamSkillResult.objects.filter(exam_result_id__in=exam_result_ids)
+            .select_related('skill', 'exam_attendance', 'co_scholastic_grade')
+        )
+        skill_result_map = {(sr.exam_result_id, sr.skill_id): sr for sr in skill_results}
+
+        # === Stream response ===
+        filename = self.filename_template.format(
+            class_name=section.class_name.name.replace(" ", "_"),
+            section=section.name.replace(" ", "_"),
+        )
+
+        response = StreamingHttpResponse(
+            self.generate_csv(students, exam_instances, skill_instance_map, exam_result_map, skill_result_map),
+            content_type="text/csv"
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+    def generate_csv(self, students, exam_instances, skill_instance_map, exam_result_map, skill_result_map):
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+
+        # === Dynamic header ===
+        headers = ["Sl.No.", "Student Name", "SCS Number", "Marks Type"]
+        external_row = internal_row = grade_row = False
+
+        for instance in exam_instances:
+            # Subject-level columns
+            if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
+                headers.append(instance.subject.name)
+                if instance.has_external_marks:
+                    external_row = True
+                if instance.has_internal_marks:
+                    internal_row = True
+                if instance.has_subject_co_scholastic_grade:
+                    grade_row = True
+
+            # Skill-level columns
+            for skill in instance.subject_skills.all():
+                si = skill_instance_map.get((instance.exam_instance_id, skill.id))
+                if si and (si.has_external_marks or si.has_internal_marks or si.has_subject_co_scholastic_grade):
+                    headers.append(f"{instance.subject.name} - {skill.name}")
+                    if si.has_external_marks:
+                        external_row = True
+                    if si.has_internal_marks:
+                        internal_row = True
+                    if si.has_subject_co_scholastic_grade:
+                        grade_row = True
+
+        writer.writerow(headers)
+        yield from self._flush_buffer(buffer)
+
+        # === Student rows ===
+        for sl_no, student in enumerate(students, start=1):
+            marks = {
+                'external_marks': [''] * (len(headers) - 4),
+                'internal_marks': [''] * (len(headers) - 4),
+                'grade': [''] * (len(headers) - 4),
+            }
+
+            col_index = 0
+            for instance in exam_instances:
+                exam_result = exam_result_map.get((student.student_id, instance.exam_instance_id))
+                if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
+                    if exam_result:
+                        att = exam_result.exam_attendance
+                        if instance.has_external_marks:
+                            marks['external_marks'][col_index] = (
+                                exam_result.external_marks if att and att.exam_attendance_status_id == 1
+                                else (att.short_code if att else '')
+                            )
+                        if instance.has_internal_marks:
+                            marks['internal_marks'][col_index] = exam_result.internal_marks or ''
+                        if instance.has_subject_co_scholastic_grade and exam_result.co_scholastic_grade:
+                            marks['grade'][col_index] = exam_result.co_scholastic_grade.name
+                    col_index += 1
+
+                for skill in instance.subject_skills.all():
+                    si = skill_instance_map.get((instance.exam_instance_id, skill.id))
+                    if not si or not exam_result:
+                        col_index += 1
+                        continue
+
+                    sr = skill_result_map.get((exam_result.exam_result_id, skill.id))
+                    if sr:
+                        att = sr.exam_attendance
+                        if si.has_external_marks:
+                            marks['external_marks'][col_index] = (
+                                sr.external_marks if att and att.exam_attendance_status_id == 1
+                                else (att.short_code if att else '')
+                            )
+                        if si.has_internal_marks:
+                            marks['internal_marks'][col_index] = sr.internal_marks or ''
+                        if si.has_subject_co_scholastic_grade and sr.co_scholastic_grade:
+                            marks['grade'][col_index] = sr.co_scholastic_grade.name
+                    col_index += 1
+
+            # === Write student data rows ===
+            if external_row:
+                writer.writerow([sl_no, student.name, student.SCS_Number, "External Marks"] + marks['external_marks'])
+                yield from self._flush_buffer(buffer)
+            if internal_row:
+                writer.writerow([sl_no, student.name, student.SCS_Number, "Internal Marks"] + marks['internal_marks'])
+                yield from self._flush_buffer(buffer)
+            if grade_row:
+                writer.writerow([sl_no, student.name, student.SCS_Number, "Grade"] + marks['grade'])
+                yield from self._flush_buffer(buffer)
+
+    def _flush_buffer(self, buffer):
+        buffer.seek(0)
+        data = buffer.read()
+        yield data
+        buffer.seek(0)
+        buffer.truncate(0)
+
+# class ExportSectionExamResultsCSVViewSet(APIView):
+#     authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
+#     permission_classes = [IsAuthenticated]
+#     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+
+#     filename = "Section_Exam_Results.csv"
+#     chunk_size = 500
+
+#     def get(self, request, *args, **kwargs):
+#         section_status_id = request.query_params.get('section_wise_exam_result_status_id')
+#         if not section_status_id:
+#             return Response(
+#                 {'section_wise_exam_result_status_id': "This field is required in the URL."},
+#                 status=status.HTTP_400_BAD_REQUEST
+#             )
+
+#         try:
+#             section_status = SectionWiseExamResultStatus.objects.select_related('exam', 'section').get(
+#                 id=section_status_id, is_active=True
+#             )
+#         except SectionWiseExamResultStatus.DoesNotExist:
+#             return Response({'section_wise_exam_result_status_id': "Invalid id"},
+#                             status=status.HTTP_400_BAD_REQUEST)
+
+#         exam = section_status.exam
+#         exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+#         students = Student.objects.filter(
+#             section=section_status.section,
+#             is_active=True,
+#             academic_year=exam.academic_year,
+#         ).exclude(admission_status__admission_status_id=3)
+
+#         response = StreamingHttpResponse(
+#             self.generate_csv(students, exam_instances),
+#             content_type="text/csv"
+#         )
+#         response["Content-Disposition"] = f'attachment; filename="{self.filename}".csv'
+#         return response
+
+#     def generate_csv(self, students, exam_instances):
+#         buffer = io.StringIO()
+#         writer = csv.writer(buffer)
+
+#         # ===== Dynamic Header =====
+#         dynamic_headers = []
+#         external_row = internal_row = grade_row = False
+
+#         for instance in exam_instances:
+#             if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
+#                 dynamic_headers.append(instance.subject.name)
+#                 if instance.has_external_marks:
+#                     external_row = True
+#                 if instance.has_internal_marks:
+#                     internal_row = True
+#                 if instance.has_subject_co_scholastic_grade:
+#                     grade_row = True
+
+#             if instance.has_subject_skills:
+#                 for skill in instance.subject_skills.all():
+#                     skill_instance = ExamSubjectSkillInstance.objects.filter(
+#                         exam_instance=instance, subject_skill=skill, is_active=True
+#                     ).first()
+#                     if (skill_instance and (
+#                         skill_instance.has_external_marks or
+#                         skill_instance.has_internal_marks or
+#                         skill_instance.has_subject_co_scholastic_grade
+#                     )):
+#                         dynamic_headers.append(f'{instance.subject.name} - {skill.name}')
+#                         if skill_instance.has_external_marks:
+#                             external_row = True
+#                         if skill_instance.has_internal_marks:
+#                             internal_row = True
+#                         if skill_instance.has_subject_co_scholastic_grade:
+#                             grade_row = True
+
+#         header = ['Sl.No.', 'Student Name', 'SCS Number', 'Marks Type'] + dynamic_headers
+#         writer.writerow(header)
+#         yield from self._flush_buffer(buffer, writer)
+
+#         # ===== Write Data =====
+#         for sl_no, student in enumerate(students, start=1):
+#             # Prebuild empty lists to maintain column structure
+#             marks = {
+#                 'external_marks': [''] * len(dynamic_headers),
+#                 'internal_marks': [''] * len(dynamic_headers),
+#                 'grade': [''] * len(dynamic_headers),
+#             }
+
+#             column_index = 0
+#             for instance in exam_instances:
+#                 exam_result = ExamResult.objects.filter(
+#                     student=student, exam_instance=instance, is_active=True
+#                 ).select_related('co_scholastic_grade', 'exam_attendance').first()
+
+#                 if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
+#                     if exam_result:
+#                         attendance = exam_result.exam_attendance
+#                         # External
+#                         if instance.has_external_marks:
+#                             marks['external_marks'][column_index] = (
+#                                 exam_result.external_marks if attendance.exam_attendance_status_id == 1
+#                                 else attendance.short_code
+#                             )
+#                         # Internal
+#                         if instance.has_internal_marks:
+#                             marks['internal_marks'][column_index] = exam_result.internal_marks or ''
+#                         # Grade
+#                         if instance.has_subject_co_scholastic_grade and exam_result.co_scholastic_grade:
+#                             marks['grade'][column_index] = exam_result.co_scholastic_grade.name
+#                     column_index += 1
+
+#                 # Skill-level marks
+#                 if instance.has_subject_skills:
+#                     for skill in instance.subject_skills.all():
+#                         skill_instance = ExamSubjectSkillInstance.objects.filter(
+#                             exam_instance=instance, subject_skill=skill, is_active=True
+#                         ).first()
+#                         if not skill_instance:
+#                             continue
+
+#                         skill_result = ExamSkillResult.objects.filter(
+#                             exam_result=exam_result, skill=skill
+#                         ).select_related('co_scholastic_grade', 'exam_attendance').first()
+
+#                         if skill_result:
+#                             attendance = skill_result.exam_attendance
+#                             # External
+#                             if skill_instance.has_external_marks:
+#                                 marks['external_marks'][column_index] = (
+#                                     skill_result.external_marks if attendance.exam_attendance_status_id == 1
+#                                     else attendance.short_code
+#                                 )
+#                             # Internal
+#                             if skill_instance.has_internal_marks:
+#                                 marks['internal_marks'][column_index] = skill_result.internal_marks or ''
+#                             # Grade
+#                             if skill_instance.has_subject_co_scholastic_grade and skill_result.co_scholastic_grade:
+#                                 marks['grade'][column_index] = skill_result.co_scholastic_grade.name
+#                         column_index += 1
+
+#             # ===== Write rows based on flags =====
+#             if external_row:
+#                 writer.writerow([
+#                     sl_no, student.name, student.SCS_Number, "External Marks"
+#                 ] + marks['external_marks'])
+#                 yield from self._flush_buffer(buffer, writer)
+
+#             if internal_row:
+#                 writer.writerow([
+#                     sl_no, student.name, student.SCS_Number, "Internal Marks"
+#                 ] + marks['internal_marks'])
+#                 yield from self._flush_buffer(buffer, writer)
+
+#             if grade_row:
+#                 writer.writerow([
+#                     sl_no, student.name, student.SCS_Number, "Grade"
+#                 ] + marks['grade'])
+#                 yield from self._flush_buffer(buffer, writer)
+
+#     def _flush_buffer(self, buffer, writer):
+#         buffer.seek(0)
+#         data = buffer.getvalue()
+#         yield data
+#         buffer.seek(0)
+#         buffer.truncate(0)
+
+
+#============================== Branch Exam Results Download ====================================
+import io
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font
+from django.http import StreamingHttpResponse
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+
+class BranchSectionsExamResultsXLSXView(APIView):
+    authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    filename_template = "{branch}_{exam}_Exam_Results.xlsx"
+
+    def get(self, request, *args, **kwargs):
+        branch_wise_exam_result_status_id = request.query_params.get('branch_wise_exam_result_status_id')
+        if not branch_wise_exam_result_status_id:
+            return Response({'branch_wise_exam_result_status_id': "This field is required in the URL."}, status=400)
+
+        branch_status = BranchWiseExamResultStatus.objects.select_related('branch', 'exam', 'academic_year').filter(
+            id=branch_wise_exam_result_status_id,
+            is_active=True
+        ).first()
+        if not branch_status:
+            return Response({'branch_wise_exam_result_status_id': "Invalid Branch Wise Exam Result Status ID."}, status=400)
+
+        exam = branch_status.exam
+
+        # Fetch all sections belonging to this branch and exam
+        sections = Section.objects.filter(
+            academic_year=branch_status.academic_year,
+            branch=branch_status.branch,
+            class_name__class_name_id__in=exam.student_classes.values_list('class_name_id', flat=True),
+            orientation__orientation_id__in=exam.orientations.values_list('orientation_id', flat=True),
+            is_active=True,
+            has_students=True
+        ).distinct().order_by('class_name__class_sequence', 'name')
+
+        if not sections.exists():
+            return Response({
+                "message": ["No sections found matching the given branch, exam classes, and orientations."]
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        exam_instances = list(ExamInstance.objects.filter(exam=exam, is_active=True).prefetch_related('subject_skills'))
+
+        # Map skill and result data for quick lookup
+        skill_instances_qs = ExamSubjectSkillInstance.objects.filter(
+            exam_instance__in=exam_instances, is_active=True
+        ).select_related('subject_skill', 'exam_instance')
+        skill_instance_map = {(si.exam_instance_id, si.subject_skill_id): si for si in skill_instances_qs}
+
+        student_ids = Student.objects.filter(section__in=sections, is_active=True).values_list('student_id', flat=True)
+        exam_results_qs = ExamResult.objects.filter(
+            student_id__in=student_ids, exam_instance__in=exam_instances, is_active=True
+        ).select_related('exam_attendance', 'co_scholastic_grade')
+        exam_result_map = {(er.student_id, er.exam_instance_id): er for er in exam_results_qs}
+
+        exam_result_ids = [er.exam_result_id for er in exam_results_qs]
+        skill_results_qs = ExamSkillResult.objects.filter(
+            exam_result_id__in=exam_result_ids
+        ).select_related('exam_attendance', 'co_scholastic_grade', 'skill')
+        skill_result_map = {(sr.exam_result_id, sr.skill_id): sr for sr in skill_results_qs}
+
+        # ===== Workbook Setup =====
+        wb = Workbook()
+        wb.remove(wb.active)
+        header_font = Font(bold=True)
+        center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+        for section in sections:
+            ws_title = f"{section.class_name.name}_{section.name}"[:31]
+            ws = wb.create_sheet(title=ws_title)
+
+            # ===== Dynamic Header =====
+            headers = ["SCS Number", "Student Name", "Marks Type"]
+            external_row = internal_row = grade_row = False
+
+            for instance in exam_instances:
+                if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
+                    headers.append(instance.subject.name)
+                    if instance.has_external_marks:
+                        external_row = True
+                    if instance.has_internal_marks:
+                        internal_row = True
+                    if instance.has_subject_co_scholastic_grade:
+                        grade_row = True
+
+                for skill in instance.subject_skills.all():
+                    si = skill_instance_map.get((instance.exam_instance_id, skill.id))
+                    if si and (
+                        si.has_external_marks or si.has_internal_marks or si.has_subject_co_scholastic_grade
+                    ):
+                        headers.append(f"{instance.subject.name} - {skill.name}")
+                        if si.has_external_marks:
+                            external_row = True
+                        if si.has_internal_marks:
+                            internal_row = True
+                        if si.has_subject_co_scholastic_grade:
+                            grade_row = True
+
+            ws.append(headers)
+            for col_idx in range(1, len(headers) + 1):
+                cell = ws.cell(row=1, column=col_idx)
+                cell.font = header_font
+                cell.alignment = center
+
+            # ===== Students and Results =====
+            students = Student.objects.filter(
+                section=section, is_active=True
+            ).exclude(admission_status__admission_status_id=3)
+
+            sl_no = 1
+            for student in students:
+                # Precompute mark values
+                marks = {
+                    'external_marks': [''] * (len(headers) - 3),
+                    'internal_marks': [''] * (len(headers) - 3),
+                    'grade': [''] * (len(headers) - 3),
+                }
+                col_index = 0
+
+                for instance in exam_instances:
+                    exam_result = exam_result_map.get((student.student_id, instance.exam_instance_id))
+                    if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
+                        if exam_result:
+                            attendance = exam_result.exam_attendance
+                            # External
+                            if instance.has_external_marks:
+                                marks['external_marks'][col_index] = (
+                                    exam_result.external_marks if attendance and attendance.exam_attendance_status_id == 1
+                                    else (attendance.short_code if attendance else '')
+                                )
+                            # Internal
+                            if instance.has_internal_marks:
+                                marks['internal_marks'][col_index] = exam_result.internal_marks or ''
+                            # Grade
+                            if instance.has_subject_co_scholastic_grade and exam_result.co_scholastic_grade:
+                                marks['grade'][col_index] = exam_result.co_scholastic_grade.name
+                        col_index += 1
+
+                    # Skills
+                    for skill in instance.subject_skills.all():
+                        si = skill_instance_map.get((instance.exam_instance_id, skill.id))
+                        if not si:
+                            continue
+                        skill_result = exam_result and skill_result_map.get((exam_result.exam_result_id, skill.id))
+                        if skill_result:
+                            attendance = skill_result.exam_attendance
+                            # External
+                            if si.has_external_marks:
+                                marks['external_marks'][col_index] = (
+                                    skill_result.external_marks if attendance and attendance.exam_attendance_status_id == 1
+                                    else (attendance.short_code if attendance else '')
+                                )
+                            # Internal
+                            if si.has_internal_marks:
+                                marks['internal_marks'][col_index] = skill_result.internal_marks or ''
+                            # Grade
+                            if si.has_subject_co_scholastic_grade and skill_result.co_scholastic_grade:
+                                marks['grade'][col_index] = skill_result.co_scholastic_grade.name
+                        col_index += 1
+
+                # ===== Only add rows that are actually needed =====
+                if external_row:
+                    ws.append([student.SCS_Number, student.name, "External Marks"] + marks['external_marks'])
+                if internal_row:
+                    ws.append([student.SCS_Number, student.name, "Internal Marks"] + marks['internal_marks'])
+                if grade_row:
+                    ws.append([student.SCS_Number, student.name, "Grade"] + marks['grade'])
+                sl_no += 1
+
+        # ===== Stream XLSX =====
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        filename = self.filename_template.format(
+            branch=branch_status.branch.name.replace(" ", "_")[:20],
+            exam=exam.name.replace(" ", "_")[:20],
+        )
+
+        response = StreamingHttpResponse(
+            output,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response

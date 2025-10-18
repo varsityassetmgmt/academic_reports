@@ -10,6 +10,7 @@ router.register(r'exam_dropdown', ExamDropdownViewSet, basename='exam_dropdown')
 router.register(r'examinstance_dropdown', ExamInstanceDropdownViewSet, basename='examinstance_dropdown')
 router.register(r'examattendancestatus_dropdown', ExamAttendanceStatusDropdownViewSet, basename='examattendancestatus_dropdown')
 router.register(r'co_scholastic_grade_dropdown', CoScholasticGradeDropdownViewSet, basename='co_scholastic_grade_dropdown')
+router.register(r'exam_result_status_dropdown', ExamResultStatusDropdownViewSet, basename='exam_result_status_dropdown')
 
 router.register(r'subject', SubjectViewSet, basename='subject')
 router.register(r'subjectskill', SubjectSkillViewSet, basename='subjectskill')
@@ -25,6 +26,7 @@ router.register(r'subjectskill_dropdown_for_exam_instance', SubjectSkillDropdown
 
 router.register(r'edit_exam_results', EditExamResultsViewSet, basename='edit_exam_results')
 router.register(r'edit_exam_skill_result', EditExamSkillResultViewSet, basename='edit_exam_skill_result')
+router.register(r'exam_status_dropdown', ExamStatusDropDownViewset, basename='exam_status_dropdown')
 
 urlpatterns = [
 
@@ -54,6 +56,12 @@ urlpatterns = [
 
         path('create_exam_instance/<int:exam_id>/', create_exam_instance, name='create_exam_instance'),
         path('update_exam_instance/<int:pk>/', update_exam_instance, name='update_exam_instance'),
- 
+
+        path('marks_entry_expired_datetime_status/', marks_entry_expired_datetime_status, name='marks_entry_expired_datetime_status'),
+        path('finalize_section_results/', finalize_section_results, name='finalize_section_results'),
+
+        path('export_branch_wise_exam_result_status/', ExportBranchWiseExamResultStatusCSVViewSet.as_view(), name='export_branch_wise_exam_result_status'),
+        path('export_section_exam_results/', ExportSectionExamResultsCSVViewSet.as_view(), name='export_section_exam_results'),
+        path('export_branch_section_exam_results/', BranchSectionsExamResultsXLSXView.as_view(), name='branch_section_exam_results'),
 
 ]+ router.urls
