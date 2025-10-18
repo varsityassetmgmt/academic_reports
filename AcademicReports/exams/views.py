@@ -2282,6 +2282,7 @@ class ExportSectionExamResultsViewSet(APIView):
                     sl_no,
                     student.name,
                     student.SCS_Number,
+                    mark_type.replace('_', ' ').title(),
                     ]
                 else:
                     row = [
