@@ -2389,8 +2389,8 @@ class BranchSectionsExamResultsXLSXView(APIView):
             # Build header
             headers = ["SCS Number", "Student Name", "Marks Type"]
             for instance in exam_instances:
+                headers.append(instance.subject.name)
                 for skill in instance.subject_skills.all():
-                    headers.append(instance.subject.name)
                     si = skill_instance_map.get((instance.exam_instance_id, skill.id))
                     if si:
                         headers.append(f"{instance.subject.name} - {skill.name}")
