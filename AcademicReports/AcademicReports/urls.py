@@ -13,6 +13,7 @@ urlpatterns = [
     path('students/', include('students.urls')),
     path('exams/', include('exams.urls')),
     path('api/', include('apibridge.urls')),
+    path('progresscard/',include('progresscard.urls')),
     
 ]
 
