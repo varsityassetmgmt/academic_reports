@@ -21,10 +21,12 @@ django-timezone-field==7.1
 django_celery_results==2.6.0
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
+et_xmlfile==2.0.0
 fonttools==4.60.1
 idna==3.10
 kombu==5.5.4
 Markdown==3.9
+openpyxl==3.1.5
 packaging==25.0
 pillow==11.3.0
 prompt_toolkit==3.0.52
