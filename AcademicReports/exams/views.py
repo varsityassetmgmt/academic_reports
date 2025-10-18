@@ -2195,9 +2195,18 @@ class ExportSectionExamResultsViewSet(APIView):
 
         # ===== Dynamic Header =====
         dynamic_headers = []
+        external_row = internal_row = grade_row = False
+
         for instance in exam_instances:
             if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
                 dynamic_headers.append(instance.subject.name)
+                if instance.has_external_marks:
+                    external_row = True
+                if instance.has_internal_marks:
+                    internal_row = True
+                if instance.has_subject_co_scholastic_grade:
+                    grade_row = True
+
             if instance.has_subject_skills:
                 for skill in instance.subject_skills.all():
                     skill_instance = ExamSubjectSkillInstance.objects.filter(
@@ -2209,6 +2218,12 @@ class ExportSectionExamResultsViewSet(APIView):
                         skill_instance.has_subject_co_scholastic_grade
                     )):
                         dynamic_headers.append(skill.name)
+                        if skill_instance.has_external_marks:
+                            external_row = True
+                        if skill_instance.has_internal_marks:
+                            internal_row = True
+                        if skill_instance.has_subject_co_scholastic_grade:
+                            grade_row = True
 
         header = ['Sl.No.', 'Student Name', 'SCS Number', 'Marks Type'] + dynamic_headers
         writer.writerow(header)
@@ -2286,15 +2301,15 @@ class ExportSectionExamResultsViewSet(APIView):
 
             # ✅ Write only non-empty rows
             for mark_type, mark_values in marks.items():
-                if any(value not in ('', None) for value in mark_values):  # skip fully empty row
-                    row = [
-                        sl_no,
-                        student.name,
-                        student.SCS_Number,
-                        mark_type.replace('_', ' ').title(),
-                    ] + mark_values
-                    writer.writerow(row)
-                    yield from self._flush_buffer(buffer, writer)
+                # if any(value not in ('', None) for value in mark_values):  # skip fully empty row
+                row = [
+                    sl_no,
+                    student.name,
+                    student.SCS_Number,
+                    mark_type.replace('_', ' ').title(),
+                ] + mark_values
+                writer.writerow(row)
+                yield from self._flush_buffer(buffer, writer)
 
     def _flush_buffer(self, buffer, writer):
         buffer.seek(0)
