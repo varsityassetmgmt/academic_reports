@@ -2001,7 +2001,7 @@ class ExportSectionExamResultsCSVViewSet(APIView):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
-    filename_template = "{class_name}_{section}_Exam_Results.csv"
+    filename_template = "{class_name}class _{section} Section_Exam_Results.csv"
     chunk_size = 500
 
     def get(self, request, *args, **kwargs):
@@ -2170,7 +2170,6 @@ class ExportSectionExamResultsCSVViewSet(APIView):
         yield data
         buffer.seek(0)
         buffer.truncate(0)
-
 
 # class ExportSectionExamResultsCSVViewSet(APIView):
 #     authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
