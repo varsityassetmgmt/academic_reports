@@ -890,7 +890,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
                 'exam',
                 'status',
             )
-            .order_by('-section__class_name__class_sequence', 'section__name')  # show most recent first
+            .order_by('section__class_name__class_sequence', 'section__name')  # show most recent first
         )
 
         return queryset
@@ -2356,7 +2356,7 @@ class BranchSectionsExamResultsXLSXView(APIView):
             orientation__orientation_id__in=exam.orientations.values_list('orientation_id', flat=True),
             is_active=True,
             has_students=True
-        ).distinct()
+        ).distinct().order_by('class_name__class_sequence', 'name')
 
         exam_instances = list(ExamInstance.objects.filter(exam=exam, is_active=True).prefetch_related('subject_skills'))
 
