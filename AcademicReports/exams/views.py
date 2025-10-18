@@ -1982,12 +1982,16 @@ class ExportBranchWiseExamResultStatusCSVViewSet(APIView):
                 buffer.truncate(0)
                 sl_no += 1
 
+
+
+# ========================================= Working upto removing rows and columns ====================================
+
 class ExportSectionExamResultsCSVViewSet(APIView):
     authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
-    # filename = "Section_Exam_Results.csv"
+    filename = "Section_Exam_Results.csv"
     chunk_size = 500
 
     def get(self, request, *args, **kwargs):
@@ -2014,13 +2018,11 @@ class ExportSectionExamResultsCSVViewSet(APIView):
             academic_year=exam.academic_year,
         ).exclude(admission_status__admission_status_id=3)
 
-        filename = f'{exam.name} - {section_status.section.class_name.name} Class - {section_status.section} Section Results'
-
         response = StreamingHttpResponse(
             self.generate_csv(students, exam_instances),
             content_type="text/csv"
         )
-        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["Content-Disposition"] = f'attachment; filename="{self.filename}".csv'
         return response
 
     def generate_csv(self, students, exam_instances):
@@ -2149,9 +2151,6 @@ class ExportSectionExamResultsCSVViewSet(APIView):
         yield data
         buffer.seek(0)
         buffer.truncate(0)
-
-
-# ========================================= Working upto removing rows and columns ====================================
 
 # class ExportSectionExamResultsCSVViewSet(APIView):
 #     authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
