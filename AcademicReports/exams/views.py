@@ -853,7 +853,6 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         'section__class_name__name',     
         'section__orientation__name',     
         'status__name',
-        'is_progress_card_downloaded',
     ]
 
     filterset_fields = [
@@ -865,6 +864,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         'is_visible',
         'is_active',
         'is_progress_card_downloaded',
+        'marks_entry_expiry_datetime'
     ]
 
     ordering_fields = [
