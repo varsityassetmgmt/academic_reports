@@ -853,7 +853,6 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         'section__class_name__name',     
         'section__orientation__name',     
         'status__name',
-        'is_progress_card_downloaded',
     ]
 
     filterset_fields = [
@@ -865,6 +864,7 @@ class SectionWiseExamResultStatusViewSet(ModelViewSet):
         'is_visible',
         'is_active',
         'is_progress_card_downloaded',
+        'marks_entry_expiry_datetime'
     ]
 
     ordering_fields = [
@@ -1821,6 +1821,28 @@ def marks_entry_expired_datetime_status(request):
     return Response({
         'marks_entry_expiry_datetime': expiry_datetime,
         'marks_entry_expiry_datetime_human': human_readable
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def marks_entry_percentage_for_marks_entry_page(request):
+    section_status_id = request.query_params.get('section_wise_exam_result_status_id')
+    if not section_status_id:
+        return Response({'section_wise_exam_result_status_id': "This field is required in the URL."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        section_status = SectionWiseExamResultStatus.objects.select_related('exam', 'section').get(
+            id=section_status_id, is_active=True
+        )
+    except SectionWiseExamResultStatus.DoesNotExist:
+        return Response({'section_wise_exam_result_status_id': "Invalid id"},
+                        status=status.HTTP_400_BAD_REQUEST)
+    
+    marks_completion_percentage=section_status.marks_completion_percentage
+
+    return Response({
+        'marks_completion_percentage':marks_completion_percentage
     })
 
 class ExamStatusDropDownViewset(ModelViewSet):

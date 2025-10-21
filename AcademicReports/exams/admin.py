@@ -151,9 +151,8 @@ class StudentExamSummaryAdmin(admin.ModelAdmin):
     )
 
     search_fields = (
-        "student__first_name",
-        "student__last_name",
-        "student__admission_number",
+        "student__name",
+        "student__SCS_Number",
         "exam__name",
     )
 

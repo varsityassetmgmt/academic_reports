@@ -58,6 +58,7 @@ urlpatterns = [
         path('update_exam_instance/<int:pk>/', update_exam_instance, name='update_exam_instance'),
 
         path('marks_entry_expired_datetime_status/', marks_entry_expired_datetime_status, name='marks_entry_expired_datetime_status'),
+        path('marks_entry_percentage_for_marks_entry_page/', marks_entry_percentage_for_marks_entry_page, name='marks_entry_percentage_for_marks_entry_page'),
         path('finalize_section_results/', finalize_section_results, name='finalize_section_results'),
 
         path('export_branch_wise_exam_result_status/', ExportBranchWiseExamResultStatusCSVViewSet.as_view(), name='export_branch_wise_exam_result_status'),
