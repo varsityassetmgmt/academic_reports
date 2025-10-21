@@ -122,12 +122,51 @@ class ExamSkillResultAdmin(admin.ModelAdmin):
 
 
 # ===================== Student Exam Summary =====================
+from django.contrib import admin
+from .models import StudentExamSummary
+
+
 @admin.register(StudentExamSummary)
 class StudentExamSummaryAdmin(admin.ModelAdmin):
-    list_display = ('students_exam_summary_id', 'student', 'exam', 'total_subjects_marks', 'percentage', 'overall_grade', 'is_active')
-    search_fields = ('student__name', 'exam__name')
-    list_filter = ('is_active',)
-    autocomplete_fields = ('student', 'exam')
+    list_display = (
+        "students_exam_summary_id",
+        "student",
+        "exam",
+        "subjects_percentage",
+        "subject_grade",
+        "skills_percentage",
+        "skills_grade",
+        "section_rank",
+        "class_rank",
+        "state_rank",
+        "all_india_rank",
+        "is_active",
+    )
+
+    list_filter = (
+        "exam",
+        "subject_grade",
+        "skills_grade",
+        "is_active",
+    )
+
+    search_fields = (
+        "student__first_name",
+        "student__last_name",
+        "student__admission_number",
+        "exam__name",
+    )
+
+    autocomplete_fields = (
+        "student",
+        "exam",
+        "subject_grade",
+        "skills_grade",
+    )
+
+    ordering = ("-students_exam_summary_id",)
+    list_per_page = 25
+
 
 # ==================== ExamResultStatus ====================
 @admin.register(ExamResultStatus)

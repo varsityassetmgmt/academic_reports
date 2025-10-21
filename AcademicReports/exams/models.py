@@ -351,6 +351,8 @@ class ExamResult(models.Model):
     # 🔥 New Field — Grade as FK
     grade = models.ForeignKey("GradeBoundary", on_delete=models.SET_NULL, null=True, blank=True,related_name="exam_results_grade")
 
+    skills_grade = models.ForeignKey("GradeBoundary", on_delete=models.SET_NULL, null=True, blank=True,related_name="exam_result_skills_grade")
+
     class Meta:
         constraints = [
         models.UniqueConstraint(
@@ -447,6 +449,8 @@ class ExamSkillResult(models.Model):
     internal_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True)  
     marks_obtained = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True) 
 
+    grade = models.ForeignKey("GradeBoundary", on_delete=models.SET_NULL, null=True, blank=True,related_name="exam_skill_results_grade")
+
     def __str__(self):
         return f"{self.exam_result.student} - {self.skill.name}: {self.value}"
     
@@ -483,11 +487,19 @@ class StudentExamSummary(models.Model):
     exam = models.ForeignKey(Exam, on_delete=models.PROTECT, related_name='exam_summary_exam')
     
 
-    total_subjects_marks = models.DecimalField(max_digits=7,decimal_places=2,blank=True,null=True) 
-    percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    total_subjects_maximum_marks = models.DecimalField(max_digits=7,decimal_places=2,blank=True,null=True) 
+    total_subjects_obtained_marks = models.DecimalField(max_digits=7,decimal_places=2,blank=True,null=True) 
+    subjects_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    subject_grade = models.ForeignKey("GradeBoundary", on_delete=models.SET_NULL, null=True, blank=True,related_name="student_exam_summary_subject_grade")
+
+
+    total_skills_maximum_marks = models.DecimalField(max_digits=7,decimal_places=2,blank=True,null=True) 
+    total_skills_obtained_marks = models.DecimalField(max_digits=7,decimal_places=2,blank=True,null=True) 
+    skills_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    skills_grade = models.ForeignKey("GradeBoundary", on_delete=models.SET_NULL, null=True, blank=True,related_name="student_exam_summary_skills_grade")
     
-    overall_grade = models.CharField(max_length=3, null=True, blank=True)  # Overall grade (A+, A, B, etc.)
-    overall_remarks = models.CharField(max_length=100, null=True, blank=True)  # Overall remarks (Very Good, Good, etc.)
+    # overall_grade = models.CharField(max_length=3, null=True, blank=True)  # Overall grade (A+, A, B, etc.)
+    # overall_remarks = models.CharField(max_length=100, null=True, blank=True)  # Overall remarks (Very Good, Good, etc.)
 
     # Ranking fields
     section_rank = models.IntegerField(null=True, blank=True)
@@ -509,8 +521,17 @@ class StudentExamSummary(models.Model):
         indexes = [
             models.Index(fields=['student']),
             models.Index(fields=['exam']),
-            models.Index(fields=['total_subjects_marks']),  # Add index for total_subject_marks
-            models.Index(fields=["percentage"]),
+
+            models.Index(fields=['total_subjects_maximum_marks']),   
+            models.Index(fields=["total_subjects_obtained_marks"]),
+            models.Index(fields=['subjects_percentage']),   
+            models.Index(fields=['subject_grade']),   
+
+            models.Index(fields=["total_skills_maximum_marks"]),
+            models.Index(fields=['total_skills_obtained_marks']),  
+            models.Index(fields=["skills_percentage"]),
+            models.Index(fields=['skills_grade']),         
+
             models.Index(fields=["class_rank"]),
             models.Index(fields=["section_rank"]),
             models.Index(fields=["zone_rank"]),
