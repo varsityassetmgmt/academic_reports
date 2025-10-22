@@ -486,7 +486,6 @@ class StudentExamSummary(models.Model):
     student = models.ForeignKey("students.Student", on_delete=models.PROTECT, related_name='exam_summary_student')
     exam = models.ForeignKey(Exam, on_delete=models.PROTECT, related_name='exam_summary_exam')
     
-
     total_subjects_maximum_marks = models.DecimalField(max_digits=7,decimal_places=2,blank=True,null=True) 
     total_subjects_obtained_marks = models.DecimalField(max_digits=7,decimal_places=2,blank=True,null=True) 
     subjects_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
@@ -508,6 +507,9 @@ class StudentExamSummary(models.Model):
     state_rank = models.IntegerField(null=True, blank=True)
     all_india_rank = models.IntegerField(null=True, blank=True)
     is_active = models.BooleanField(default= True)
+
+    academic_year = models.ForeignKey("branches.AcademicYear",null=True, blank=True, on_delete=models.PROTECT, related_name='student_exam_summary_academic_year')
+    is_progresscard = models.BooleanField(default= False)
 
 
     class Meta:
