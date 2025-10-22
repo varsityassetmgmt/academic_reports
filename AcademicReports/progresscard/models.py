@@ -40,3 +40,6 @@ class ExamProgressCardMapping(models.Model):
 
     def __str__(self):
         return f"{self.exam.name} → {self.template.name}"
+    
+
+

@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'exams',
     'apibridge',
     'progresscard',
+    'apisource',
 
    
     
