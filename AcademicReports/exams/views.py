@@ -1258,12 +1258,23 @@ def create_exam_results(request):
                         status=status.HTTP_400_BAD_REQUEST)
 
     exam = section_status.exam
-    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True) #.select_related('subject')
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True) 
     students = Student.objects.filter(
         section=section_status.section,
         is_active=True,
         academic_year=exam.academic_year,
     ).exclude(admission_status__admission_status_id=3,)
+
+    if not students:
+        exam_result_status = ExamResultStatus.objects.get(id=4)
+        section_status.marks_completion_percentage = 100
+        section_status.status = exam_result_status
+        section_status.save(update_fields=["marks_completion_percentage", "status"])
+        
+        return Response(
+            {"Students": "No Students Found"},
+            status=status.HTTP_200_OK
+        )
 
     existing_results = ExamResult.objects.filter(
         student__in=students,
