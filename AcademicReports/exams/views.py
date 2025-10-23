@@ -1904,6 +1904,7 @@ def finalize_section_results(request):
     section_status.save(update_fields=['finalized_by', 'finalized_at', 'status'])
 
     tasks.create_update_student_exam_summary(section_status_id)
+    print(section_status_id)
 
     return Response({
         'message': f'Section "{section_status.section.name}" results finalized successfully.'
