@@ -171,16 +171,6 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
         logger.error(f"Invalid SectionWiseExamResultStatus ID: {section_wise_exam_result_status_id}")
         return {"status": "error", "message": "Invalid section_wise_exam_result_status_id"}
 
-    if section_status.status != 4:
-        logger.info(
-            f"Marks not completed for section {section_status.id}: "
-            f"{section_status.status}"
-        )
-        return {
-            "status": "Not Finalized",
-            "message": "Make Section Finalizer"
-        }
-
     exam = section_status.exam
     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
     skill_instances = ExamSubjectSkillInstance.objects.filter(
