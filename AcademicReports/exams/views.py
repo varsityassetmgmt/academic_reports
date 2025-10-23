@@ -1,7 +1,6 @@
 from django.shortcuts import get_object_or_404, render
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
-from AcademicReports import branches
 from exams.tasks import *
 from usermgmt.models import UserProfile
 from .serializers import *
