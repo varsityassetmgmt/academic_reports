@@ -148,7 +148,7 @@ class DownloadProgressCardAPIView(APIView):
 
 
 
-class BulkProgressCardDownloadAPIView(APIView):
+class BulkProgressCardDownloadZipFileAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
@@ -280,7 +280,7 @@ from io import BytesIO
 from PyPDF2 import PdfMerger
 import pdfkit
 
-class New2BulkProgressCardAPIView(APIView):
+class DownloadBulkProgressCardsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
