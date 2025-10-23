@@ -129,11 +129,11 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
             },
         )
 
-        logger.info(
-            f"{'Created' if created else 'Updated'} exam summary for student {student.id} "
-            f"({student.name}) in section {section_status.section.name} - "
-            f"{subjects_percentage:.2f}% ({subject_grade})"
-        )
+        # logger.info(
+        #     f"{'Created' if created else 'Updated'} exam summary for student {student.id} "
+        #     f"({student.name}) in section {section_status.section.name} - "
+        #     f"{subjects_percentage:.2f}% ({subject_grade})"
+        # )
 
     return {"status": "success", "message": "Student exam summaries updated successfully"}
 
