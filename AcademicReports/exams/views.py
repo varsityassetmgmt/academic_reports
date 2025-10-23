@@ -1,6 +1,7 @@
 from django.shortcuts import get_object_or_404, render
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
+from AcademicReports import branches
 from exams.tasks import *
 from usermgmt.models import UserProfile
 from .serializers import *
@@ -22,6 +23,7 @@ from rest_framework.authentication import SessionAuthentication
 from django.http import StreamingHttpResponse, HttpResponse
 import csv
 import io
+from progresscard.models import ExamProgressCardMapping
 
 # ---------------- Subject ----------------
 class SubjectDropdownViewSet(ModelViewSet):
@@ -2970,3 +2972,26 @@ class BranchSectionsExamResultsXLSXView(APIView):
 #         )
 #         response['Content-Disposition'] = f'attachment; filename="{filename}"'
 #         return response
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def publish_progress_card_for_exam(request, exam_id):
+    try:
+        exam = Exam.objects.get(exam_id=exam_id, is_active=True)
+    except Exam.DoesNotExist:
+        return Response({"detail": "Exam not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if exam.exam_status_id != 3:
+        return Response({'message': 'Exam is Not Yet Locked'}, status=status.HTTP_200_OK)
+
+    progresscard_mapping = ExamProgressCardMapping.objects.filter(exam=exam, is_active=True).first()
+    if not progresscard_mapping:
+        return Response({'message': 'Progress Card Template Not Yet Mapped'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Update all relevant section statuses
+    SectionWiseExamResultStatus.objects.filter(
+        exam=exam, is_active=True, status_id=4
+    ).update(is_progress_card_downloaded=True)
+
+    return Response({'message': 'Progress Card Published Successfully'}, status=status.HTTP_200_OK)
+
