@@ -449,6 +449,7 @@ class ExamSkillResult(models.Model):
     internal_marks = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True)  
     marks_obtained = models.DecimalField(max_digits=6,decimal_places=2,blank=True,null=True) 
 
+    percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
     grade = models.ForeignKey("GradeBoundary", on_delete=models.SET_NULL, null=True, blank=True,related_name="exam_skill_results_grade")
 
     def __str__(self):
