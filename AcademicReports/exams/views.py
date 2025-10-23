@@ -1,6 +1,7 @@
 from django.shortcuts import get_object_or_404, render
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
+from exams import tasks
 from usermgmt.models import UserProfile
 from .serializers import *
 from . models import *
@@ -1901,6 +1902,8 @@ def finalize_section_results(request):
     section_status.finalized_at = timezone.now()
     section_status.status = finalized_status
     section_status.save(update_fields=['finalized_by', 'finalized_at', 'status'])
+
+    tasks.create_update_student_exam_summary
 
     return Response({
         'message': f'Section "{section_status.section.name}" results finalized successfully.'
