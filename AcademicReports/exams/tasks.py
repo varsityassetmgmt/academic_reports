@@ -171,14 +171,14 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
         logger.error(f"Invalid SectionWiseExamResultStatus ID: {section_wise_exam_result_status_id}")
         return {"status": "error", "message": "Invalid section_wise_exam_result_status_id"}
 
-    if section_status.marks_completion_percentage != 100:
+    if section_status.status != 4:
         logger.info(
             f"Marks not completed for section {section_status.id}: "
             f"{section_status.marks_completion_percentage}% done"
         )
         return {
-            "status": "incomplete",
-            "message": f"Marks entry not completed ({section_status.marks_completion_percentage}%)"
+            "status": "Not Finalized",
+            "message": "Make Section Finalize"
         }
 
     exam = section_status.exam
