@@ -174,11 +174,11 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
     if section_status.status != 4:
         logger.info(
             f"Marks not completed for section {section_status.id}: "
-            f"{section_status.marks_completion_percentage}% done"
+            f"{section_status.status}"
         )
         return {
             "status": "Not Finalized",
-            "message": "Make Section Finalize"
+            "message": "Make Section Finalizer"
         }
 
     exam = section_status.exam
