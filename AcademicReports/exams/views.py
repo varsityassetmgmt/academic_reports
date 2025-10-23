@@ -978,7 +978,7 @@ def update_section_wise_exam_result_status_view(request):
     )
 
     updated_count = existing_records.update(
-        is_progress_card_downloaded=branch_status.is_progress_card_downloaded,
+        # is_progress_card_downloaded=branch_status.is_progress_card_downloaded,
         marks_entry_expiry_datetime=branch_status.marks_entry_expiry_datetime,
         is_visible=branch_status.is_visible,
         updated_at=timezone.now()
@@ -998,7 +998,7 @@ def update_section_wise_exam_result_status_view(request):
                 exam=branch_status.exam,
                 marks_entry_expiry_datetime=branch_status.marks_entry_expiry_datetime,
                 is_visible=branch_status.is_visible,
-                is_progress_card_downloaded=branch_status.is_progress_card_downloaded,
+                # is_progress_card_downloaded=branch_status.is_progress_card_downloaded,
                 is_active=True,
                 status = ExamResultStatus.objects.get(id=1),
             )
