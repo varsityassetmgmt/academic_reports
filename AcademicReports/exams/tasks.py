@@ -117,6 +117,7 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
         student_exam_summary, created = StudentExamSummary.objects.update_or_create(
             student=student,
             exam=exam,
+            academic_year = exam.academic_year,
             defaults={
                 "total_subjects_maximum_marks": total_subjects_maximum_marks,
                 "total_skills_maximum_marks": total_skills_maximum_marks,
