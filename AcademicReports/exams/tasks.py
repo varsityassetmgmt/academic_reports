@@ -1,143 +1,3 @@
-# from celery import shared_task
-# from django.core.exceptions import ObjectDoesNotExist
-# from django.db.models import Sum
-# from exams.models import (
-#     SectionWiseExamResultStatus,
-#     ExamInstance,
-#     ExamSubjectSkillInstance,
-#     ExamResult,
-#     ExamSkillResult,
-# )
-# from students.models import Student
-# from .models import GradeBoundary, StudentExamSummary
-# import logging
-
-# logger = logging.getLogger(__name__)
-
-# @shared_task
-# def create_update_student_exam_summary(section_wise_exam_result_status_id):
-#     """
-#     Background task to create or update student exam summaries.
-#     """
-#     if not section_wise_exam_result_status_id:
-#         logger.error("Missing section_wise_exam_result_status_id")
-#         return {"status": "error", "message": "section_wise_exam_result_status_id is required"}
-
-#     try:
-#         section_status = SectionWiseExamResultStatus.objects.get(
-#             id=section_wise_exam_result_status_id, is_active=True
-#         )
-#     except ObjectDoesNotExist:
-#         logger.error(f"Invalid SectionWiseExamResultStatus ID: {section_wise_exam_result_status_id}")
-#         return {"status": "error", "message": "Invalid section_wise_exam_result_status_id"}
-
-#     if section_status.marks_completion_percentage != 100:
-#         logger.info(
-#             f"Marks not completed for section {section_status.id}: "
-#             f"{section_status.marks_completion_percentage}% done"
-#         )
-#         return {
-#             "status": "incomplete",
-#             "message": f"Marks entry not completed ({section_status.marks_completion_percentage}%)"
-#         }
-
-#     exam = section_status.exam
-#     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
-#     skill_instances = ExamSubjectSkillInstance.objects.filter(
-#         exam_instance__in=exam_instances, is_active=True
-#     )
-
-#     students = Student.objects.filter(
-#         section=section_status.section,
-#         is_active=True,
-#         academic_year=exam.academic_year,
-#     ).exclude(admission_status__admission_status_id=3)
-
-#     exam_results = ExamResult.objects.filter(
-#         student__in=students,
-#         exam_instance__in=exam_instances,
-#         is_active=True
-#     ).select_related("student", "exam_instance", "exam_attendance", "co_scholastic_grade")
-
-
-#     skill_results = ExamSkillResult.objects.filter(exam_result__exam_result_id__in= exam_results.values_list('exam_result_id', flat=True))
-
-#     # Pre-compute total maximum marks (same for all students)
-#     total_subjects_maximum = exam_instances.aggregate(
-#         total_ext=Sum("maximum_marks_external"),
-#         total_int=Sum("maximum_marks_internal")
-#     )
-#     total_subjects_maximum_marks = (total_subjects_maximum["total_ext"] or 0) + (total_subjects_maximum["total_int"] or 0)
-
-#     total_skills_maximum = skill_instances.aggregate(
-#         total_ext=Sum("maximum_marks_external"),
-#         total_int=Sum("maximum_marks_internal")
-#     )
-#     total_skills_maximum_marks = (total_skills_maximum["total_ext"] or 0) + (total_skills_maximum["total_int"] or 0)
-
-#     # Create/update summaries for each student
-#     for student in students:
-#         student_results = exam_results.filter(student=student)
-#         total_subjects_obtained = student_results.aggregate(
-#             total_marks_obt=Sum("total_marks")
-#         )
-#         total_subjects_obtained_marks = total_subjects_obtained["total_marks_obt"] or 0
-
-#         # Calculate percentage safely
-#         subjects_percentage = (
-#             (total_subjects_obtained_marks / total_subjects_maximum_marks) * 100
-#             if total_subjects_maximum_marks > 0
-#             else 0
-#         )
-
-#         # Determine grade
-#         subject_grade = GradeBoundary.objects.filter(
-#             min_percentage__lte=subjects_percentage,
-#             max_percentage__gte=subjects_percentage,
-#             is_active=True
-#         ).first()
-
-#         student_skill_results = skill_results.filter(exam_result__exam_result_id__in = student_results.values_list('exam_result_id', flat=True))
-#         total_skills_obtained = student_skill_results.aggregate(
-#             total_skill_marks_obt = Sum('marks_obtained')
-#         )
-#         total_skills_obtained_marks = total_skills_obtained['total_skill_marks_obt'] or 0
-#         skills_percentage = (
-#             (total_skills_obtained_marks/total_skills_maximum_marks)*100
-#             if total_skills_maximum_marks >0
-#             else 0
-#         )
-
-#         skills_grade = GradeBoundary.objects.filter(
-#             min_percentage__lte=skills_percentage,
-#             max_percentage__gte=skills_percentage,
-#             is_active=True
-#         ).first()
-
-#         student_exam_summary, created = StudentExamSummary.objects.update_or_create(
-#             student=student,
-#             exam=exam,
-#             defaults={
-#                 "total_subjects_maximum_marks": total_subjects_maximum_marks,
-#                 "total_skills_maximum_marks": total_skills_maximum_marks,
-#                 "total_subjects_obtained_marks": total_subjects_obtained_marks,
-#                 "subjects_percentage": subjects_percentage,
-#                 "subject_grade": subject_grade,
-#                 "total_skills_obtained_marks":total_skills_obtained_marks,
-#                 "skills_percentage":skills_percentage,
-#                 "skills_grade":skills_grade,
-#             },
-#         )
-
-#         logger.info(
-#             f"{'Created' if created else 'Updated'} exam summary for student {student.id} "
-#             f"({student.name}) in section {section_status.section.name} - "
-#             f"{subjects_percentage:.2f}% ({subject_grade})"
-#         )
-
-#     return {"status": "success", "message": "Student exam summaries updated successfully"}
-
-
 from celery import shared_task
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Sum
@@ -171,15 +31,15 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
         logger.error(f"Invalid SectionWiseExamResultStatus ID: {section_wise_exam_result_status_id}")
         return {"status": "error", "message": "Invalid section_wise_exam_result_status_id"}
 
-    if section_status.status != 4:
-        logger.info(
-            f"Marks not completed for section {section_status.id}: "
-            f"{section_status.marks_completion_percentage}% done"
-        )
-        return {
-            "status": "Not Finalized",
-            "message": "Make Section Finalize"
-        }
+    # if section_status.marks_completion_percentage != 100:
+    #     logger.info(
+    #         f"Marks not completed for section {section_status.id}: "
+    #         f"{section_status.marks_completion_percentage}% done"
+    #     )
+    #     return {
+    #         "status": "incomplete",
+    #         "message": f"Marks entry not completed ({section_status.marks_completion_percentage}%)"
+    #     }
 
     exam = section_status.exam
     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
@@ -197,20 +57,10 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
         student__in=students,
         exam_instance__in=exam_instances,
         is_active=True
-    ).select_related("student", "exam_instance")
+    ).select_related("student", "exam_instance", "exam_attendance", "co_scholastic_grade")
 
-    exam_result_ids = list(exam_results.values_list('exam_result_id', flat=True))
-    skill_results = ExamSkillResult.objects.filter(exam_result_id__in=exam_result_ids)
 
-    # Precompute lookups
-    results_by_student = {}
-    for res in exam_results:
-        results_by_student.setdefault(res.student_id, []).append(res)
-
-    skill_results_by_student = {}
-    for skill in skill_results:
-        sid = skill.exam_result.student_id
-        skill_results_by_student.setdefault(sid, []).append(skill)
+    skill_results = ExamSkillResult.objects.filter(exam_result__exam_result_id__in= exam_results.values_list('exam_result_id', flat=True))
 
     # Pre-compute total maximum marks (same for all students)
     total_subjects_maximum = exam_instances.aggregate(
@@ -227,26 +77,35 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
 
     # Create/update summaries for each student
     for student in students:
-        student_results = results_by_student.get(student.id, [])
-        total_subjects_obtained_marks = sum(res.total_marks or 0 for res in student_results)
+        student_results = exam_results.filter(student=student)
+        total_subjects_obtained = student_results.aggregate(
+            total_marks_obt=Sum("total_marks")
+        )
+        total_subjects_obtained_marks = total_subjects_obtained["total_marks_obt"] or 0
 
+        # Calculate percentage safely
         subjects_percentage = (
-            float(total_subjects_obtained_marks) / float(total_subjects_maximum_marks) * 100
-            if total_subjects_maximum_marks > 0 else 0
+            (total_subjects_obtained_marks / total_subjects_maximum_marks) * 100
+            if total_subjects_maximum_marks > 0
+            else 0
         )
 
+        # Determine grade
         subject_grade = GradeBoundary.objects.filter(
             min_percentage__lte=subjects_percentage,
             max_percentage__gte=subjects_percentage,
             is_active=True
         ).first()
 
-        student_skill_results = skill_results_by_student.get(student.id, [])
-        total_skills_obtained_marks = sum(s.marks_obtained or 0 for s in student_skill_results)
-
+        student_skill_results = skill_results.filter(exam_result__exam_result_id__in = student_results.values_list('exam_result_id', flat=True))
+        total_skills_obtained = student_skill_results.aggregate(
+            total_skill_marks_obt = Sum('marks_obtained')
+        )
+        total_skills_obtained_marks = total_skills_obtained['total_skill_marks_obt'] or 0
         skills_percentage = (
-            float(total_skills_obtained_marks) / float(total_skills_maximum_marks) * 100
-            if total_skills_maximum_marks > 0 else 0
+            (total_skills_obtained_marks/total_skills_maximum_marks)*100
+            if total_skills_maximum_marks >0
+            else 0
         )
 
         skills_grade = GradeBoundary.objects.filter(
@@ -258,22 +117,154 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
         student_exam_summary, created = StudentExamSummary.objects.update_or_create(
             student=student,
             exam=exam,
+            academic_year = exam.academic_year,
             defaults={
                 "total_subjects_maximum_marks": total_subjects_maximum_marks,
                 "total_skills_maximum_marks": total_skills_maximum_marks,
                 "total_subjects_obtained_marks": total_subjects_obtained_marks,
                 "subjects_percentage": subjects_percentage,
                 "subject_grade": subject_grade,
-                "total_skills_obtained_marks": total_skills_obtained_marks,
-                "skills_percentage": skills_percentage,
-                "skills_grade": skills_grade,
+                "total_skills_obtained_marks":total_skills_obtained_marks,
+                "skills_percentage":skills_percentage,
+                "skills_grade":skills_grade,
             },
         )
 
-        grade_label = getattr(subject_grade, "grade_name", None) or getattr(subject_grade, "name", "")
-        logger.info(
-            f"{'Created' if created else 'Updated'} summary for {student.name}: "
-            f"{subjects_percentage:.2f}% ({grade_label})"
-        )
+        # logger.info(
+        #     f"{'Created' if created else 'Updated'} exam summary for student {student.id} "
+        #     f"({student.name}) in section {section_status.section.name} - "
+        #     f"{subjects_percentage:.2f}% ({subject_grade})"
+        # )
 
     return {"status": "success", "message": "Student exam summaries updated successfully"}
+
+
+# from celery import shared_task
+# from django.core.exceptions import ObjectDoesNotExist
+# from django.db.models import Sum
+# from exams.models import (
+#     SectionWiseExamResultStatus,
+#     ExamInstance,
+#     ExamSubjectSkillInstance,
+#     ExamResult,
+#     ExamSkillResult,
+# )
+# from students.models import Student
+# from .models import GradeBoundary, StudentExamSummary
+# import logging
+
+# logger = logging.getLogger(__name__)
+
+# @shared_task
+# def create_update_student_exam_summary(section_wise_exam_result_status_id):
+#     """
+#     Background task to create or update student exam summaries.
+#     """
+#     if not section_wise_exam_result_status_id:
+#         logger.error("Missing section_wise_exam_result_status_id")
+#         return {"status": "error", "message": "section_wise_exam_result_status_id is required"}
+
+#     try:
+#         section_status = SectionWiseExamResultStatus.objects.get(
+#             id=section_wise_exam_result_status_id, is_active=True
+#         )
+#     except ObjectDoesNotExist:
+#         logger.error(f"Invalid SectionWiseExamResultStatus ID: {section_wise_exam_result_status_id}")
+#         return {"status": "error", "message": "Invalid section_wise_exam_result_status_id"}
+
+#     exam = section_status.exam
+#     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+#     skill_instances = ExamSubjectSkillInstance.objects.filter(
+#         exam_instance__in=exam_instances, is_active=True
+#     )
+
+#     students = Student.objects.filter(
+#         section=section_status.section,
+#         is_active=True,
+#         academic_year=exam.academic_year,
+#     ).exclude(admission_status__admission_status_id=3)
+
+#     exam_results = ExamResult.objects.filter(
+#         student__in=students,
+#         exam_instance__in=exam_instances,
+#         is_active=True
+#     ).select_related("student", "exam_instance")
+
+#     exam_result_ids = list(exam_results.values_list('exam_result_id', flat=True))
+#     skill_results = ExamSkillResult.objects.filter(exam_result_id__in=exam_result_ids)
+
+#     # Precompute lookups
+#     results_by_student = {}
+#     for res in exam_results:
+#         results_by_student.setdefault(res.student_id, []).append(res)
+
+#     skill_results_by_student = {}
+#     for skill in skill_results:
+#         sid = skill.exam_result.student_id
+#         skill_results_by_student.setdefault(sid, []).append(skill)
+
+#     # Pre-compute total maximum marks (same for all students)
+#     total_subjects_maximum = exam_instances.aggregate(
+#         total_ext=Sum("maximum_marks_external"),
+#         total_int=Sum("maximum_marks_internal")
+#     )
+#     total_subjects_maximum_marks = (total_subjects_maximum["total_ext"] or 0) + (total_subjects_maximum["total_int"] or 0)
+
+#     total_skills_maximum = skill_instances.aggregate(
+#         total_ext=Sum("maximum_marks_external"),
+#         total_int=Sum("maximum_marks_internal")
+#     )
+#     total_skills_maximum_marks = (total_skills_maximum["total_ext"] or 0) + (total_skills_maximum["total_int"] or 0)
+
+#     # Create/update summaries for each student
+#     for student in students:
+#         student_results = results_by_student.get(student.id, [])
+#         total_subjects_obtained_marks = sum(res.total_marks or 0 for res in student_results)
+
+#         subjects_percentage = (
+#             float(total_subjects_obtained_marks) / float(total_subjects_maximum_marks) * 100
+#             if total_subjects_maximum_marks > 0 else 0
+#         )
+
+#         subject_grade = GradeBoundary.objects.filter(
+#             min_percentage__lte=subjects_percentage,
+#             max_percentage__gte=subjects_percentage,
+#             is_active=True
+#         ).first()
+
+#         student_skill_results = skill_results_by_student.get(student.id, [])
+#         total_skills_obtained_marks = sum(s.marks_obtained or 0 for s in student_skill_results)
+
+#         skills_percentage = (
+#             float(total_skills_obtained_marks) / float(total_skills_maximum_marks) * 100
+#             if total_skills_maximum_marks > 0 else 0
+#         )
+
+#         skills_grade = GradeBoundary.objects.filter(
+#             min_percentage__lte=skills_percentage,
+#             max_percentage__gte=skills_percentage,
+#             is_active=True
+#         ).first()
+
+#         student_exam_summary, created = StudentExamSummary.objects.update_or_create(
+#             student=student,
+#             exam=exam,
+#             defaults={
+#                 "total_subjects_maximum_marks": total_subjects_maximum_marks,
+#                 "total_skills_maximum_marks": total_skills_maximum_marks,
+#                 "total_subjects_obtained_marks": total_subjects_obtained_marks,
+#                 "subjects_percentage": subjects_percentage,
+#                 "subject_grade": subject_grade,
+#                 "total_skills_obtained_marks": total_skills_obtained_marks,
+#                 "skills_percentage": skills_percentage,
+#                 "skills_grade": skills_grade,
+#             },
+#         )
+
+#         grade_label = getattr(subject_grade, "grade_name", None) or getattr(subject_grade, "name", "")
+#         logger.info(
+#             f"{'Created' if created else 'Updated'} summary for {student.name}: "
+#             f"{subjects_percentage:.2f}% ({grade_label})"
+#         )
+
+#     return {"status": "success", "message": "Student exam summaries updated successfully"}
