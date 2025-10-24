@@ -519,7 +519,7 @@ class DownloadProgressCardWebsiteAPIView(APIView):
         
 #===============================================================================================================================================
 
-class OldversionDownloadBulkSectionProgressCardsAPIView(APIView):
+class DownloadBulkSectionProgressCardsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
@@ -628,8 +628,6 @@ class OldversionDownloadBulkSectionProgressCardsAPIView(APIView):
             "margin-right": "10mm",
             "quiet": "",
         }
-
-  
         rendered_html = rendered_html.replace('src="/static/', f'src="{base_url}static/')
 
         config = None
@@ -650,173 +648,173 @@ class OldversionDownloadBulkSectionProgressCardsAPIView(APIView):
  
 
 
-class DownloadBulkSectionProgressCardsAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-    chunk_size = 50  # how many students processed before writing intermediate merged file (tune as needed)
+# class DownloadBulkSectionProgressCardsAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+#     chunk_size = 50  # how many students processed before writing intermediate merged file (tune as needed)
 
-    def get(self, request, *args, **kwargs):
-        section_id = request.query_params.get("section_id")
-        exam_id = request.query_params.get("exam_id")
+#     def get(self, request, *args, **kwargs):
+#         section_id = request.query_params.get("section_id")
+#         exam_id = request.query_params.get("exam_id")
 
-        if not section_id or not exam_id:
-            return Response({"error": "section_id and exam_id are required"}, status=status.HTTP_400_BAD_REQUEST)
+#         if not section_id or not exam_id:
+#             return Response({"error": "section_id and exam_id are required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            exam = Exam.objects.select_related("progress_card_mapping__template").get(pk=exam_id)
-        except Exam.DoesNotExist:
-            return Response({"error": "Exam not found"}, status=status.HTTP_404_NOT_FOUND)
+#         try:
+#             exam = Exam.objects.select_related("progress_card_mapping__template").get(pk=exam_id)
+#         except Exam.DoesNotExist:
+#             return Response({"error": "Exam not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        mapping = getattr(exam, "progress_card_mapping", None)
-        if not mapping or not mapping.template:
-            return Response({"error": "No progress card template assigned"}, status=status.HTTP_400_BAD_REQUEST)
+#         mapping = getattr(exam, "progress_card_mapping", None)
+#         if not mapping or not mapping.template:
+#             return Response({"error": "No progress card template assigned"}, status=status.HTTP_400_BAD_REQUEST)
 
-        template = mapping.template
-        if not template.html_template:
-            return Response({"error": "Progress card template HTML is missing"}, status=status.HTTP_400_BAD_REQUEST)
+#         template = mapping.template
+#         if not template.html_template:
+#             return Response({"error": "Progress card template HTML is missing"}, status=status.HTTP_400_BAD_REQUEST)
 
-        students = Student.objects.filter(section_id=section_id).select_related("section")
-        if not students.exists():
-            return Response({"error": "No students found in this section"}, status=status.HTTP_404_NOT_FOUND)
+#         students = Student.objects.filter(section_id=section_id).select_related("section")
+#         if not students.exists():
+#             return Response({"error": "No students found in this section"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Use temp files: store all student PDFs, merge into merged_temp_path, then stream merged file
-        temp_student_files = []
-        merger = PdfMerger()
+#         # Use temp files: store all student PDFs, merge into merged_temp_path, then stream merged file
+#         temp_student_files = []
+#         merger = PdfMerger()
 
-        try:
-            # 1) generate per-student PDFs on disk and append to merger
-            for student in students.iterator():  # iterator() to avoid caching queryset in memory
-                pdf_bytes = self.generate_student_pdf(student, exam, template)
-                if not pdf_bytes:
-                    continue
+#         try:
+#             # 1) generate per-student PDFs on disk and append to merger
+#             for student in students.iterator():  # iterator() to avoid caching queryset in memory
+#                 pdf_bytes = self.generate_student_pdf(student, exam, template)
+#                 if not pdf_bytes:
+#                     continue
 
-                # write to named temp file
-                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-                try:
-                    tmp.write(pdf_bytes)
-                    tmp.flush()
-                finally:
-                    tmp.close()
+#                 # write to named temp file
+#                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+#                 try:
+#                     tmp.write(pdf_bytes)
+#                     tmp.flush()
+#                 finally:
+#                     tmp.close()
 
-                temp_student_files.append(tmp.name)
-                merger.append(tmp.name)
+#                 temp_student_files.append(tmp.name)
+#                 merger.append(tmp.name)
 
-            if not temp_student_files:
-                return Response({"error": "No valid progress cards generated"}, status=status.HTTP_400_BAD_REQUEST)
+#             if not temp_student_files:
+#                 return Response({"error": "No valid progress cards generated"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # 2) write merged PDF to disk
-            merged_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-            merged_tmp.close()  # we'll open for writing
-            merged_path = merged_tmp.name
+#             # 2) write merged PDF to disk
+#             merged_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+#             merged_tmp.close()  # we'll open for writing
+#             merged_path = merged_tmp.name
 
-            with open(merged_path, "wb") as merged_fh:
-                merger.write(merged_fh)
-            merger.close()
+#             with open(merged_path, "wb") as merged_fh:
+#                 merger.write(merged_fh)
+#             merger.close()
 
-            # 3) Stream merged file using FileResponse (efficient) but delete files after streaming
-            filename = f"{exam.name}_Section_{section_id}_ProgressCards.pdf".replace(" ", "_")
+#             # 3) Stream merged file using FileResponse (efficient) but delete files after streaming
+#             filename = f"{exam.name}_Section_{section_id}_ProgressCards.pdf".replace(" ", "_")
 
-            # Create a generator that yields file bytes and then cleans up
-            def file_stream_and_cleanup(path, cleanup_paths, chunk_size=8192):
-                try:
-                    with open(path, "rb") as fh:
-                        while True:
-                            chunk = fh.read(chunk_size)
-                            if not chunk:
-                                break
-                            yield chunk
-                finally:
-                    # cleanup merged and student temp files
-                    try:
-                        os.remove(path)
-                    except Exception:
-                        pass
-                    for p in cleanup_paths:
-                        try:
-                            os.remove(p)
-                        except Exception:
-                            pass
+#             # Create a generator that yields file bytes and then cleans up
+#             def file_stream_and_cleanup(path, cleanup_paths, chunk_size=8192):
+#                 try:
+#                     with open(path, "rb") as fh:
+#                         while True:
+#                             chunk = fh.read(chunk_size)
+#                             if not chunk:
+#                                 break
+#                             yield chunk
+#                 finally:
+#                     # cleanup merged and student temp files
+#                     try:
+#                         os.remove(path)
+#                     except Exception:
+#                         pass
+#                     for p in cleanup_paths:
+#                         try:
+#                             os.remove(p)
+#                         except Exception:
+#                             pass
 
-            response = StreamingHttpResponse(
-                file_stream_and_cleanup(merged_path, temp_student_files),
-                content_type="application/pdf",
-            )
-            response["Content-Disposition"] = f'attachment; filename="{filename}"'
-            return response
+#             response = StreamingHttpResponse(
+#                 file_stream_and_cleanup(merged_path, temp_student_files),
+#                 content_type="application/pdf",
+#             )
+#             response["Content-Disposition"] = f'attachment; filename="{filename}"'
+#             return response
 
-        except Exception as exc:
-            # cleanup in case of exception
-            for p in temp_student_files:
-                try:
-                    os.remove(p)
-                except Exception:
-                    pass
-            try:
-                merger.close()
-            except Exception:
-                pass
-            return Response({"error": "Server error during PDF generation", "details": str(exc)}, status=500)
+#         except Exception as exc:
+#             # cleanup in case of exception
+#             for p in temp_student_files:
+#                 try:
+#                     os.remove(p)
+#                 except Exception:
+#                     pass
+#             try:
+#                 merger.close()
+#             except Exception:
+#                 pass
+#             return Response({"error": "Server error during PDF generation", "details": str(exc)}, status=500)
 
-    # -------------------------
-    def generate_student_pdf(self, student, exam, template):
-        """
-        Generate a single student's PDF bytes. Keep same logic as your previous function.
-        """
-        exam_results = (
-            ExamResult.objects.filter(student=student, exam_instance__exam=exam)
-            .select_related("exam_instance__subject")
-        )
-        summary = StudentExamSummary.objects.filter(student=student, exam=exam).first()
+#     # -------------------------
+#     def generate_student_pdf(self, student, exam, template):
+#         """
+#         Generate a single student's PDF bytes. Keep same logic as your previous function.
+#         """
+#         exam_results = (
+#             ExamResult.objects.filter(student=student, exam_instance__exam=exam)
+#             .select_related("exam_instance__subject")
+#         )
+#         summary = StudentExamSummary.objects.filter(student=student, exam=exam).first()
 
-        context = {
-            "student": student,
-            "exam": exam,
-            "exam_results": exam_results,
-            "summary": summary,
-            "generated_at": timezone.now(),
-        }
+#         context = {
+#             "student": student,
+#             "exam": exam,
+#             "exam_results": exam_results,
+#             "summary": summary,
+#             "generated_at": timezone.now(),
+#         }
 
-        if template.script:
-            try:
-                exec(template.script, {}, context)
-            except Exception as e:
-                # log or attach error to context; don't crash generation
-                context["script_error"] = str(e)
+#         if template.script:
+#             try:
+#                 exec(template.script, {}, context)
+#             except Exception as e:
+#                 # log or attach error to context; don't crash generation
+#                 context["script_error"] = str(e)
 
-        html = self.render_template_from_db(template.html_template, template.css_styles, context)
+#         html = self.render_template_from_db(template.html_template, template.css_styles, context)
 
-        # convert to pdf bytes
-        return self.html_to_pdf(html)
+#         # convert to pdf bytes
+#         return self.html_to_pdf(html)
 
-    # -------------------------
-    def render_template_from_db(self, html_text, css_text, context):
-        django_engine = engines["django"]
-        html = f"<style>{css_text or ''}</style>{html_text or ''}"
-        template = django_engine.from_string(html)
-        return template.render(context)
+#     # -------------------------
+#     def render_template_from_db(self, html_text, css_text, context):
+#         django_engine = engines["django"]
+#         html = f"<style>{css_text or ''}</style>{html_text or ''}"
+#         template = django_engine.from_string(html)
+#         return template.render(context)
 
-    # -------------------------
-    def html_to_pdf(self, rendered_html):
-        options = {
-            "enable-local-file-access": "",
-            "page-size": "A4",
-            "encoding": "UTF-8",
-            "margin-top": "10mm",
-            "margin-bottom": "10mm",
-            "margin-left": "10mm",
-            "margin-right": "10mm",
-            "quiet": "",
-        }
+#     # -------------------------
+#     def html_to_pdf(self, rendered_html):
+#         options = {
+#             "enable-local-file-access": "",
+#             "page-size": "A4",
+#             "encoding": "UTF-8",
+#             "margin-top": "10mm",
+#             "margin-bottom": "10mm",
+#             "margin-left": "10mm",
+#             "margin-right": "10mm",
+#             "quiet": "",
+#         }
 
-        config = None
-        if hasattr(settings, "WKHTMLTOPDF_CMD"):
-            config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_CMD)
+#         config = None
+#         if hasattr(settings, "WKHTMLTOPDF_CMD"):
+#             config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_CMD)
 
-        try:
-            return pdfkit.from_string(rendered_html, False, configuration=config, options=options)
-        except Exception as e:
-            # log the error and return None so this student is skipped
-            print("PDF generation error:", e)
-            return None
+#         try:
+#             return pdfkit.from_string(rendered_html, False, configuration=config, options=options)
+#         except Exception as e:
+#             # log the error and return None so this student is skipped
+#             print("PDF generation error:", e)
+#             return None
 
 
 
