@@ -2980,17 +2980,33 @@ def publish_progress_card_for_exam(request, exam_id):
     except Exam.DoesNotExist:
         return Response({"detail": "Exam not found."}, status=status.HTTP_404_NOT_FOUND)
 
+    # Ensure exam is locked
     if exam.exam_status_id != 3:
-        return Response({'message': 'Exam is Not Yet Locked'}, status=status.HTTP_200_OK)
+        return Response({'message': 'Exam is Not Yet Locked'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Check progress card mapping
     progresscard_mapping = ExamProgressCardMapping.objects.filter(exam=exam, is_active=True).first()
     if not progresscard_mapping:
         return Response({'message': 'Progress Card Template Not Yet Mapped'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Update all relevant section statuses
-    SectionWiseExamResultStatus.objects.filter(
+    # Get relevant section IDs first
+    section_qs = SectionWiseExamResultStatus.objects.filter(
         exam=exam, is_active=True, status_id=4
-    ).update(is_progress_card_downloaded=True)
+    )
+    section_ids = list(section_qs.values_list('section__section_id', flat=True))
 
-    return Response({'message': 'Progress Card Published Successfully'}, status=status.HTTP_200_OK)
+    # Update progress card download flag
+    section_qs.update(is_progress_card_downloaded=True)
+
+    # Update StudentExamSummary for those sections
+    StudentExamSummary.objects.filter(
+        exam=exam,
+        student__section__section_id__in=section_ids
+    ).update(is_progresscard=True)
+
+    return Response({
+        'message': 'Progress Card Published Successfully',
+        'sections_updated': len(section_ids)
+    }, status=status.HTTP_200_OK)
+
 
