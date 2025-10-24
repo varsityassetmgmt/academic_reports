@@ -733,7 +733,7 @@ class DownloadBulkSectionProgressCardsAPIView(APIView):
                 pass
 
     # ----------------------------------------------------------------------
-    def stream_file_chunk(self, filepath, chunk_size=4096):
+    def stream_file_chunk(self, filepath, chunk_size=5):
         """Yield file content in chunks (stream)."""
         with open(filepath, "rb") as file:
             while chunk := file.read(chunk_size):
