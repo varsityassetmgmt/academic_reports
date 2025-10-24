@@ -1,7 +1,6 @@
 
 from django.template import Context
 from exams.models import *
-from students.models import Student
 # from progresscard.utils.pdf import render_template_from_db, html_to_pdf_bytes
 # from progresscard.utils.safe_exec import exec_template_script  # optional
 from rest_framework import permissions, status
@@ -15,13 +14,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from progresscard.models import *
 from students.models import *
-from exams.models import *
+import os
 import io
 import zipfile
 from django.conf import settings
 from usermgmt.authentication import QueryParameterTokenAuthentication
 from rest_framework.authentication import ( SessionAuthentication, TokenAuthentication )
-
+import tempfile
+from io import BytesIO
+from PyPDF2 import PdfMerger
+from django.http import StreamingHttpResponse
+ 
+ 
  
 class DownloadProgressCardAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -515,7 +519,7 @@ class DownloadProgressCardWebsiteAPIView(APIView):
         
 #===============================================================================================================================================
 
-class DownloadBulkSectionProgressCardsAPIView(APIView):
+class OldversionDownloadBulkSectionProgressCardsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
@@ -636,4 +640,161 @@ class DownloadBulkSectionProgressCardsAPIView(APIView):
             return pdfkit.from_string(rendered_html, False, configuration=config, options=options)
         except Exception as e:
             print("PDF generation error:", e)
+            return None
+
+
+
+
+
+
+
+
+
+class DownloadBulkSectionProgressCardsAPIView(APIView):
+    """
+    Stream and merge progress cards for an entire section into one PDF file.
+    """
+
+    permission_classes = [IsAuthenticated]
+    chunk_size = 25  # Number of students to process per chunk
+
+    def get(self, request, *args, **kwargs):
+        section_id = request.query_params.get("section_id")
+        exam_id = request.query_params.get("exam_id")
+
+        if not section_id or not exam_id:
+            return Response({"error": "section_id and exam_id are required"},status=status.HTTP_400_BAD_REQUEST,)
+
+        try:
+            exam = Exam.objects.select_related("progress_card_mapping__template").get(pk=exam_id)
+        except Exam.DoesNotExist:
+            return Response({"error": "Exam not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        mapping = getattr(exam, "progress_card_mapping", None)
+        if not mapping or not mapping.template:
+            return Response({"error": "No progress card template assigned"},status=status.HTTP_400_BAD_REQUEST,)
+
+        template = mapping.template
+        students = Student.objects.filter(section_id=section_id).select_related("section")
+
+        if not students.exists():
+            return Response({"error": "No students found in this section"},status=status.HTTP_404_NOT_FOUND,)
+
+        filename = f"{exam.name}_Section_{section_id}_ProgressCards.pdf".replace(" ", "_")
+
+        # ✅ Return streaming response
+        response = StreamingHttpResponse(self.generate_pdf_stream(students, exam, template),content_type="application/pdf",)
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+    # ----------------------------------------------------------------------
+    def generate_pdf_stream(self, students, exam, template):
+        """
+        Stream-generate merged PDF in small chunks using temp files.
+        """
+        temp_files = []
+        merger = PdfMerger()
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as merged_output:
+            merged_path = merged_output.name
+
+        total_students = students.count()
+        processed = 0
+
+        # ✅ Generate PDFs in chunks
+        for start in range(0, total_students, self.chunk_size):
+            chunk_students = students[start:start + self.chunk_size]
+
+            for student in chunk_students:
+                pdf_data = self.generate_student_pdf(student, exam, template)
+                if not pdf_data:
+                    continue
+
+                tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+                tmp_file.write(pdf_data)
+                tmp_file.close()
+                temp_files.append(tmp_file.name)
+                merger.append(tmp_file.name)
+                processed += 1
+
+            # Write chunk to disk
+            with open(merged_path, "wb") as merged_output:
+                merger.write(merged_output)
+
+            yield from self.stream_file_chunk(merged_path)
+
+        merger.close()
+
+        # Cleanup temporary files
+        for path in temp_files + [merged_path]:
+            try:
+                os.remove(path)
+            except:
+                pass
+
+    # ----------------------------------------------------------------------
+    def stream_file_chunk(self, filepath, chunk_size=4096):
+        """Yield file content in chunks (stream)."""
+        with open(filepath, "rb") as file:
+            while chunk := file.read(chunk_size):
+                yield chunk
+
+    # ----------------------------------------------------------------------
+    def generate_student_pdf(self, student, exam, template):
+        """Generate a single student's PDF as bytes."""
+        exam_results = (
+            ExamResult.objects.filter(student=student, exam_instance__exam=exam)
+            .select_related("exam_instance__subject")
+        )
+        summary = StudentExamSummary.objects.filter(student=student, exam=exam).first()
+
+        context = {
+            "student": student,
+            "exam": exam,
+            "exam_results": exam_results,
+            "summary": summary,
+            "generated_at": timezone.now(),
+        }
+
+        # Execute template script safely
+        if template.script:
+            try:
+                exec(template.script, {}, context)
+            except Exception as e:
+                print(f"⚠️ Script error for {student}: {e}")
+                context["script_error"] = str(e)
+
+        html = self.render_template_from_db(template.html_template, template.css_styles, context)
+        return self.html_to_pdf(html)
+
+    # ----------------------------------------------------------------------
+    def render_template_from_db(self, html_text, css_text, context):
+        """Combine DB template HTML + CSS and render it."""
+        django_engine = engines["django"]
+        html = f"<style>{css_text or ''}</style>{html_text or ''}"
+        template = django_engine.from_string(html)
+        return template.render(context)
+
+    # ----------------------------------------------------------------------
+    def html_to_pdf(self, rendered_html):
+        """Convert rendered HTML string to PDF bytes using pdfkit."""
+        options = {
+            "enable-local-file-access": "",
+            "page-size": "A4",
+            "encoding": "UTF-8",
+            "margin-top": "10mm",
+            "margin-bottom": "10mm",
+            "margin-left": "10mm",
+            "margin-right": "10mm",
+            "quiet": "",
+        }
+
+        config = None
+        if hasattr(settings, "WKHTMLTOPDF_CMD"):
+            config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_CMD)
+
+        try:
+            return pdfkit.from_string(rendered_html, False, configuration=config, options=options)
+        except Exception as e:
+            print("❌ PDF generation error:", e)
             return None
