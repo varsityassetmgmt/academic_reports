@@ -13,7 +13,7 @@ from rest_framework.authentication import ( SessionAuthentication, TokenAuthenti
 
 class StudentProgressCardsListForWebsiteViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = StudentProgressCardsListForWebsiteSerializer
-    pagination_class = CustomPagination
+    # pagination_class = CustomPagination
     http_method_names = ['get']
     authentication_classes = [QueryParameterTokenAuthentication,SessionAuthentication]
     permission_classes = [IsAuthenticated]
