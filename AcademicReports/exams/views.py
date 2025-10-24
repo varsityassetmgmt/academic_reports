@@ -1408,7 +1408,8 @@ def create_exam_results(request):
         section_status.marks_completion_percentage = 100
         section_status.status = exam_result_status
         section_status.save(update_fields=["marks_completion_percentage", "status"])
-        return Response({"Students": "No Students Found"}, status=status.HTTP_200_OK)
+        # return Response({"Students": "No Students Found"}, status=status.HTTP_200_OK)
+        return Response([])
 
     existing_results = ExamResult.objects.filter(
         student__in=students,
