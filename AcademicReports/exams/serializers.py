@@ -788,8 +788,8 @@ class EditExamResultSerializer(serializers.ModelSerializer):
         attendance_obj = None
 
         # Valid text markers
-        ABSENT_VALUES = ['AB']
-        DROPOUT_VALUES = ['DR']
+        ABSENT_VALUES = ['AB', 'A']
+        DROPOUT_VALUES = ['DR', 'D']
 
         # ---------- Helper functions ----------
         def parse_external_marks(value, field_name, cut_off):
@@ -946,8 +946,8 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             return attrs
 
         attendance_obj = None
-        ABSENT_VALUES = ['AB']
-        DROPOUT_VALUES = ['DR']
+        ABSENT_VALUES = ['AB', 'A']
+        DROPOUT_VALUES = ['DR', 'D']
 
         # --- Helper functions ---
         def parse_external_marks(value, field_name, cut_off):
