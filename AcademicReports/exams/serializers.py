@@ -101,7 +101,7 @@ class ExamSerializer(serializers.ModelSerializer):
     def validate(self, data):
         # ---- 1. Prevent editing published exams ----
         if self.instance and self.instance.is_editable is False:
-            raise serializers.ValidationError({"non_field_errors": "This Exam is already published, editing is not allowed."})
+            raise serializers.ValidationError({"Exam": "This Exam is already published, editing is not allowed."})
 
         # ---- 2. Duplicate name validation ----
         # fallback to instance values when updating
@@ -1229,7 +1229,7 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
 
         # ✅ Co-scholastic grade + subject_skills validation
         if has_subject_skills and not subject_skills:
-            errors["subject_skills"] = "At least one subject skill must be selected when co-scholastic grading is enabled."
+            errors["subject_skills"] = "At least one subject skill must be selected when Has Subject Skill is enabled."
 
         # ✅ Exam edit check
         if exam and not getattr(exam, "is_editable", True):
