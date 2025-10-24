@@ -788,8 +788,9 @@ class EditExamResultSerializer(serializers.ModelSerializer):
         attendance_obj = None
 
         # Valid text markers
-        ABSENT_VALUES = ['AB', 'A']
-        DROPOUT_VALUES = ['DR', 'D']
+        ABSENT_VALUES = ['AB']
+        DROPOUT_VALUES = ['DR']
+        INTERNAL_TRANSFER_VALUES = ['IT']
 
         # ---------- Helper functions ----------
         def parse_external_marks(value, field_name, cut_off):
@@ -802,6 +803,8 @@ class EditExamResultSerializer(serializers.ModelSerializer):
                 return "ABSENT"
             if str_val in DROPOUT_VALUES:
                 return "DROPOUT"
+            if str_val in INTERNAL_TRANSFER_VALUES:
+                return "INTERNAL_TRANSFER"
 
             try:
                 dec_val = Decimal(value)
@@ -856,6 +859,9 @@ class EditExamResultSerializer(serializers.ModelSerializer):
             elif ext_value == "DROPOUT":
                 attrs['external_marks'] = None
                 attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=3).first()
+            elif ext_value == 'INTERNAL_TRANSFER':
+                attrs['external_marks'] = None
+                attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=4).first()
             else:
                 # Numeric external marks
                 attrs['external_marks'] = ext_value
@@ -946,8 +952,9 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             return attrs
 
         attendance_obj = None
-        ABSENT_VALUES = ['AB', 'A']
-        DROPOUT_VALUES = ['DR', 'D']
+        ABSENT_VALUES = ['AB']
+        DROPOUT_VALUES = ['DR']
+        INTERNAL_TRANSFER_VALUES = ['IT']
 
         # --- Helper functions ---
         def parse_external_marks(value, field_name, cut_off):
@@ -960,6 +967,8 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
                 return "ABSENT"
             if str_val in DROPOUT_VALUES:
                 return "DROPOUT"
+            if str_val in INTERNAL_TRANSFER_VALUES:
+                return "INTERNAL_TRANSFER"
 
             try:
                 dec_val = Decimal(value)
@@ -985,6 +994,8 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
                 return "ABSENT"
             if str_val in DROPOUT_VALUES:
                 return "DROPOUT"
+            if str_val in INTERNAL_TRANSFER_VALUES:
+                return "INTERNAL_TRANSFER"
 
             try:
                 dec_val = Decimal(value)
@@ -1038,6 +1049,9 @@ class EditExamSkillResultSerializer(serializers.ModelSerializer):
             elif ext_value == "DROPOUT":
                 attrs['external_marks'] = None
                 attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=3).first()
+            elif ext_value == 'INTERNAL_TRANSFER':
+                attrs['external_marks'] = None
+                attendance_obj = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=4).first()
             else:
                 # Numeric external marks
                 attrs['external_marks'] = ext_value
