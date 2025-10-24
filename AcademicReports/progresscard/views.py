@@ -416,10 +416,10 @@ class DownloadProgressCardWebsiteAPIView(APIView):
  
     def get(self, request, *args, **kwargs):
     
-        students_exam_summary_id = request.query_params.get("students_exam_summary_id")
+        students_exam_summary_id = request.query_params.get("progress_reports_id")
 
         if not students_exam_summary_id:
-            return Response({"error": "students_exam_summary_id is required"},status=status.HTTP_400_BAD_REQUEST,)
+            return Response({"error": "progress_reports_id is required"},status=status.HTTP_400_BAD_REQUEST,)
         
         try:
             student_exam_summary = StudentExamSummary.objects.get(students_exam_summary_id=students_exam_summary_id)
