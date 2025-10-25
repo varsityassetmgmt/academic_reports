@@ -1215,15 +1215,17 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
         start = attrs.get('exam_start_time') or (self.instance.exam_start_time if self.instance else None)
         end = attrs.get('exam_end_time') or (self.instance.exam_end_time if self.instance else None)
         subject_skills = attrs.get('subject_skills', [])
-        has_subject_skills = attrs.get('has_subject_skills', False)
+        has_subject_skills = attrs.get('has_subject_skills', getattr(self.instance, 'has_subject_skills', False))
 
-        has_external = attrs.get('has_external_marks', False)
+        has_external = attrs.get('has_external_marks', getattr(self.instance, 'has_external_marks', False))
         max_external = attrs.get('maximum_marks_external')
         cut_off_external = attrs.get('cut_off_marks_external')
 
-        has_internal = attrs.get('has_internal_marks', False)
+        has_internal = attrs.get('has_internal_marks', getattr(self.instance, 'has_internal_marks', False))
         max_internal = attrs.get('maximum_marks_internal')
         cut_off_internal = attrs.get('cut_off_marks_internal')
+
+        has_coscholastic = attrs.get('has_subject_co_scholastic_grade', getattr(self.instance, 'has_subject_co_scholastic_grade', False))
 
         errors = {}
 
@@ -1255,7 +1257,7 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
-            errors["subject"] = f"An exam instance already exists for this subject in the selected exam."
+            errors["subject"] = "An exam instance already exists for this subject in the selected exam."
 
         # ✅ External marks validation
         if has_external:
@@ -1275,6 +1277,12 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
             elif max_internal is not None and cut_off_internal > max_internal:
                 errors["cut_off_marks_internal"] = "Cut-off internal marks cannot exceed the maximum internal marks."
 
+        # ✅ At least one result type must be enabled
+        if not (has_external or has_internal or has_coscholastic or has_subject_skills):
+            errors["result_types"] = (
+                "At least one of external marks, internal marks, co-scholastic grade, or subject skills must be selected."
+            )
+
         if errors:
             raise serializers.ValidationError(errors)
 
@@ -1293,6 +1301,7 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
         if subject_skills is not None:
             instance.subject_skills.set(subject_skills)
         return instance
+
 
 class ExamStatusDropDropDownSerializer(serializers.ModelSerializer):
     class Meta:
