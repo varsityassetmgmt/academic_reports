@@ -1098,7 +1098,7 @@ import pdfkit
 from io import BytesIO
 from PyPDF2 import PdfReader, PdfWriter
 
-class DownloadBulkSectionProgressCardsAPIView2(APIView):
+class DownloadBulkSectionProgressStreamingCardsAPIView2(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
