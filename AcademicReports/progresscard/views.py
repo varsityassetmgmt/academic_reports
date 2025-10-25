@@ -687,7 +687,7 @@ class DownloadBulkSectionProgressStreamingCardsAPIView(APIView):
         # 🔹 Define a generator to yield each student's PDF bytes
         def pdf_stream():
             for idx, student in enumerate(students, start=1):
-                summary = summary_map.get(student.id)
+                summary = summary_map.get(student.student_id)
                 if not summary:
                     continue
 
