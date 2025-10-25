@@ -1097,6 +1097,7 @@ from django.conf import settings
 import pdfkit
 from io import BytesIO
 from PyPDF2 import PdfReader, PdfWriter
+from django.template import Template, Context
 
 class DownloadBulkSectionProgressStreamingCardsAPIView2(APIView):
     permission_classes = [IsAuthenticated]
@@ -1149,20 +1150,26 @@ class DownloadBulkSectionProgressStreamingCardsAPIView2(APIView):
                 if script:
                     exec(script, {}, context)
 
-                rendered_html = render_to_string(
-                    "exam_progress_card_template.html",
-                    {"html_template": html_template, "css_styles": css_styles, **context}
-                )
+                # ✅ Render directly from DB fields (no template file)
+                template_string = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                <style>{css_styles or ''}</style>
+                </head>
+                <body>{html_template or ''}</body>
+                </html>
+                """
+                rendered_html = Template(template_string).render(Context(context))
 
                 rendered_html = rendered_html.replace('src="/static/', f'src="{base_url}/static/')
                 pdf_bytes = pdfkit.from_string(rendered_html, False, configuration=config, options=options)
 
-                # Append each student PDF page-by-page to the writer
                 reader = PdfReader(BytesIO(pdf_bytes))
                 for page in reader.pages:
                     pdf_writer.add_page(page)
 
-                # Periodically flush chunks to the stream
+                # Stream every few students
                 if idx % 5 == 0 or idx == len(students):
                     buffer.seek(0)
                     pdf_writer.write(buffer)
@@ -1171,6 +1178,7 @@ class DownloadBulkSectionProgressStreamingCardsAPIView2(APIView):
                     buffer.seek(0)
 
             yield b"%%EOF"
+
 
         response = StreamingHttpResponse(pdf_generator(), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
