@@ -3010,6 +3010,9 @@ def publish_progress_card_for_exam(request, exam_id):
     progresscard_mapping = ExamProgressCardMapping.objects.filter(exam=exam, is_active=True).first()
     if not progresscard_mapping:
         return Response({'message': 'Progress Card Template Not Yet Mapped'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    exam.is_progress_card_visible = True 
+    exam.save()
 
     # Filter sections whose results are published (status_id = 4)
     section_qs = SectionWiseExamResultStatus.objects.filter(
