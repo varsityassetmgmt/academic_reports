@@ -66,5 +66,6 @@ urlpatterns = [
         path('export_branch_section_exam_results/', BranchSectionsExamResultsXLSXView.as_view(), name='branch_section_exam_results'),
 
         path('publish_progress_card_for_exam/<int:exam_id>/', publish_progress_card_for_exam, name='publish_progress_card_for_exam'),
+        path('view_exam_details/<int:exam_id>/', view_exam_details, name='view_exam_details'),
 
 ]+ router.urls

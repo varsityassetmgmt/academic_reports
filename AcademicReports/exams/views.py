@@ -3041,21 +3041,13 @@ def publish_progress_card_for_exam(request, exam_id):
     }, status=status.HTTP_200_OK)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def view_exam_details(request, exam_id):
+    try:
+        exam = Exam.objects.get(exam_id=exam_id, is_active=True)
+    except Exam.DoesNotExist:
+        return Response({'exam_id': 'Invalid Exam ID'}, status=status.HTTP_400_BAD_REQUEST)
 
-# @api_view(['GET'])
-# @permission_classes([IsAuthenticated])
-# def view_exam_details(request, exam_id):
-#     try:
-#         exam = Exam.objects.get(exam_id=exam_id, is_active=True)
-#     except Exam.DoesNotExist:
-#         return Response({'exam_id': 'Invalid Exam ID'}, status=status.HTTP_400_BAD_REQUEST)
-    
-#     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
-#     exam_skill_instances = ExamSubjectSkillInstance.objects.filter(exam_instance__exam_instance_id__in=exam_instances.values_list('exam_instance_id', flat=True), is_active=True)
-
-#     exam_data = {
-#         'exam_type' : exam.exam_type.name,
-#         'exam_name'
-#     }
-
-#     return Response({})
+    serializer = ExamSerializer(exam)
+    return Response(serializer.data, status=status.HTTP_200_OK)
