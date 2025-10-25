@@ -825,7 +825,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
                 academic_year=current_academic_year,
             )
             .select_related('academic_year', 'branch', 'exam', 'status')  # optimization
-            .order_by('-academic_year', 'marks_completion_percentage')
+            .order_by('-academic_year', 'marks_completion_percentage', '-id') 
         )
         return queryset
 
