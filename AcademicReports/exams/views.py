@@ -1094,6 +1094,27 @@ class PublishExamAPIView(APIView):
         except ExamStatus.DoesNotExist:
             return Response({"detail": "ExamStatus with id=2 not found."},status=status.HTTP_400_BAD_REQUEST,)
         
+        # === Validate Exam Instances ===
+        exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+        if not exam_instances.exists():
+            return Response(
+                {'detail': 'There are no subjects for this exam.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # === Check if any instance date is outside exam date range ===
+        invalid_instances = exam_instances.filter(
+            Q(date__lt=exam.start_date) | Q(date__gt=exam.end_date)
+        )
+
+        if invalid_instances.exists():
+            first_invalid = invalid_instances.first()
+            return Response(
+                {
+                    'detail': f"The exam date for {first_invalid.subject.name} ({first_invalid.date}) "
+                    f"is not within the scheduled exam period."
+                },status=status.HTTP_400_BAD_REQUEST
+            )
         
         exam.is_visible = True
         exam.exam_status = exam_status
@@ -2119,7 +2140,7 @@ class ExportSectionExamResultsCSVViewSet(APIView):
             Student.objects.filter(
                 section=section,
                 is_active=True,
-                academic_year=exam.academic_year,
+                # academic_year=exam.academic_year,
             ).exclude(admission_status__admission_status_id=3)
         )
 
@@ -3054,12 +3075,160 @@ def view_exam_details(request, exam_id):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+
+# import io
+# from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, Border, Side
+from openpyxl.utils import get_column_letter
+# from django.http import HttpResponse
+# from rest_framework.views import APIView
+# from rest_framework.permissions import IsAuthenticated
+# from rest_framework.response import Response
+# from django_filters.rest_framework import DjangoFilterBackend
+# from rest_framework.filters import SearchFilter, OrderingFilter
+
+class ExportSectionExamResultsTemplateXLSXView(APIView):
+    authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+
+    filename_template = "{class_name}_{section}_Section_Exam_Results.xlsx"
+
+    def get(self, request, *args, **kwargs):
+        section_status_id = request.query_params.get("section_wise_exam_result_status_id")
+        if not section_status_id:
+            return Response(
+                {"section_wise_exam_result_status_id": "This field is required in the URL."},
+                status=400,
+            )
+
+        # === Fetch section & exam info ===
+        section_status = (
+            SectionWiseExamResultStatus.objects
+            .select_related("exam", "section__class_name")
+            .filter(id=section_status_id, is_active=True)
+            .first()
+        )
+        if not section_status:
+            return Response({"section_wise_exam_result_status_id": "Invalid ID"}, status=400)
+
+        exam = section_status.exam
+        section = section_status.section
+
+        # === Prefetch Exam Instances ===
+        exam_instances = list(
+            ExamInstance.objects.filter(exam=exam, is_active=True)
+            .prefetch_related("subject_skills")
+        )
+
+        skill_instances_qs = ExamSubjectSkillInstance.objects.filter(
+            exam_instance__in=exam_instances, is_active=True
+        ).select_related("subject_skill", "exam_instance")
+        skill_instance_map = {(si.exam_instance_id, si.subject_skill_id): si for si in skill_instances_qs}
+
+        students = list(
+            Student.objects.filter(
+                section=section,
+                is_active=True,
+                # academic_year=exam.academic_year,
+            ).exclude(admission_status__admission_status_id=3)
+        )
+
+        # === Build Excel ===
+        output = io.BytesIO()
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Exam Results Template"
+
+        # === Header Row ===
+        headers = ["Sl.No.", "Student Name", "SCS Number", "Marks Type"]
+        has_external = has_internal = has_grade = False
+
+        for instance in exam_instances:
+            if instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade:
+                headers.append(instance.subject.name)
+                has_external |= instance.has_external_marks
+                has_internal |= instance.has_internal_marks
+                has_grade |= instance.has_subject_co_scholastic_grade
+
+            for skill in instance.subject_skills.all():
+                si = skill_instance_map.get((instance.exam_instance_id, skill.id))
+                if si and (
+                    si.has_external_marks or si.has_internal_marks or si.has_subject_co_scholastic_grade
+                ):
+                    headers.append(f"{instance.subject.name} - {skill.name}")
+                    has_external |= si.has_external_marks
+                    has_internal |= si.has_internal_marks
+                    has_grade |= si.has_subject_co_scholastic_grade
+
+        ws.append(headers)
+
+        # === Style Header ===
+        header_font = Font(bold=True)
+        for col_num, _ in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            ws.column_dimensions[get_column_letter(col_num)].width = 20
+
+        # === Fill Blank Template Rows (No Marks) ===
+        row_num = 2
+        for sl_no, student in enumerate(students, start=1):
+            row_start = row_num
+            marks_types = []
+
+            if has_external:
+                marks_types.append("External Marks")
+            if has_internal:
+                marks_types.append("Internal Marks")
+            if has_grade:
+                marks_types.append("Grade")
+
+            for marks_type in marks_types:
+                ws.cell(row=row_num, column=1, value=sl_no)
+                ws.cell(row=row_num, column=2, value=student.name)
+                ws.cell(row=row_num, column=3, value=student.SCS_Number)
+                ws.cell(row=row_num, column=4, value=marks_type)
+                row_num += 1
+
+            # === Merge Student Info Cells Vertically ===
+            if len(marks_types) > 1:
+                ws.merge_cells(start_row=row_start, start_column=1, end_row=row_num - 1, end_column=1)
+                ws.merge_cells(start_row=row_start, start_column=2, end_row=row_num - 1, end_column=2)
+                ws.merge_cells(start_row=row_start, start_column=3, end_row=row_num - 1, end_column=3)
+
+                for col in range(1, 4):
+                    ws.cell(row=row_start, column=col).alignment = Alignment(
+                        vertical="center", horizontal="center"
+                    )
+
+        # === Border Styling ===
+        thin = Side(border_style="thin", color="000000")
+        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=ws.max_column):
+            for cell in row:
+                cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
+
+        # === Return Response ===
+        wb.save(output)
+        output.seek(0)
+        filename = self.filename_template.format(
+            class_name=section.class_name.name.replace(" ", "_"),
+            section=section.name.replace(" ", "_"),
+        )
+
+        response = HttpResponse(
+            output.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
 # class ExportSectionExamResultsTemplateXLSXView(APIView):
 #     authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
 #     permission_classes = [IsAuthenticated]
 #     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
 
-#     filename_template = "{class_name} _{section} Section_Exam_Results.xlsx"
+#     filename_template = "{class_name} _{section} Section_Exam_Results.csv"
 #     chunk_size = 500
 
 #     def get(self, request, *args, **kwargs):

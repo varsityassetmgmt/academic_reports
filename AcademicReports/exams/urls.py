@@ -64,6 +64,7 @@ urlpatterns = [
         path('export_branch_wise_exam_result_status/', ExportBranchWiseExamResultStatusCSVViewSet.as_view(), name='export_branch_wise_exam_result_status'),
         path('export_section_exam_results/', ExportSectionExamResultsCSVViewSet.as_view(), name='export_section_exam_results'),
         path('export_branch_section_exam_results/', BranchSectionsExamResultsXLSXView.as_view(), name='branch_section_exam_results'),
+        path('export_section_exam_results_template/', ExportSectionExamResultsTemplateXLSXView.as_view(), name='export_section_exam_results_template'),
 
         path('publish_progress_card_for_exam/<int:exam_id>/', publish_progress_card_for_exam, name='publish_progress_card_for_exam'),
         path('view_exam_details/<int:exam_id>/', view_exam_details, name='view_exam_details'),
