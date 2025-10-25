@@ -1651,17 +1651,24 @@ class CoScholasticGradeDropdownViewSet(ModelViewSet):
     serializer_class = CoScholasticGradeDropdownSerializer
     http_method_names = ['get']
 
-@api_view(['GET'])
+@api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_marks_entry_expiry_datetime_in_exam_instance(request, exam_id):
     try:
         exam = Exam.objects.get(exam_id=exam_id, is_active=True)
     except Exam.DoesNotExist:
-        return Response({'exam_id': 'Invalid Exam ID'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'exam_id': 'Invalid Exam ID'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-    marks_entry_expiry_datetime_str = request.query_params.get('marks_entry_expiry_datetime')
+    # ✅ Take from JSON payload
+    marks_entry_expiry_datetime_str = request.data.get('marks_entry_expiry_datetime')
     if not marks_entry_expiry_datetime_str:
-        return Response({'marks_entry_expiry_datetime': 'marks_entry_expiry_datetime field is required'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'marks_entry_expiry_datetime': 'This field is required.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     # ✅ Convert string → datetime
     try:
@@ -1678,24 +1685,75 @@ def update_marks_entry_expiry_datetime_in_exam_instance(request, exam_id):
 
     now = timezone.now()
     if marks_entry_expiry_datetime <= now:
-        raise serializers.ValidationError({
-            "marks_entry_expiry_datetime": "Marks entry expiry datetime must be in the future."
-        })
+        return Response(
+            {"marks_entry_expiry_datetime": "Marks entry expiry datetime must be in the future."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-    # ✅ Ensure expiry is after exam end date (exact date, not end of day)
+    # ✅ Ensure expiry is after exam end date
     if exam.end_date:
         end_datetime = timezone.make_aware(datetime.datetime.combine(exam.end_date, datetime.time.min))
         if marks_entry_expiry_datetime <= end_datetime:
-            raise serializers.ValidationError({
-                "marks_entry_expiry_datetime": "Marks entry expiry datetime must be after the exam end date."
-            })
+            return Response(
+                {"marks_entry_expiry_datetime": "Marks entry expiry datetime must be after the exam end date."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
+    # ✅ Save updated datetime
     exam.marks_entry_expiry_datetime = marks_entry_expiry_datetime
-    
-    
     exam.save(update_fields=['marks_entry_expiry_datetime'])
 
-    return Response({'message': 'Marks Entry Expiry Date Updated Successfully'}, status=status.HTTP_200_OK)
+    return Response(
+        {'message': 'Marks Entry Expiry Date Updated Successfully'},
+        status=status.HTTP_200_OK
+    )
+
+
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def update_marks_entry_expiry_datetime_in_exam_instance(request, exam_id):
+#     try:
+#         exam = Exam.objects.get(exam_id=exam_id, is_active=True)
+#     except Exam.DoesNotExist:
+#         return Response({'exam_id': 'Invalid Exam ID'}, status=status.HTTP_400_BAD_REQUEST)
+
+#     marks_entry_expiry_datetime_str = request.query_params.get('marks_entry_expiry_datetime')
+#     if not marks_entry_expiry_datetime_str:
+#         return Response({'marks_entry_expiry_datetime': 'marks_entry_expiry_datetime field is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+#     # ✅ Convert string → datetime
+#     try:
+#         marks_entry_expiry_datetime = datetime.datetime.fromisoformat(marks_entry_expiry_datetime_str)
+#     except ValueError:
+#         return Response(
+#             {'marks_entry_expiry_datetime': 'Invalid datetime format. Use ISO format: YYYY-MM-DDTHH:MM:SS'},
+#             status=status.HTTP_400_BAD_REQUEST
+#         )
+
+#     # ✅ Make timezone-aware if it's naive
+#     if timezone.is_naive(marks_entry_expiry_datetime):
+#         marks_entry_expiry_datetime = timezone.make_aware(marks_entry_expiry_datetime)
+
+#     now = timezone.now()
+#     if marks_entry_expiry_datetime <= now:
+#         raise serializers.ValidationError({
+#             "marks_entry_expiry_datetime": "Marks entry expiry datetime must be in the future."
+#         })
+
+#     # ✅ Ensure expiry is after exam end date (exact date, not end of day)
+#     if exam.end_date:
+#         end_datetime = timezone.make_aware(datetime.datetime.combine(exam.end_date, datetime.time.min))
+#         if marks_entry_expiry_datetime <= end_datetime:
+#             raise serializers.ValidationError({
+#                 "marks_entry_expiry_datetime": "Marks entry expiry datetime must be after the exam end date."
+#             })
+
+#     exam.marks_entry_expiry_datetime = marks_entry_expiry_datetime
+    
+    
+#     exam.save(update_fields=['marks_entry_expiry_datetime'])
+
+#     return Response({'message': 'Marks Entry Expiry Date Updated Successfully'}, status=status.HTTP_200_OK)
 
 
 
@@ -2936,7 +2994,7 @@ class BranchSectionsExamResultsXLSXView(APIView):
 #         response['Content-Disposition'] = f'attachment; filename="{filename}"'
 #         return response
 
-@api_view(['GET'])
+@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def publish_progress_card_for_exam(request, exam_id):
     try:
@@ -2952,12 +3010,21 @@ def publish_progress_card_for_exam(request, exam_id):
     progresscard_mapping = ExamProgressCardMapping.objects.filter(exam=exam, is_active=True).first()
     if not progresscard_mapping:
         return Response({'message': 'Progress Card Template Not Yet Mapped'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    exam.is_progress_card_visible = True 
+    exam.save()
 
-    # Get relevant section IDs first
+    # Filter sections whose results are published (status_id = 4)
     section_qs = SectionWiseExamResultStatus.objects.filter(
         exam=exam, is_active=True, status_id=4
     )
+
     section_ids = list(section_qs.values_list('section__section_id', flat=True))
+
+    # If no sections are ready, notify
+    if not section_ids:
+        return Response({'message': 'No sections with published results found.'},
+                        status=status.HTTP_400_BAD_REQUEST)
 
     # Update progress card download flag
     section_qs.update(is_progress_card_downloaded=True)
@@ -2974,3 +3041,21 @@ def publish_progress_card_for_exam(request, exam_id):
     }, status=status.HTTP_200_OK)
 
 
+
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def view_exam_details(request, exam_id):
+#     try:
+#         exam = Exam.objects.get(exam_id=exam_id, is_active=True)
+#     except Exam.DoesNotExist:
+#         return Response({'exam_id': 'Invalid Exam ID'}, status=status.HTTP_400_BAD_REQUEST)
+    
+#     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+#     exam_skill_instances = ExamSubjectSkillInstance.objects.filter(exam_instance__exam_instance_id__in=exam_instances.values_list('exam_instance_id', flat=True), is_active=True)
+
+#     exam_data = {
+#         'exam_type' : exam.exam_type.name,
+#         'exam_name'
+#     }
+
+#     return Response({})
