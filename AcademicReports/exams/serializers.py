@@ -1303,3 +1303,102 @@ class ExamResultStatusDropdownSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExamResultStatus
         fields = ['id', 'name']
+
+class ExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
+    subject_skill_name = serializers.CharField(source='subject_skill.name', read_only=True)
+
+    class Meta:
+        model = ExamSubjectSkillInstance
+        fields = [
+            'subject_skill_name',
+            'has_external_marks',
+            'maximum_marks_external',
+            'cut_off_marks_external',
+            'has_internal_marks',
+            'maximum_marks_internal',
+            'cut_off_marks_internal',
+            'has_subject_co_scholastic_grade',
+        ]
+
+
+class ExamInstanceSerializer(serializers.ModelSerializer):
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    date = serializers.SerializerMethodField()
+    start_time = serializers.SerializerMethodField()
+    end_time = serializers.SerializerMethodField()
+    subject_skills = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ExamInstance
+        fields = [
+            'subject_name',
+            'date',
+            'start_time',
+            'end_time',
+            'is_optional',
+            'has_external_marks',
+            'maximum_marks_external',
+            'cut_off_marks_external',
+            'has_internal_marks',
+            'maximum_marks_internal',
+            'cut_off_marks_internal',
+            'has_subject_co_scholastic_grade',
+            'has_subject_skills',
+            'subject_skills',
+        ]
+
+    def get_date(self, obj):
+        return obj.date.strftime("%d-%b-%Y") if obj.date else None
+
+    def get_start_time(self, obj):
+        return obj.exam_start_time.strftime("%I:%M %p") if obj.exam_start_time else None
+
+    def get_end_time(self, obj):
+        return obj.exam_end_time.strftime("%I:%M %p") if obj.exam_end_time else None
+
+    def get_subject_skills(self, obj):
+        skills_qs = obj.exam_subject_skills_instance_exam_instance.filter(is_active=True)
+        return ExamSubjectSkillInstanceSerializer(skills_qs, many=True).data
+
+
+class ExamSerializer(serializers.ModelSerializer):
+    exam_type = serializers.CharField(source='exam_type.name', default=None)
+    academic_year = serializers.CharField(source='academic_year.name', default=None)
+    exam_status = serializers.CharField(source='exam_status.name', default=None)
+    start_date = serializers.SerializerMethodField()
+    end_date = serializers.SerializerMethodField()
+    marks_entry_expiry_datetime = serializers.SerializerMethodField()
+    marks_entry_expiry_datetime_backup = serializers.SerializerMethodField()
+    Subjects = ExamInstanceSerializer(source='exam_instance_exam', many=True)
+
+    class Meta:
+        model = Exam
+        fields = [
+            'exam_type',
+            'name',
+            'academic_year',
+            'exam_status',
+            'start_date',
+            'end_date',
+            'marks_entry_expiry_datetime',
+            'marks_entry_expiry_datetime_backup',
+            'is_visible',
+            'is_progress_card_visible',
+            'Subjects'
+        ]
+
+    def get_start_date(self, obj):
+        return obj.start_date.strftime("%d-%b-%Y") if obj.start_date else None
+
+    def get_end_date(self, obj):
+        return obj.end_date.strftime("%d-%b-%Y") if obj.end_date else None
+
+    def get_marks_entry_expiry_datetime(self, obj):
+        if obj.marks_entry_expiry_datetime:
+            return timezone.localtime(obj.marks_entry_expiry_datetime).strftime("%d-%b-%Y %I:%M %p")
+        return None
+
+    def get_marks_entry_expiry_datetime_backup(self, obj):
+        if obj.marks_entry_expiry_datetime:
+            return timezone.localtime(obj.marks_entry_expiry_datetime).strftime("%Y-%m-%d %H:%M:%S")
+        return None

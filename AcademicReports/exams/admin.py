@@ -306,4 +306,10 @@ class SectionWiseExamResultStatusAdmin(admin.ModelAdmin):
         }),
     )
 
-admin.site.register(ExamStatus)
+
+@admin.register(ExamStatus)
+class ExamStatusAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('name',)
+    ordering = ('id',)
