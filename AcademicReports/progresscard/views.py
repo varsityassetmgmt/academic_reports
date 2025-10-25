@@ -1203,6 +1203,7 @@ from datetime import datetime
 
 class DownloadBulkSectionProgressStreamingCardsAPIView2(APIView):
     permission_classes = [IsAuthenticated]
+    authentication_classes = [QueryParameterTokenAuthentication,SessionAuthentication]
 
     def get(self, request, *args, **kwargs):
         section_id = request.query_params.get("section_id")
