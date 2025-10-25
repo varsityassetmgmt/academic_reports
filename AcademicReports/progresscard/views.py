@@ -1088,3 +1088,126 @@ class DownloadBulkSectionProgressStreamingCardsAPIView(APIView):
 #         except Exception as e:
 #             print("❌ PDF generation error:", e)
 #             return None
+
+
+
+import tempfile
+from django.http import FileResponse
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.template import engines
+from django.utils import timezone
+from django.conf import settings
+from PyPDF2 import PdfMerger
+from io import BytesIO
+import pdfkit
+
+class DownloadBulkSectionProgressStreamingCardsAPIView2(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        section_id = request.query_params.get("section_id")
+        exam_id = request.query_params.get("exam_id")
+
+        if not section_id or not exam_id:
+            return Response({"error": "section_id and exam_id are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            exam = Exam.objects.select_related("progress_card_mapping__template").get(pk=exam_id)
+        except Exam.DoesNotExist:
+            return Response({"error": "Exam not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        mapping = getattr(exam, "progress_card_mapping", None)
+        if not mapping or not mapping.template:
+            return Response({"error": "No progress card template assigned"}, status=status.HTTP_400_BAD_REQUEST)
+
+        template = mapping.template
+
+        students = Student.objects.filter(section_id=section_id)
+        if not students.exists():
+            return Response({"error": "No students found for this section"}, status=status.HTTP_404_NOT_FOUND)
+
+        summaries = StudentExamSummary.objects.filter(
+            exam=exam, student__section_id=section_id, is_progresscard=True
+        ).select_related("student")
+        summary_map = {s.student_id: s for s in summaries}
+
+        # ✅ Use a temporary file to write merged PDF incrementally
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
+            merger = PdfMerger()
+
+            for idx, student in enumerate(students, start=1):
+                summary = summary_map.get(student.student_id)
+                if not summary:
+                    continue
+
+                pdf_bytes = self.generate_student_pdf(request, student, exam, template)
+                if pdf_bytes:
+                    merger.append(BytesIO(pdf_bytes))
+                    print(f"[{idx}/{students.count()}] Added {student.name}")
+
+            merger.write(temp_file)
+            merger.close()
+            temp_file.seek(0)
+
+            filename = f"{exam.name}_ProgressCards_{timezone.now().strftime('%Y%m%d_%H%M%S')}.pdf".replace(" ", "_")
+
+            # ✅ Stream final merged file efficiently
+            response = FileResponse(open(temp_file.name, "rb"), content_type="application/pdf")
+            response["Content-Disposition"] = f'attachment; filename="{filename}"'
+            return response
+
+    def generate_student_pdf(self, request, student, exam, template):
+        exam_results = ExamResult.objects.filter(
+            student=student, exam_instance__exam=exam
+        ).select_related("exam_instance__subject")
+
+        summary = StudentExamSummary.objects.filter(student=student, exam=exam).first()
+
+        context = {
+            "student": student,
+            "exam": exam,
+            "exam_results": exam_results,
+            "summary": summary,
+            "generated_at": timezone.now(),
+        }
+
+        if template.script:
+            try:
+                exec(template.script, {}, context)
+            except Exception as e:
+                context["script_error"] = str(e)
+
+        html = self.render_template_from_db(template.html_template, template.css_styles, context)
+        return self.html_to_pdf(html, request)
+
+    def render_template_from_db(self, html_text, css_text, context):
+        django_engine = engines["django"]
+        html = f"<style>{css_text or ''}</style>{html_text}"
+        template = django_engine.from_string(html)
+        return template.render(context)
+
+    def html_to_pdf(self, rendered_html, request):
+        base_url = request.build_absolute_uri("/")
+        options = {
+            "enable-local-file-access": "",
+            "page-size": "A4",
+            "encoding": "UTF-8",
+            "margin-top": "10mm",
+            "margin-bottom": "10mm",
+            "margin-left": "10mm",
+            "margin-right": "10mm",
+            "quiet": "",
+        }
+        rendered_html = rendered_html.replace('src="/static/', f'src="{base_url}static/')
+
+        config = None
+        if hasattr(settings, "WKHTMLTOPDF_CMD"):
+            config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_CMD)
+
+        try:
+            return pdfkit.from_string(rendered_html, False, configuration=config, options=options)
+        except Exception as e:
+            print("PDF generation error:", e)
+            return None

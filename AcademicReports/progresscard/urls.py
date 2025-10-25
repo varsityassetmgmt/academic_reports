@@ -16,7 +16,9 @@ urlpatterns = [
     # path('bulk_download_section_progress_cards/',DownloadBulkSectionProgressCardsAPIView.as_view()),
 
 #
-    path('bulk_download_section_progress_cards/',DownloadBulkSectionProgressStreamingCardsAPIView.as_view()),
+    # path('bulk_download_section_progress_cards/',DownloadBulkSectionProgressStreamingCardsAPIView.as_view()),
+
+    path('bulk_download_section_progress_cards/',DownloadBulkSectionProgressStreamingCardsAPIView2.as_view()),
 
 
 
