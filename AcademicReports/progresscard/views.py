@@ -1091,15 +1091,117 @@ class DownloadBulkSectionProgressStreamingCardsAPIView(APIView):
 
 
 
-from django.http import StreamingHttpResponse
-from django.utils.timezone import now
-from django.conf import settings
-import pdfkit
-from io import BytesIO
-from PyPDF2 import PdfReader, PdfWriter
-from django.template import Template, Context
+# from django.http import StreamingHttpResponse
+# from django.utils.timezone import now
+# from django.conf import settings
+# import pdfkit
+# from io import BytesIO
+# from PyPDF2 import PdfReader, PdfWriter
+# from django.template import Template, Context
 
-class DownloadBulkSectionProgressStreamingCardsAPIView2(APIView):
+# class DownloadBulkSectionProgressStreamingCardsAPIView2(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request, *args, **kwargs):
+#         section_id = request.query_params.get("section_id")
+#         exam_id = request.query_params.get("exam_id")
+
+#         if not section_id or not exam_id:
+#             return Response({"error": "section_id and exam_id are required"}, status=400)
+
+#         exam = Exam.objects.filter(exam_id=exam_id).first()
+#         if not exam:
+#             return Response({"error": "Exam not found"}, status=404)
+
+#         mapping = ExamProgressCardMapping.objects.filter(exam=exam, is_active=True).first()
+#         if not mapping or not mapping.template:
+#             return Response({"error": "Progress card template not found"}, status=404)
+
+#         template = mapping.template
+#         html_template, css_styles, script = template.html_template, template.css_styles, template.script
+#         base_url = request.build_absolute_uri("/")[:-1]
+#         wkhtmltopdf_path = getattr(settings, "WKHTMLTOPDF_CMD", "/usr/bin/wkhtmltopdf")
+#         config = pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
+#         options = {"enable-local-file-access": ""}
+
+#         students = Student.objects.filter(section_id=section_id, is_active=True)
+#         timestamp = now().strftime("%Y%m%d_%H%M%S")
+#         filename = f"{exam.name}_ProgressCards_{timestamp}.pdf".replace(" ", "_")
+
+#         def pdf_generator():
+#             pdf_writer = PdfWriter()
+#             buffer = BytesIO()
+
+#             for idx, student in enumerate(students, start=1):
+#                 summary = StudentExamSummary.objects.filter(
+#                     exam=exam, student=student, is_progresscard=True
+#                 ).first()
+#                 if not summary:
+#                     continue
+
+#                 context = {
+#                     "student": student,
+#                     "summary": summary,
+#                     "exam": exam,
+#                     "branch": student.branch,
+#                     "section": student.section,
+#                 }
+
+#                 if script:
+#                     exec(script, {}, context)
+
+#                 # ✅ Render directly from DB fields (no template file)
+#                 template_string = f"""
+#                 <!DOCTYPE html>
+#                 <html>
+#                 <head>
+#                 <style>{css_styles or ''}</style>
+#                 </head>
+#                 <body>{html_template or ''}</body>
+#                 </html>
+#                 """
+#                 rendered_html = Template(template_string).render(Context(context))
+
+#                 rendered_html = rendered_html.replace('src="/static/', f'src="{base_url}/static/')
+#                 pdf_bytes = pdfkit.from_string(rendered_html, False, configuration=config, options=options)
+
+#                 reader = PdfReader(BytesIO(pdf_bytes))
+#                 for page in reader.pages:
+#                     pdf_writer.add_page(page)
+
+#                 # Stream every few students
+#                 if idx % 5 == 0 or idx == len(students):
+#                     buffer.seek(0)
+#                     pdf_writer.write(buffer)
+#                     yield buffer.getvalue()
+#                     buffer.truncate(0)
+#                     buffer.seek(0)
+
+#             yield b"%%EOF"
+
+
+#         response = StreamingHttpResponse(pdf_generator(), content_type="application/pdf")
+#         response["Content-Disposition"] = f'attachment; filename="{filename}"'
+#         return response
+
+
+
+
+from django.http import StreamingHttpResponse
+from django.template import Template, Context
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from io import BytesIO
+from PyPDF2 import PdfWriter, PdfReader
+import pdfkit
+from django.utils import timezone
+from django.conf import settings
+from datetime import datetime
+
+
+class DownloadBulkSectionProgressCardsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
@@ -1107,29 +1209,45 @@ class DownloadBulkSectionProgressStreamingCardsAPIView2(APIView):
         exam_id = request.query_params.get("exam_id")
 
         if not section_id or not exam_id:
-            return Response({"error": "section_id and exam_id are required"}, status=400)
+            return Response(
+                {"error": "section_id and exam_id are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        exam = Exam.objects.filter(exam_id=exam_id).first()
-        if not exam:
-            return Response({"error": "Exam not found"}, status=404)
+        try:
+            exam = Exam.objects.select_related(
+                "progress_card_mapping__template"
+            ).get(pk=exam_id)
+        except Exam.DoesNotExist:
+            return Response({"error": "Exam not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        mapping = ExamProgressCardMapping.objects.filter(exam=exam, is_active=True).first()
+        mapping = getattr(exam, "progress_card_mapping", None)
         if not mapping or not mapping.template:
-            return Response({"error": "Progress card template not found"}, status=404)
+            return Response({"error": "No progress card template assigned"}, status=status.HTTP_400_BAD_REQUEST)
 
         template = mapping.template
-        html_template, css_styles, script = template.html_template, template.css_styles, template.script
-        base_url = request.build_absolute_uri("/")[:-1]
-        wkhtmltopdf_path = getattr(settings, "WKHTMLTOPDF_CMD", "/usr/bin/wkhtmltopdf")
-        config = pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
-        options = {"enable-local-file-access": ""}
+        students = Student.objects.filter(section_id=section_id).order_by("name")
+        if not students.exists():
+            return Response({"error": "No students found"}, status=status.HTTP_404_NOT_FOUND)
 
-        students = Student.objects.filter(section_id=section_id, is_active=True)
-        timestamp = now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{exam.name}_ProgressCards_{timestamp}.pdf".replace(" ", "_")
+        base_url = request.build_absolute_uri("/")
+        options = {
+            "enable-local-file-access": "",
+            "page-size": "A4",
+            "encoding": "UTF-8",
+            "margin-top": "10mm",
+            "margin-bottom": "10mm",
+            "margin-left": "10mm",
+            "margin-right": "10mm",
+            "quiet": "",
+        }
+        config = None
+        if hasattr(settings, "WKHTMLTOPDF_CMD"):
+            config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_CMD)
 
+        # ✅ Streaming Generator
         def pdf_generator():
-            pdf_writer = PdfWriter()
+            writer = PdfWriter()
             buffer = BytesIO()
 
             for idx, student in enumerate(students, start=1):
@@ -1139,48 +1257,57 @@ class DownloadBulkSectionProgressStreamingCardsAPIView2(APIView):
                 if not summary:
                     continue
 
+                exam_results = ExamResult.objects.filter(
+                    student=student, exam_instance__exam=exam
+                ).select_related("exam_instance__subject", "grade")
+
                 context = {
                     "student": student,
-                    "summary": summary,
                     "exam": exam,
-                    "branch": student.branch,
-                    "section": student.section,
+                    "exam_results": exam_results,
+                    "summary": summary,
+                    "generated_at": timezone.now(),
                 }
 
-                if script:
-                    exec(script, {}, context)
+                # 🧩 Execute optional script stored in DB
+                if template.script:
+                    try:
+                        exec(template.script, {}, context)
+                    except Exception as e:
+                        context["script_error"] = str(e)
 
-                # ✅ Render directly from DB fields (no template file)
-                template_string = f"""
-                <!DOCTYPE html>
+                # 🧩 Render HTML from DB template
+                html = f"""
                 <html>
-                <head>
-                <style>{css_styles or ''}</style>
-                </head>
-                <body>{html_template or ''}</body>
+                <head><style>{template.css_styles or ''}</style></head>
+                <body>{template.html_template or ''}</body>
                 </html>
                 """
-                rendered_html = Template(template_string).render(Context(context))
+                rendered_html = Template(html).render(Context(context))
+                rendered_html = rendered_html.replace(
+                    'src="/static/', f'src="{base_url}static/'
+                )
 
-                rendered_html = rendered_html.replace('src="/static/', f'src="{base_url}/static/')
-                pdf_bytes = pdfkit.from_string(rendered_html, False, configuration=config, options=options)
+                try:
+                    pdf_bytes = pdfkit.from_string(
+                        rendered_html, False, configuration=config, options=options
+                    )
+                    reader = PdfReader(BytesIO(pdf_bytes))
+                    for page in reader.pages:
+                        writer.add_page(page)
+                except Exception as e:
+                    print("PDF generation failed for student:", student.name, e)
+                    continue
 
-                reader = PdfReader(BytesIO(pdf_bytes))
-                for page in reader.pages:
-                    pdf_writer.add_page(page)
-
-                # Stream every few students
-                if idx % 5 == 0 or idx == len(students):
-                    buffer.seek(0)
-                    pdf_writer.write(buffer)
-                    yield buffer.getvalue()
-                    buffer.truncate(0)
-                    buffer.seek(0)
+                # Stream per student (immediate download growth)
+                writer.write(buffer)
+                yield buffer.getvalue()
+                buffer.truncate(0)
+                buffer.seek(0)
 
             yield b"%%EOF"
 
-
+        filename = f"{exam.name}_Section_{section_id}_ProgressCards_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         response = StreamingHttpResponse(pdf_generator(), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
-
