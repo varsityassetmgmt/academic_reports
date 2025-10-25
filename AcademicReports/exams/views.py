@@ -2603,44 +2603,37 @@ class ExportSectionExamResultsCSVViewSet(APIView):
 
 
 #============================== Branch Exam Results Download ====================================
+
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
 from django.http import StreamingHttpResponse
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
 from rest_framework.response import Response
+from rest_framework import status
 
 class BranchSectionsExamResultsXLSXView(APIView):
     authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     filename_template = "{branch}_{exam}_Exam_Results.xlsx"
-    chunk_size = 100  # number of students to process at a time
 
     def get(self, request, *args, **kwargs):
         branch_wise_exam_result_status_id = request.query_params.get('branch_wise_exam_result_status_id')
         if not branch_wise_exam_result_status_id:
-            return Response(
-                {'branch_wise_exam_result_status_id': "This field is required in the URL."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'branch_wise_exam_result_status_id': "This field is required in the URL."}, status=400)
 
-        # Fetch branch and exam
         branch_status = BranchWiseExamResultStatus.objects.select_related('branch', 'exam', 'academic_year').filter(
             id=branch_wise_exam_result_status_id,
             is_active=True
         ).first()
         if not branch_status:
-            return Response(
-                {'branch_wise_exam_result_status_id': "Invalid Branch Wise Exam Result Status ID."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'branch_wise_exam_result_status_id': "Invalid Branch Wise Exam Result Status ID."}, status=400)
 
         exam = branch_status.exam
 
-        # Fetch sections
+        # Fetch all sections belonging to this branch and exam
         sections = Section.objects.filter(
             academic_year=branch_status.academic_year,
             branch=branch_status.branch,
@@ -2651,21 +2644,19 @@ class BranchSectionsExamResultsXLSXView(APIView):
         ).distinct().order_by('class_name__class_sequence', 'name')
 
         if not sections.exists():
-            return Response(
-                {"message": ["No sections found matching the given branch, exam classes, and orientations."]},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({
+                "message": ["No sections found matching the given branch, exam classes, and orientations."]
+            }, status=status.HTTP_404_NOT_FOUND)
 
         # Fetch exam instances
         exam_instances = list(ExamInstance.objects.filter(exam=exam, is_active=True).prefetch_related('subject_skills'))
 
-        # Map skill instances
+        # Map skill and result data for quick lookup
         skill_instances_qs = ExamSubjectSkillInstance.objects.filter(
             exam_instance__in=exam_instances, is_active=True
         ).select_related('subject_skill', 'exam_instance')
         skill_instance_map = {(si.exam_instance_id, si.subject_skill_id): si for si in skill_instances_qs}
 
-        # Fetch student IDs and exam results
         student_ids = Student.objects.filter(section__in=sections, is_active=True).values_list('student_id', flat=True)
         exam_results_qs = ExamResult.objects.filter(
             student_id__in=student_ids, exam_instance__in=exam_instances, is_active=True
@@ -2678,325 +2669,141 @@ class BranchSectionsExamResultsXLSXView(APIView):
         ).select_related('exam_attendance', 'co_scholastic_grade', 'skill')
         skill_result_map = {(sr.exam_result_id, sr.skill_id): sr for sr in skill_results_qs}
 
-        # ===== Streaming generator for Excel =====
-        def generate_excel():
-            wb = Workbook(write_only=True)
-            header_font = Font(bold=True)
-            center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        # ===== Workbook Setup =====
+        wb = Workbook()
+        wb.remove(wb.active)
+        header_font = Font(bold=True)
+        center = Alignment(horizontal='center', vertical='center', wrap_text=True)
 
-            for section in sections:
-                ws_title = f"{section.class_name.name}_{section.name}"[:31]
-                ws = wb.create_sheet(title=ws_title)
+        for section in sections:
+            ws_title = f"{section.class_name.name}_{section.name}"[:31]
+            ws = wb.create_sheet(title=ws_title)
 
-                # Dynamic header
-                headers = ["Sl.No.", "Student Name", "SCS Number", "Marks Type"]
-                external_row = internal_row = grade_row = False
+            # ===== Dynamic Header =====
+            headers = ["Sl.No.", "Student Name", "SCS Number", "Marks Type"]
+            external_row = internal_row = grade_row = False
+
+            for instance in exam_instances:
+                if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
+                    headers.append(instance.subject.name)
+                    if instance.has_external_marks:
+                        external_row = True
+                    if instance.has_internal_marks:
+                        internal_row = True
+                    if instance.has_subject_co_scholastic_grade:
+                        grade_row = True
+
+                for skill in instance.subject_skills.all():
+                    si = skill_instance_map.get((instance.exam_instance_id, skill.id))
+                    if si and (si.has_external_marks or si.has_internal_marks or si.has_subject_co_scholastic_grade):
+                        headers.append(f"{instance.subject.name} - {skill.name}")
+                        if si.has_external_marks:
+                            external_row = True
+                        if si.has_internal_marks:
+                            internal_row = True
+                        if si.has_subject_co_scholastic_grade:
+                            grade_row = True
+
+            ws.append(headers)
+            for col_idx in range(1, len(headers) + 1):
+                cell = ws.cell(row=1, column=col_idx)
+                cell.font = header_font
+                cell.alignment = center
+
+            # ===== Students and Results =====
+            students = Student.objects.filter(
+                section=section, is_active=True
+            ).exclude(admission_status__admission_status_id=3)
+
+            sl_no = 1
+            for student in students:
+                # Precompute mark values
+                marks = {
+                    'external_marks': [''] * (len(headers) - 4),
+                    'internal_marks': [''] * (len(headers) - 4),
+                    'grade': [''] * (len(headers) - 4),
+                }
+                col_index = 0
 
                 for instance in exam_instances:
+                    exam_result = exam_result_map.get((student.student_id, instance.exam_instance_id))
                     if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
-                        headers.append(instance.subject.name)
-                        external_row |= instance.has_external_marks
-                        internal_row |= instance.has_internal_marks
-                        grade_row |= instance.has_subject_co_scholastic_grade
+                        if exam_result:
+                            attendance = exam_result.exam_attendance
+                            # External
+                            if instance.has_external_marks:
+                                marks['external_marks'][col_index] = (
+                                    exam_result.external_marks if attendance and attendance.exam_attendance_status_id == 1
+                                    else (attendance.short_code if attendance else '')
+                                )
+                            # Internal
+                            if instance.has_internal_marks:
+                                marks['internal_marks'][col_index] = exam_result.internal_marks or ''
+                            # Grade
+                            if instance.has_subject_co_scholastic_grade and exam_result.co_scholastic_grade:
+                                marks['grade'][col_index] = exam_result.co_scholastic_grade.name
+                        col_index += 1
 
+                    # Skills
                     for skill in instance.subject_skills.all():
                         si = skill_instance_map.get((instance.exam_instance_id, skill.id))
-                        if si and (si.has_external_marks or si.has_internal_marks or si.has_subject_co_scholastic_grade):
-                            headers.append(f"{instance.subject.name} - {skill.name}")
-                            external_row |= si.has_external_marks
-                            internal_row |= si.has_internal_marks
-                            grade_row |= si.has_subject_co_scholastic_grade
+                        if not si:
+                            continue
+                        skill_result = exam_result and skill_result_map.get((exam_result.exam_result_id, skill.id))
+                        if skill_result:
+                            attendance = skill_result.exam_attendance
+                            # External
+                            if si.has_external_marks:
+                                marks['external_marks'][col_index] = (
+                                    skill_result.external_marks if attendance and attendance.exam_attendance_status_id == 1
+                                    else (attendance.short_code if attendance else '')
+                                )
+                            # Internal
+                            if si.has_internal_marks:
+                                marks['internal_marks'][col_index] = skill_result.internal_marks or ''
+                            # Grade
+                            if si.has_subject_co_scholastic_grade and skill_result.co_scholastic_grade:
+                                marks['grade'][col_index] = skill_result.co_scholastic_grade.name
+                        col_index += 1
 
-                ws.append(headers)
+                # Rows to write
+                row_start = ws.max_row + 1
+                row_types = []
+                if external_row:
+                    row_types.append(("External Marks", marks['external_marks']))
+                if internal_row:
+                    row_types.append(("Internal Marks", marks['internal_marks']))
+                if grade_row:
+                    row_types.append(("Grade", marks['grade']))
 
-                # Fetch students in chunks
-                students_qs = Student.objects.filter(
-                    section=section, is_active=True
-                ).exclude(admission_status__admission_status_id=3)
+                # Write student rows
+                for i, (mark_type, mark_values) in enumerate(row_types):
+                    ws.append([sl_no if i == 0 else "", student.name if i == 0 else "", student.SCS_Number if i == 0 else "", mark_type] + mark_values)
 
-                students = list(students_qs)
-                sl_no = 1
-                for i in range(0, len(students), self.chunk_size):
-                    chunk = students[i:i + self.chunk_size]
-                    for student in chunk:
-                        marks = {
-                            'external_marks': [''] * (len(headers) - 4),
-                            'internal_marks': [''] * (len(headers) - 4),
-                            'grade': [''] * (len(headers) - 4),
-                        }
-                        col_index = 0
+                # Merge cells vertically for Sl.No., Student Name, SCS Number
+                if len(row_types) > 1:
+                    ws.merge_cells(start_row=row_start, start_column=1, end_row=row_start + len(row_types) - 1, end_column=1)  # Sl.No.
+                    ws.merge_cells(start_row=row_start, start_column=2, end_row=row_start + len(row_types) - 1, end_column=2)  # Student Name
+                    ws.merge_cells(start_row=row_start, start_column=3, end_row=row_start + len(row_types) - 1, end_column=3)  # SCS Number
 
-                        for instance in exam_instances:
-                            exam_result = exam_result_map.get((student.student_id, instance.exam_instance_id))
-                            if instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade:
-                                if exam_result:
-                                    attendance = exam_result.exam_attendance
-                                    if instance.has_external_marks:
-                                        marks['external_marks'][col_index] = (
-                                            exam_result.external_marks if attendance and attendance.exam_attendance_status_id == 1
-                                            else (attendance.short_code if attendance else '')
-                                        )
-                                    if instance.has_internal_marks:
-                                        marks['internal_marks'][col_index] = exam_result.internal_marks or ''
-                                    if instance.has_subject_co_scholastic_grade and exam_result.co_scholastic_grade:
-                                        marks['grade'][col_index] = exam_result.co_scholastic_grade.name
-                                col_index += 1
+                sl_no += 1
 
-                            for skill in instance.subject_skills.all():
-                                si = skill_instance_map.get((instance.exam_instance_id, skill.id))
-                                if not si:
-                                    continue
-                                skill_result = exam_result and skill_result_map.get((exam_result.exam_result_id, skill.id))
-                                if skill_result:
-                                    attendance = skill_result.exam_attendance
-                                    if si.has_external_marks:
-                                        marks['external_marks'][col_index] = (
-                                            skill_result.external_marks if attendance and attendance.exam_attendance_status_id == 1
-                                            else (attendance.short_code if attendance else '')
-                                        )
-                                    if si.has_internal_marks:
-                                        marks['internal_marks'][col_index] = skill_result.internal_marks or ''
-                                    if si.has_subject_co_scholastic_grade and skill_result.co_scholastic_grade:
-                                        marks['grade'][col_index] = skill_result.co_scholastic_grade.name
-                                col_index += 1
+        # ===== Stream XLSX =====
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
 
-                        # Write rows for student
-                        row_types = []
-                        if external_row: row_types.append(("External Marks", marks['external_marks']))
-                        if internal_row: row_types.append(("Internal Marks", marks['internal_marks']))
-                        if grade_row: row_types.append(("Grade", marks['grade']))
-
-                        row_start_index = ws._current_row + 1
-                        for idx, (mark_type, mark_values) in enumerate(row_types):
-                            ws.append([sl_no if idx == 0 else "", student.name if idx == 0 else "", student.SCS_Number if idx == 0 else "", mark_type] + mark_values)
-
-                        # Merge vertical cells for Sl.No., Student Name, SCS Number
-                        if len(row_types) > 1:
-                            ws.merge_cells(start_row=row_start_index, start_column=1, end_row=row_start_index + len(row_types) - 1, end_column=1)
-                            ws.merge_cells(start_row=row_start_index, start_column=2, end_row=row_start_index + len(row_types) - 1, end_column=2)
-                            ws.merge_cells(start_row=row_start_index, start_column=3, end_row=row_start_index + len(row_types) - 1, end_column=3)
-
-                        sl_no += 1
-
-            # Save workbook to BytesIO and yield bytes
-            output = io.BytesIO()
-            wb.save(output)
-            output.seek(0)
-            yield output.getvalue()
-
-        # ===== Stream the Excel =====
         filename = self.filename_template.format(
             branch=branch_status.branch.name.replace(" ", "_")[:20],
             exam=exam.name.replace(" ", "_")[:20],
         )
 
         response = StreamingHttpResponse(
-            generate_excel(),
+            output,
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
-
-# import io
-# from openpyxl import Workbook
-# from openpyxl.styles import Alignment, Font
-# from django.http import StreamingHttpResponse
-# from rest_framework.views import APIView
-# from rest_framework.permissions import IsAuthenticated
-# from rest_framework.response import Response
-# from rest_framework import status
-
-# class BranchSectionsExamResultsXLSXView(APIView):
-#     authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
-#     permission_classes = [IsAuthenticated]
-
-#     filename_template = "{branch}_{exam}_Exam_Results.xlsx"
-
-#     def get(self, request, *args, **kwargs):
-#         branch_wise_exam_result_status_id = request.query_params.get('branch_wise_exam_result_status_id')
-#         if not branch_wise_exam_result_status_id:
-#             return Response({'branch_wise_exam_result_status_id': "This field is required in the URL."}, status=400)
-
-#         branch_status = BranchWiseExamResultStatus.objects.select_related('branch', 'exam', 'academic_year').filter(
-#             id=branch_wise_exam_result_status_id,
-#             is_active=True
-#         ).first()
-#         if not branch_status:
-#             return Response({'branch_wise_exam_result_status_id': "Invalid Branch Wise Exam Result Status ID."}, status=400)
-
-#         exam = branch_status.exam
-
-#         # Fetch all sections belonging to this branch and exam
-#         sections = Section.objects.filter(
-#             academic_year=branch_status.academic_year,
-#             branch=branch_status.branch,
-#             class_name__class_name_id__in=exam.student_classes.values_list('class_name_id', flat=True),
-#             orientation__orientation_id__in=exam.orientations.values_list('orientation_id', flat=True),
-#             is_active=True,
-#             has_students=True
-#         ).distinct().order_by('class_name__class_sequence', 'name')
-
-#         if not sections.exists():
-#             return Response({
-#                 "message": ["No sections found matching the given branch, exam classes, and orientations."]
-#             }, status=status.HTTP_404_NOT_FOUND)
-
-#         # Fetch exam instances
-#         exam_instances = list(ExamInstance.objects.filter(exam=exam, is_active=True).prefetch_related('subject_skills'))
-
-#         # Map skill and result data for quick lookup
-#         skill_instances_qs = ExamSubjectSkillInstance.objects.filter(
-#             exam_instance__in=exam_instances, is_active=True
-#         ).select_related('subject_skill', 'exam_instance')
-#         skill_instance_map = {(si.exam_instance_id, si.subject_skill_id): si for si in skill_instances_qs}
-
-#         student_ids = Student.objects.filter(section__in=sections, is_active=True).values_list('student_id', flat=True)
-#         exam_results_qs = ExamResult.objects.filter(
-#             student_id__in=student_ids, exam_instance__in=exam_instances, is_active=True
-#         ).select_related('exam_attendance', 'co_scholastic_grade')
-#         exam_result_map = {(er.student_id, er.exam_instance_id): er for er in exam_results_qs}
-
-#         exam_result_ids = [er.exam_result_id for er in exam_results_qs]
-#         skill_results_qs = ExamSkillResult.objects.filter(
-#             exam_result_id__in=exam_result_ids
-#         ).select_related('exam_attendance', 'co_scholastic_grade', 'skill')
-#         skill_result_map = {(sr.exam_result_id, sr.skill_id): sr for sr in skill_results_qs}
-
-#         # ===== Workbook Setup =====
-#         wb = Workbook()
-#         wb.remove(wb.active)
-#         header_font = Font(bold=True)
-#         center = Alignment(horizontal='center', vertical='center', wrap_text=True)
-
-#         for section in sections:
-#             ws_title = f"{section.class_name.name}_{section.name}"[:31]
-#             ws = wb.create_sheet(title=ws_title)
-
-#             # ===== Dynamic Header =====
-#             headers = ["Sl.No.", "Student Name", "SCS Number", "Marks Type"]
-#             external_row = internal_row = grade_row = False
-
-#             for instance in exam_instances:
-#                 if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
-#                     headers.append(instance.subject.name)
-#                     if instance.has_external_marks:
-#                         external_row = True
-#                     if instance.has_internal_marks:
-#                         internal_row = True
-#                     if instance.has_subject_co_scholastic_grade:
-#                         grade_row = True
-
-#                 for skill in instance.subject_skills.all():
-#                     si = skill_instance_map.get((instance.exam_instance_id, skill.id))
-#                     if si and (si.has_external_marks or si.has_internal_marks or si.has_subject_co_scholastic_grade):
-#                         headers.append(f"{instance.subject.name} - {skill.name}")
-#                         if si.has_external_marks:
-#                             external_row = True
-#                         if si.has_internal_marks:
-#                             internal_row = True
-#                         if si.has_subject_co_scholastic_grade:
-#                             grade_row = True
-
-#             ws.append(headers)
-#             for col_idx in range(1, len(headers) + 1):
-#                 cell = ws.cell(row=1, column=col_idx)
-#                 cell.font = header_font
-#                 cell.alignment = center
-
-#             # ===== Students and Results =====
-#             students = Student.objects.filter(
-#                 section=section, is_active=True
-#             ).exclude(admission_status__admission_status_id=3)
-
-#             sl_no = 1
-#             for student in students:
-#                 # Precompute mark values
-#                 marks = {
-#                     'external_marks': [''] * (len(headers) - 4),
-#                     'internal_marks': [''] * (len(headers) - 4),
-#                     'grade': [''] * (len(headers) - 4),
-#                 }
-#                 col_index = 0
-
-#                 for instance in exam_instances:
-#                     exam_result = exam_result_map.get((student.student_id, instance.exam_instance_id))
-#                     if (instance.has_external_marks or instance.has_internal_marks or instance.has_subject_co_scholastic_grade):
-#                         if exam_result:
-#                             attendance = exam_result.exam_attendance
-#                             # External
-#                             if instance.has_external_marks:
-#                                 marks['external_marks'][col_index] = (
-#                                     exam_result.external_marks if attendance and attendance.exam_attendance_status_id == 1
-#                                     else (attendance.short_code if attendance else '')
-#                                 )
-#                             # Internal
-#                             if instance.has_internal_marks:
-#                                 marks['internal_marks'][col_index] = exam_result.internal_marks or ''
-#                             # Grade
-#                             if instance.has_subject_co_scholastic_grade and exam_result.co_scholastic_grade:
-#                                 marks['grade'][col_index] = exam_result.co_scholastic_grade.name
-#                         col_index += 1
-
-#                     # Skills
-#                     for skill in instance.subject_skills.all():
-#                         si = skill_instance_map.get((instance.exam_instance_id, skill.id))
-#                         if not si:
-#                             continue
-#                         skill_result = exam_result and skill_result_map.get((exam_result.exam_result_id, skill.id))
-#                         if skill_result:
-#                             attendance = skill_result.exam_attendance
-#                             # External
-#                             if si.has_external_marks:
-#                                 marks['external_marks'][col_index] = (
-#                                     skill_result.external_marks if attendance and attendance.exam_attendance_status_id == 1
-#                                     else (attendance.short_code if attendance else '')
-#                                 )
-#                             # Internal
-#                             if si.has_internal_marks:
-#                                 marks['internal_marks'][col_index] = skill_result.internal_marks or ''
-#                             # Grade
-#                             if si.has_subject_co_scholastic_grade and skill_result.co_scholastic_grade:
-#                                 marks['grade'][col_index] = skill_result.co_scholastic_grade.name
-#                         col_index += 1
-
-#                 # Rows to write
-#                 row_start = ws.max_row + 1
-#                 row_types = []
-#                 if external_row:
-#                     row_types.append(("External Marks", marks['external_marks']))
-#                 if internal_row:
-#                     row_types.append(("Internal Marks", marks['internal_marks']))
-#                 if grade_row:
-#                     row_types.append(("Grade", marks['grade']))
-
-#                 # Write student rows
-#                 for i, (mark_type, mark_values) in enumerate(row_types):
-#                     ws.append([sl_no if i == 0 else "", student.name if i == 0 else "", student.SCS_Number if i == 0 else "", mark_type] + mark_values)
-
-#                 # Merge cells vertically for Sl.No., Student Name, SCS Number
-#                 if len(row_types) > 1:
-#                     ws.merge_cells(start_row=row_start, start_column=1, end_row=row_start + len(row_types) - 1, end_column=1)  # Sl.No.
-#                     ws.merge_cells(start_row=row_start, start_column=2, end_row=row_start + len(row_types) - 1, end_column=2)  # Student Name
-#                     ws.merge_cells(start_row=row_start, start_column=3, end_row=row_start + len(row_types) - 1, end_column=3)  # SCS Number
-
-#                 sl_no += 1
-
-#         # ===== Stream XLSX =====
-#         output = io.BytesIO()
-#         wb.save(output)
-#         output.seek(0)
-
-#         filename = self.filename_template.format(
-#             branch=branch_status.branch.name.replace(" ", "_")[:20],
-#             exam=exam.name.replace(" ", "_")[:20],
-#         )
-
-#         response = StreamingHttpResponse(
-#             output,
-#             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-#         )
-#         response['Content-Disposition'] = f'attachment; filename="{filename}"'
-#         return response
 
     
 # import io
