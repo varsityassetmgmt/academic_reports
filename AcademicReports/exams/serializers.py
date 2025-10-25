@@ -1304,7 +1304,7 @@ class ExamResultStatusDropdownSerializer(serializers.ModelSerializer):
         model = ExamResultStatus
         fields = ['id', 'name']
 
-class ExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
+class ViewExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
     subject_skill_name = serializers.CharField(source='subject_skill.name', read_only=True)
 
     class Meta:
@@ -1321,7 +1321,7 @@ class ExamSubjectSkillInstanceSerializer(serializers.ModelSerializer):
         ]
 
 
-class ExamInstanceSerializer(serializers.ModelSerializer):
+class ViewExamInstanceSerializer(serializers.ModelSerializer):
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     date = serializers.SerializerMethodField()
     start_time = serializers.SerializerMethodField()
@@ -1358,10 +1358,10 @@ class ExamInstanceSerializer(serializers.ModelSerializer):
 
     def get_subject_skills(self, obj):
         skills_qs = obj.exam_subject_skills_instance_exam_instance.filter(is_active=True)
-        return ExamSubjectSkillInstanceSerializer(skills_qs, many=True).data
+        return ViewExamSubjectSkillInstanceSerializer(skills_qs, many=True).data
 
 
-class ExamSerializer(serializers.ModelSerializer):
+class ViewExamSerializer(serializers.ModelSerializer):
     exam_type = serializers.CharField(source='exam_type.name', default=None)
     academic_year = serializers.CharField(source='academic_year.name', default=None)
     exam_status = serializers.CharField(source='exam_status.name', default=None)
@@ -1369,7 +1369,7 @@ class ExamSerializer(serializers.ModelSerializer):
     end_date = serializers.SerializerMethodField()
     marks_entry_expiry_datetime = serializers.SerializerMethodField()
     marks_entry_expiry_datetime_backup = serializers.SerializerMethodField()
-    Subjects = ExamInstanceSerializer(source='exam_instance_exam', many=True)
+    Subjects = ViewExamInstanceSerializer(source='exam_instance_exam', many=True)
 
     class Meta:
         model = Exam

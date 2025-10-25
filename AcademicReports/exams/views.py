@@ -3049,5 +3049,5 @@ def view_exam_details(request, exam_id):
     except Exam.DoesNotExist:
         return Response({'exam_id': 'Invalid Exam ID'}, status=status.HTTP_400_BAD_REQUEST)
 
-    serializer = ExamSerializer(exam)
+    serializer = ViewExamSerializer(exam)
     return Response(serializer.data, status=status.HTTP_200_OK)
