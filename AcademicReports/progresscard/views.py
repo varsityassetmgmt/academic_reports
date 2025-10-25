@@ -1201,7 +1201,7 @@ from django.conf import settings
 from datetime import datetime
 
 
-class DownloadBulkSectionProgressCardsAPIView(APIView):
+class DownloadBulkSectionProgressStreamingCardsAPIView2(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
