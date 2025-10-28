@@ -4,6 +4,17 @@ from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 import datetime
 
+# ==================== Subject Category ====================
+class SubjectCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubjectCategory
+        fields = ['id', 'name']
+
+class SubjectCategoryDropdownSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubjectCategory
+        fields = ['id', 'name']
+
 # ==================== Subject ====================
 class SubjectSerializer(serializers.ModelSerializer):
     class Meta:
@@ -27,6 +38,13 @@ class SubjectSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+
+        category = attrs.get('category') or getattr(self.instance, 'category', None)
+        if not category:
+            raise serializers.ValidationError({
+                "category": "Category is required."
+            })
+
         academic_divisions = attrs.get('academic_devisions', [])
         class_names = attrs.get('class_names', [])
         if not academic_divisions and not class_names:
@@ -34,6 +52,7 @@ class SubjectSerializer(serializers.ModelSerializer):
                 "academic_devisions": "At least one academic division or class must be selected.",
                 "class_names": "At least one academic division or class must be selected."
             })
+        
         return attrs
 
 # ==================== SubjectSkill ====================
@@ -85,6 +104,17 @@ class ExamTypeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("An exam type with this name already exists.")
         
         return value
+    
+# ==================== Exam Category ====================
+class ExamCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExamCategory
+        fields = ['id', 'name']
+
+class ExamCategoryDropdownSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExamCategory
+        fields = ['id', 'name']
 
 # ==================== Exam ====================
 class ExamSerializer(serializers.ModelSerializer):
@@ -108,8 +138,12 @@ class ExamSerializer(serializers.ModelSerializer):
         name = self.initial_data.get('name') or getattr(self.instance, 'name', None)
         if not name or str(name).strip() == "":
             raise serializers.ValidationError({"name": "Exam name is required."})
-
-
+        
+        category = self.initial_data.get('category') or getattr(self.instance, 'category', None)
+        if not category:
+            raise serializers.ValidationError({
+                "category": "Category is required."
+            })
 
         academic_year = (
             self.initial_data.get('academic_year')
@@ -510,6 +544,12 @@ class GradeBoundarySerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('is_active')
 
+# ==================== CoScholasticGrade ====================
+class CoScholasticGradeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoScholasticGrade
+        fields = '__all__'
+        read_only_fields = ('is_active', 'created_at', 'updated_at', 'created_by', 'updated_by')
 
 # ==================== ExamResult ====================
 class ExamResultSerializer(serializers.ModelSerializer):
@@ -1203,6 +1243,7 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
     subject_skills = serializers.PrimaryKeyRelatedField(
         queryset=SubjectSkill.objects.all(), many=True, required=False
     )
+    read_only_fields = ('created_by', 'updated_by', 'is_active')
 
     class Meta:
         model = ExamInstance
@@ -1282,6 +1323,12 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
             errors["result_types"] = (
                 "At least one of external marks, internal marks, co-scholastic grade, or subject skills must be selected."
             )
+
+        category = self.initial_data.get('sequence') or getattr(self.instance, 'sequence', None)
+        if not category:
+            raise serializers.ValidationError({
+                "Sequence": "Sequence is required."
+            })
 
         if errors:
             raise serializers.ValidationError(errors)

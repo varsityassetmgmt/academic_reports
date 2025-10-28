@@ -348,6 +348,56 @@ class ExamTypeViewSet(ModelViewSet):
             permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
 
+# ==================== Grade Boundary ====================
+class GradeBoundaryViewSet(ModelViewSet):
+    queryset = GradeBoundary.objects.filter(is_active=True).order_by('-min_percentage')
+    serializer_class = GradeBoundarySerializer
+    http_method_names = ['get', 'post', 'put']
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['grade', 'remarks', 'category__name']
+    filterset_fields = ['category', 'is_active']
+    ordering_fields = ['min_percentage', 'max_percentage', 'grade', 'category__name', 'remarks']
+    pagination_class = CustomPagination
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [CanViewGradeBoundary]
+        elif self.action == 'create':
+            permission_classes = [CanAddGradeBoundary]
+        elif self.action in ['update', 'partial_update']:
+            permission_classes = [CanChangeGradeBoundary]
+        else:
+            permission_classes = [permissions.AllowAny]
+        return [permission() for permission in permission_classes]
+
+# ==================== Co-Scholastic Grade ====================
+class CoScholasticGradeViewSet(ModelViewSet):
+    queryset = CoScholasticGrade.objects.filter(is_active=True).order_by('-point')
+    serializer_class = CoScholasticGradeSerializer
+    http_method_names = ['get', 'post', 'put']
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['name', 'description', 'category__name']
+    filterset_fields = ['category', 'is_active']
+    ordering_fields = ['name', 'point', 'created_at', 'updated_at', 'category__name']
+    pagination_class = CustomPagination
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [CanViewCoScholasticGrade]
+        elif self.action == 'create':
+            permission_classes = [CanAddCoScholasticGrade]
+        elif self.action in ['update', 'partial_update']:
+            permission_classes = [CanChangeCoScholasticGrade]
+        else:
+            permission_classes = [permissions.AllowAny]
+        return [permission() for permission in permission_classes]
+
 #
 # ==================== Exam ====================
 class ExamViewSet(ModelViewSet):
@@ -373,7 +423,7 @@ class ExamViewSet(ModelViewSet):
             raise NotFound("Current academic year not found.")
         return (
             Exam.objects.filter(academic_year=current_academic_year, is_active=True)
-            .order_by('is_visible', '-exam_id')
+            .order_by('-exam_id')
         )
 
     def perform_create(self, serializer):
@@ -825,7 +875,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
                 academic_year=current_academic_year,
             )
             .select_related('academic_year', 'branch', 'exam', 'status')  # optimization
-            .order_by('-academic_year', 'marks_completion_percentage', '-id') 
+            .order_by('-academic_year', 'marks_completion_percentage')
         )
         return queryset
 
