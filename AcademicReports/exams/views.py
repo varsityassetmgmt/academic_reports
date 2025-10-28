@@ -31,6 +31,20 @@ class SubjectDropdownViewSet(ModelViewSet):
     serializer_class = SubjectDropdownSerializer
     http_method_names = ['get']
 
+# ---------------- Subject Category Dropdown----------------
+class SubjectCategoryDropdownViewSet(ModelViewSet):
+    queryset = SubjectCategory.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = SubjectCategoryDropdownSerializer
+    http_method_names = ['get']
+
+# ---------------- Subject Category Dropdown----------------
+class ExamCategoryDropdownViewSet(ModelViewSet):
+    queryset = ExamCategory.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ExamCategoryDropdownSerializer
+    http_method_names = ['get']
+
 # class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
 #     # queryset = Subject.objects.filter(is_active=True).order_by('name')
 #     permission_classes = [IsAuthenticated]
