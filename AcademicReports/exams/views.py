@@ -569,13 +569,15 @@ class ExamInstanceViewSet(ModelViewSet):
         'subject__name',
         'exam__name',
         'exam__exam_type__name',
+        'subject_category__name',
     ]
     filterset_fields = [
         'subject',
         'has_external_marks',
         'has_internal_marks',
         'has_subject_skills',
-        'has_subject_co_scholastic_grade'
+        'has_subject_co_scholastic_grade',
+        'subject_category',
     ]
     ordering_fields = [
         'date',
@@ -585,6 +587,7 @@ class ExamInstanceViewSet(ModelViewSet):
         'has_external_marks',
         'has_internal_marks',
         'has_subject_skills',
+        'subject_category',
     ]
     pagination_class = CustomPagination
     lookup_field = 'pk'

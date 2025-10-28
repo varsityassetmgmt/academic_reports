@@ -183,6 +183,7 @@ class Exam(models.Model):
 class ExamInstance(models.Model):
     exam_instance_id = models.BigAutoField(primary_key=True)
     exam = models.ForeignKey(Exam,null=True,blank=True, on_delete=models.PROTECT, related_name='exam_instance_exam')
+    subject_category = models.ForeignKey(SubjectCategory,blank=True,null=True, on_delete=models.PROTECT, related_name='exam_instance_subject_category')
     subject = models.ForeignKey(Subject, on_delete=models.PROTECT, related_name='exam_instance_subject')    
 
     # Flags to indicate what kind of results this exam has
