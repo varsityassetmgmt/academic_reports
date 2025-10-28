@@ -2,12 +2,25 @@ from django.contrib import admin
 from .models import *
 
 # ===================== Subject =====================
+
+@admin.register(SubjectCategory)
+class SubjectCategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'description')
+    ordering = ('name',)
+    list_editable = ('is_active',)
+    list_per_page = 25
+
+
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
-    list_display = ('subject_id', 'name', 'display_name', 'is_active')
-    search_fields = ('name', 'display_name')
-    list_filter = ('is_active',)
-    filter_horizontal = ('academic_devisions', 'class_names')
+    list_display = ('name', 'category', 'is_active', 'display_name', 'created_at', 'updated_at')
+    list_filter = ('is_active', 'category')
+    search_fields = ('name', 'display_name', 'description', 'category__name')
+    autocomplete_fields = ('category', 'academic_devisions', 'class_names')
+    list_editable = ('is_active',)
+    list_per_page = 25
 
 
 @admin.register(SubjectSkill)

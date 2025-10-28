@@ -8,9 +8,25 @@ from django.utils import timezone
 from branches.models import AcademicYear
 from django.core.validators import MinValueValidator
 
+
+class SubjectCategory(models.Model):
+    name = models.CharField(max_length=250, unique=True)
+    description = models.TextField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name_plural = "Subject Categories"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+    
+
+
 class Subject(models.Model):
     subject_id = models.BigAutoField(primary_key=True, db_index=True)
     name = models.CharField(max_length=250,null=False,blank=False,unique=True)
+    category = models.ForeignKey(SubjectCategory, on_delete=models.PROTECT, related_name="subjects", null=True, blank=True)
     academic_devisions = models.ManyToManyField("branches.AcademicDevision",blank=True, related_name='subject_academic_devisions')
     class_names = models.ManyToManyField("students.ClassName",blank=True, related_name='subject_classes')
     is_active = models.BooleanField(default=True)
@@ -82,10 +98,23 @@ class ExamStatus(models.Model):
     def __str__(self):
         return self.name
 
+class ExamCategory(models.Model):
+    name = models.CharField(max_length=250, unique=True)
+    is_active = models.BooleanField(default=True)
+    class Meta:
+        verbose_name_plural = "Exam Categories"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+    
+
+
 class Exam(models.Model):
     exam_id = models.BigAutoField(primary_key=True)
     exam_type = models.ForeignKey(ExamType, on_delete=models.PROTECT, related_name='exams_exam_type')
     academic_year = models.ForeignKey("branches.AcademicYear",null=True, blank=True, on_delete=models.PROTECT, related_name='exams_academic_year')
+    category = models.ForeignKey(ExamCategory, on_delete=models.PROTECT,null=True,blank=True, related_name="exams_category")
     name = models.CharField(max_length=250,null=False,blank=False)
     start_date = models.DateField()
     end_date = models.DateField()
@@ -116,8 +145,8 @@ class Exam(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["name", "academic_year", "exam_type"],
-                name="unique_exam_per_year_type"
+                fields=["name", "academic_year", "exam_type","category"],
+                name="unique_exam_per_year_type_category"
             )
         ]
         indexes = [
@@ -127,6 +156,7 @@ class Exam(models.Model):
                     models.Index(fields=["is_visible"]),
                     models.Index(fields=["is_progress_card_visible"]),
                     models.Index(fields=["is_active"]),                    
+                    models.Index(fields=["category"]),
                     models.Index(fields=["start_date", "end_date"]),  # range queries
                     # models.Index(fields=["academic_year", "exam_type", "is_active"], name="idx_exam_year_type_active"),
                 ]
@@ -260,16 +290,24 @@ class ExamAttendanceStatus(models.Model):
 
 class GradeBoundary(models.Model):
     grade_boundary_id = models.BigAutoField(primary_key=True)
-    grade = models.CharField(max_length=10,unique=True)  # e.g., 'A+', 'A', etc.
+    category = models.ForeignKey(ExamCategory, on_delete=models.PROTECT,null=True,blank=True, related_name="grade_boundary_category")
+    grade = models.CharField(max_length=10)  # e.g., 'A+', 'A', etc.
     min_percentage = models.DecimalField(max_digits=5, decimal_places=2)  # e.g., 84.50
     max_percentage = models.DecimalField(max_digits=5, decimal_places=2)  # e.g., 100.00
     remarks = models.CharField(max_length=100, null=True, blank=True)  # e.g., 'Excellent', 'Good', etc.
     is_active = models.BooleanField(default=True)
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["category", "grade"],
+                name="unique_grade_boundary_category"
+            )
+        ]
         ordering = ['-min_percentage']  # Highest to lowest for easier matching
        
         indexes = [
+            models.Index(fields=["category"]),
             models.Index(fields=["min_percentage", "max_percentage"]),
         ]
         verbose_name_plural = "Grade Boundaries"
@@ -300,7 +338,8 @@ class CoScholasticGrade(models.Model):
     C  → Satisfactory
     """
     id = models.BigAutoField(primary_key=True)
-    name = models.CharField(max_length=5, unique=True)  # e.g., A+, A, B+, B, C
+    category = models.ForeignKey(ExamCategory, on_delete=models.PROTECT,null=True,blank=True, related_name="co_scholastic_grade_category")
+    name = models.CharField(max_length=5)  # e.g., A+, A, B+, B, C
     description = models.CharField(max_length=150, blank=True, null=True)  # e.g., Outstanding, Excellent
     point = models.PositiveSmallIntegerField(default=0)  # e.g., 5, 4, 3, etc.
     is_active = models.BooleanField(default=True)
@@ -311,8 +350,15 @@ class CoScholasticGrade(models.Model):
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='co_scholatic_grade_updated_by',on_delete=models.SET_NULL)
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["category", "name"],
+                name="unique_co_scholastic_grade_category"
+            )
+        ]
         ordering = ["-point"]
         indexes = [
+            models.Index(fields=["category"]),
             models.Index(fields=["name"]),
             models.Index(fields=["point"]),
         ]
