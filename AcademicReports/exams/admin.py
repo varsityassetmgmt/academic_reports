@@ -60,9 +60,9 @@ class ExamAdmin(admin.ModelAdmin):
 # ===================== Exam Instance =====================
 @admin.register(ExamInstance)
 class ExamInstanceAdmin(admin.ModelAdmin):
-    list_display = ('exam_instance_id', 'exam', 'subject', 'sequence', 'date', 'is_optional', 'is_active')
-    search_fields = ('exam__name', 'subject__name')
-    list_filter = ('is_active', 'is_optional', 'has_external_marks', 'has_internal_marks', 'has_subject_skills', 'has_subject_co_scholastic_grade')
+    list_display = ('exam_instance_id', 'exam', 'subject_category','subject', 'sequence', 'date', 'is_optional', 'is_active')
+    search_fields = ('exam__name', 'subject__name', 'subject_category__name')
+    list_filter = ('is_active', 'is_optional', 'has_external_marks', 'has_internal_marks', 'has_subject_skills', 'has_subject_co_scholastic_grade', 'subject_category__name')
     filter_horizontal = ('subject_skills',)
     autocomplete_fields = ('exam', 'subject')
 
