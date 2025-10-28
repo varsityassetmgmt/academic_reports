@@ -142,6 +142,7 @@ class Exam(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='exam_created_by',on_delete=models.SET_NULL)
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,related_name='exam_updated_by',on_delete=models.SET_NULL)
     sequence   = models.PositiveSmallIntegerField(null=True,blank=True)
+    #
     
     class Meta:
         constraints = [
