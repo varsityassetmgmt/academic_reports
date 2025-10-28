@@ -542,7 +542,7 @@ class GradeBoundarySerializer(serializers.ModelSerializer):
     class Meta:
         model = GradeBoundary
         fields = '__all__'
-        read_only_fields = ('is_active')
+        read_only_fields = ('is_active',)
 
 # ==================== CoScholasticGrade ====================
 class CoScholasticGradeSerializer(serializers.ModelSerializer):
