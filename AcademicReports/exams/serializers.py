@@ -17,7 +17,7 @@ class SubjectCategoryDropdownSerializer(serializers.ModelSerializer):
 
 # ==================== Subject ====================
 class SubjectSerializer(serializers.ModelSerializer):
-    category = serializers.CharField(source='category.name', read_only=True)
+    category_name= serializers.CharField(source='category.name', read_only=True)
 
     class Meta:
         model = Subject
@@ -124,7 +124,7 @@ class ExamSerializer(serializers.ModelSerializer):
     exam_type_name = serializers.CharField(source='exam_type.name', read_only=True)
     marks_entry_expiry_datetime_display = serializers.DateTimeField(source='marks_entry_expiry_datetime', format="%Y-%m-%d %H:%M:%S", read_only = True )
     exam_status_name = serializers.CharField(source='exam_status.name', read_only=True)
-    category = serializers.CharField(source='category.name', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
 
     class Meta:
         model = Exam
@@ -312,7 +312,7 @@ class ExamSerializer(serializers.ModelSerializer):
 class ExamInstanceSerializer(serializers.ModelSerializer):
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_skill_names = serializers.SerializerMethodField()
-    subject_category = serializers.CharField(source='subject_category.name', read_only=True)
+    subject_category_name = serializers.CharField(source='subject_category.name', read_only=True)
 
     class Meta:
         model = ExamInstance
