@@ -285,9 +285,9 @@ class SubjectViewSet(ModelViewSet):
     serializer_class = SubjectSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ['name', 'display_name', 'description']  # text fields to search
-    filterset_fields = ['academic_devisions', 'class_names', 'is_active']  # FK/many2many and boolean
-    ordering_fields = ['name', 'display_name', 'created_at', 'updated_at']  # fields users can order by
+    search_fields = ['name', 'display_name', 'description', 'category__name']  # text fields to search
+    filterset_fields = ['academic_devisions', 'class_names', 'is_active', 'category']  # FK/many2many and boolean
+    ordering_fields = ['name', 'display_name', 'created_at', 'updated_at', 'category__name']  # fields users can order by
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
@@ -418,16 +418,16 @@ class ExamViewSet(ModelViewSet):
     serializer_class = ExamSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ['name', 'exam_type__name', 'academic_year__name', 'exam_status__name']
+    search_fields = ['name', 'exam_type__name', 'academic_year__name', 'exam_status__name', 'category__name']
     filterset_fields = [
         'exam_type', 'is_visible', 'is_progress_card_visible',
         'is_active', 'academic_year', 'name', 'start_date',
-        'end_date', 'marks_entry_expiry_datetime', 'exam_status',
+        'end_date', 'marks_entry_expiry_datetime', 'exam_status', 'category',
     ]
     ordering_fields = [
         'exam_type__name', 'start_date', 'end_date', 'name',
         'is_visible', 'created_at', 'updated_at', 'exam_status__name',
-        'academic_year', 'marks_entry_expiry_datetime',
+        'academic_year', 'marks_entry_expiry_datetime', 'category__name',
     ]
     pagination_class = CustomPagination
 
