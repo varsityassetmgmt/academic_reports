@@ -1330,6 +1330,18 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
                 "Sequence": "Sequence is required."
             })
 
+        sequence = attrs.get('sequence') or getattr(self.instance, 'sequence', None)
+
+        # ✅ Uniqueness check: (exam, sequence)
+        if exam and sequence is not None:
+            qs = ExamInstance.objects.filter(exam=exam, sequence=sequence)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({
+                    "sequence": f"Sequence {sequence} already exists for this exam."
+                })
+
         if errors:
             raise serializers.ValidationError(errors)
 

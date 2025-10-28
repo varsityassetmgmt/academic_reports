@@ -588,7 +588,7 @@ class ExamInstanceViewSet(ModelViewSet):
         return ExamInstance.objects.filter(
             exam__exam_id=exam_id,
             is_active=True
-        ).order_by('date')
+        ).order_by('sequence')
 
     # # ✅ Override list() to include overall exam info
     # def list(self, request, *args, **kwargs):
