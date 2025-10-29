@@ -1341,10 +1341,10 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
             })
         
         try:
-            db_subject = Subject.objects.get(subject_id=subject.id)
+            db_subject = Subject.objects.get(subject_id=subject.subject_id)
         except Subject.DoesNotExist:
             raise serializers.ValidationError({
-                "subject": f"Subject with ID {subject.id} not found."
+                "subject": f"Subject with ID {subject.subject_id} not found."
             })
 
         if db_subject.category_id != subject_category:
