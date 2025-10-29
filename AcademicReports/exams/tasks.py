@@ -92,6 +92,7 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
 
         # Determine grade
         subject_grade = GradeBoundary.objects.filter(
+            category = exam.category,
             min_percentage__lte=subjects_percentage,
             max_percentage__gte=subjects_percentage,
             is_active=True
@@ -109,6 +110,7 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
         )
 
         skills_grade = GradeBoundary.objects.filter(
+            category = exam.category,
             min_percentage__lte=skills_percentage,
             max_percentage__gte=skills_percentage,
             is_active=True

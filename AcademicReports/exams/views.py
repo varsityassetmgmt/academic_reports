@@ -1423,7 +1423,7 @@ def create_exam_results(request):
                         status=status.HTTP_400_BAD_REQUEST)
 
     exam = section_status.exam
-    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True).order_by('sequence')
 
     students = Student.objects.filter(
         section=section_status.section,
@@ -2140,7 +2140,7 @@ class ExportSectionExamResultsCSVViewSet(APIView):
 
         # === Prefetch once ===
         exam_instances = list(
-            ExamInstance.objects.filter(exam=exam, is_active=True)
+            ExamInstance.objects.filter(exam=exam, is_active=True).order_by('sequence')
             .prefetch_related('subject_skills')
         )
 
@@ -2683,7 +2683,7 @@ class BranchSectionsExamResultsXLSXView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
 
         # Fetch exam instances
-        exam_instances = list(ExamInstance.objects.filter(exam=exam, is_active=True).prefetch_related('subject_skills'))
+        exam_instances = list(ExamInstance.objects.filter(exam=exam, is_active=True).order_by('sequence').prefetch_related('subject_skills'))
 
         # Map skill and result data for quick lookup
         skill_instances_qs = ExamSubjectSkillInstance.objects.filter(
@@ -3130,7 +3130,7 @@ class ExportSectionExamResultsTemplateXLSXView(APIView):
 
         # === Prefetch Exam Instances ===
         exam_instances = list(
-            ExamInstance.objects.filter(exam=exam, is_active=True)
+            ExamInstance.objects.filter(exam=exam, is_active=True).order_by('sequence')
             .prefetch_related("subject_skills")
         )
 
