@@ -10,6 +10,24 @@ import uuid
 from branches.models import State, Zone, Branch, AcademicDevision
 from .fields import *
 
+
+from django.db import models
+from django.contrib.auth.models import Group
+
+class VarnaProfiles(models.Model):
+    name = models.CharField(max_length=250,unique=True)
+    varna_profile_short_code = models.CharField(max_length=100,unique=True)
+    groups = models.ManyToManyField(Group,related_name="varna_profiles_groups",blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name_plural = "Varna Profiles"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 def user_profile_images(instance, filename):
     return 'pics/user_profile/photos/{}.webp'.format(uuid.uuid4().hex)
 
@@ -28,6 +46,12 @@ class UserProfile(models.Model):
     academic_devisions = models.ManyToManyField(AcademicDevision, related_name='user_academic_division', blank=True)
     classes =  models.ManyToManyField("students.ClassName", related_name="user_classes", blank=True)
     orientations = models.ManyToManyField("students.Orientation", related_name="user_orientations", blank=True)
+
+    varna_user = models.BooleanField(default=False)
+    varna_user_id = models.CharField(max_length=250, null=True, blank=True, unique=True)
+    varna_profile_short_code = models.CharField(max_length=250, null=True, blank=True)
+    varna_profile = models.ForeignKey(VarnaProfiles,on_delete=models.PROTECT,null=True,blank=True,related_name="user_profiles_varna_profile")
+
     
     def __str__(self):
         return self.user.username
@@ -46,11 +70,12 @@ class UserProfile(models.Model):
 
     @property
     def imageURL(self):
-        try:
-            url = self.photo.url
-        except ValueError:
-            url = ''
-        return url
+        return self.photo.url if self.photo else ''
+        # try:
+        #     url = self.photo.url
+        # except ValueError:
+        #     url = ''
+        # return url
 
 @receiver(post_save, sender=User) 
 def create_or_update_user_profile(sender, instance, created, **kwargs): 

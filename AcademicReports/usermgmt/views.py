@@ -86,6 +86,7 @@ class CustomTokenObtainPairSerializer(serializers.Serializer):
         ).distinct()
         permission_serializer = PermissionSerializer_user_abilities(permissions_user_abilities, many=True)
         data["userAbilities"] = permission_serializer.data
+        data["is_login_from_varna"] = False
 
         return data
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -475,3 +476,45 @@ class OrientationDropdownForUserProfileViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = OrientationDropdownSerializer
     http_method_names = ['get',]
+
+
+#========================================================================================================================================================================
+#=========================================================================  Varna Login  ================================================================================
+#========================================================================================================================================================================
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from .models import UserProfile
+
+class VarnaUserDataAPIView(APIView):
+    # authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user  # user from access token
+        data = {}
+        data['userData'] = CurrentUserSerializer(user).data
+
+        user_profile = UserProfile.objects.filter(user=user).first()
+        if not user_profile:
+            data['userProfileData'] = None
+            data["is_firstlogin"] = False
+        else:
+            data['userProfileData'] = UserProfileSerializer(user_profile).data
+            data["is_firstlogin"] = user_profile.must_change_password
+
+        # Add permissions
+        permissions_user_abilities = Permission.objects.filter(
+            Q(user=user) | Q(group__user=user)
+        ).distinct()
+        permission_serializer = PermissionSerializer_user_abilities(permissions_user_abilities, many=True)
+        data["userAbilities"] = permission_serializer.data
+        data["is_login_from_varna"] = True
+
+        return Response(data, status=200)
+
+
+
+
