@@ -134,6 +134,22 @@ class CanDeleteGradeBoundary(BasePermission):
     def has_permission(self, request, view):
         return request.user.has_perm('exams.delete_gradeboundary')
 
+# ==================== coscholasticgrade Permissions =====================
+class CanViewCoScholasticGrade(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.view_coscholasticgrade')
+
+class CanAddCoScholasticGrade(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.add_coscholasticgrade')
+
+class CanChangeCoScholasticGrade(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.change_coscholasticgrade')
+
+class CanDeleteCoScholasticGrade(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('exams.delete_coscholasticgrade')
 
 # ==================== ExamResult Permissions =====================
 class CanViewExamResult(BasePermission):

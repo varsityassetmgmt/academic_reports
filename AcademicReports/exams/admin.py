@@ -5,10 +5,10 @@ from .models import *
 
 @admin.register(SubjectCategory)
 class SubjectCategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description', 'is_active')
+    list_display = ('id', 'name', 'description', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('name', 'description')
-    ordering = ('name',)
+    ordering = ('-id',)
     list_editable = ('is_active',)
     list_per_page = 25
 
@@ -38,23 +38,31 @@ class ExamTypeAdmin(admin.ModelAdmin):
     search_fields = ('name',)
     list_filter = ('is_active',)
 
+@admin.register(ExamCategory)
+class ExamCategoryAdmin(admin.ModelAdmin):
+    list_display = ('id','name', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('name',)
+    ordering = ('-id',)
+
 
 # ===================== Exam =====================
 @admin.register(Exam)
 class ExamAdmin(admin.ModelAdmin):
-    list_display = ('exam_id','name', 'exam_type', 'is_active','exam_status', 'is_visible', 'is_editable' ,'is_progress_card_visible')
-    search_fields = ('name', 'exam_type__name', 'exam_status__name')
-    list_filter = ('is_active','exam_status', 'is_editable', 'is_visible', 'is_progress_card_visible')
+    list_display = ('exam_id','name', 'exam_type', 'category','is_active','exam_status', 'is_visible', 'is_editable' ,'is_progress_card_visible')
+    search_fields = ('name', 'exam_type__name', 'exam_status__name', 'category__name')
+    list_filter = ('is_active','exam_status', 'exam_type', 'category','is_editable', 'is_visible', 'is_progress_card_visible')
     filter_horizontal = ('states', 'zones', 'branches', 'orientations', 'academic_devisions', 'student_classes')
     autocomplete_fields = ('exam_type',)
+    ordering = ('-exam_id',)
 
 
 # ===================== Exam Instance =====================
 @admin.register(ExamInstance)
 class ExamInstanceAdmin(admin.ModelAdmin):
-    list_display = ('exam_instance_id', 'exam', 'subject', 'date', 'is_optional', 'is_active')
-    search_fields = ('exam__name', 'subject__name')
-    list_filter = ('is_active', 'is_optional', 'has_external_marks', 'has_internal_marks', 'has_subject_skills', 'has_subject_co_scholastic_grade')
+    list_display = ('exam_instance_id', 'exam', 'subject_category','subject', 'sequence', 'date', 'is_optional', 'is_active')
+    search_fields = ('exam__name', 'subject__name', 'subject_category__name')
+    list_filter = ('is_active', 'is_optional', 'has_external_marks', 'has_internal_marks', 'has_subject_skills', 'has_subject_co_scholastic_grade', 'subject_category__name')
     filter_horizontal = ('subject_skills',)
     autocomplete_fields = ('exam', 'subject')
 
@@ -84,26 +92,27 @@ from .models import GradeBoundary
 class GradeBoundaryAdmin(admin.ModelAdmin):
     list_display = (
         'grade',
+        'category',
         'min_percentage',
         'max_percentage',
         'remarks',
         'is_active',
     )
-    list_filter = ('is_active',)
-    search_fields = ('grade', 'remarks')
-    ordering = ('-min_percentage',)
+    list_filter = ('is_active', 'category')
+    search_fields = ('grade', 'remarks', 'category__name')
+    ordering = ( 'category','-min_percentage',)
     list_editable = ('is_active',)
     list_per_page = 20
 
     fieldsets = (
         ('Grade Information', {
-            'fields': ('grade', 'remarks')
+            'fields': ('grade', 'category','remarks')
         }),
         ('Percentage Range', {
             'fields': ('min_percentage', 'max_percentage')
         }),
         ('Status', {
-            'fields': ('is_active',)
+            'fields': ('is_active',) 
         }),
     )
 
@@ -111,9 +120,10 @@ class GradeBoundaryAdmin(admin.ModelAdmin):
 # ===================== Co-Scholastic Grade =====================
 @admin.register(CoScholasticGrade)
 class CoScholasticGradeAdmin(admin.ModelAdmin):
-    list_display = ('id','name', 'description', 'point', 'is_active')
-    search_fields = ('name', 'description')
+    list_display = ('id','name', 'category','description', 'point', 'is_active')
+    search_fields = ('name', 'description', 'category__name')
     list_filter = ('is_active',)
+    ordering = ( 'category',)
 
 
 # ===================== Exam Result =====================

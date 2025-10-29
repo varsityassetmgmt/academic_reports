@@ -28,6 +28,11 @@ router.register(r'edit_exam_results', EditExamResultsViewSet, basename='edit_exa
 router.register(r'edit_exam_skill_result', EditExamSkillResultViewSet, basename='edit_exam_skill_result')
 router.register(r'exam_status_dropdown', ExamStatusDropDownViewset, basename='exam_status_dropdown')
 
+router.register(r'subject_category_dropdown', SubjectCategoryDropdownViewSet, basename='subject_category_dropdown')
+router.register(r'exam_category_dropdown', ExamCategoryDropdownViewSet, basename='exam_category_dropdown')
+router.register(r'grade_boundary', GradeBoundaryViewSet, basename='grade_boundary')
+router.register(r'co_scholastic_grade', CoScholasticGradeViewSet, basename='co_scholastic_grade')
+
 urlpatterns = [
 
 

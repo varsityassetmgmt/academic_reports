@@ -31,6 +31,20 @@ class SubjectDropdownViewSet(ModelViewSet):
     serializer_class = SubjectDropdownSerializer
     http_method_names = ['get']
 
+# ---------------- Subject Category Dropdown----------------
+class SubjectCategoryDropdownViewSet(ModelViewSet):
+    queryset = SubjectCategory.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = SubjectCategoryDropdownSerializer
+    http_method_names = ['get']
+
+# ---------------- Subject Category Dropdown----------------
+class ExamCategoryDropdownViewSet(ModelViewSet):
+    queryset = ExamCategory.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ExamCategoryDropdownSerializer
+    http_method_names = ['get']
+
 # class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
 #     # queryset = Subject.objects.filter(is_active=True).order_by('name')
 #     permission_classes = [IsAuthenticated]
@@ -50,48 +64,69 @@ class SubjectDropdownViewSet(ModelViewSet):
 
 
  
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError
+from django.db.models import Count, Q
+
 class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
     """
     Provides a dropdown list of subjects associated with the classes of a given Exam.
     Includes the subject of the current ExamInstance if `exam_instance_id` is provided (for update view).
-    URL pattern: /subject_dropdown_for_exam_instance/<exam_id>/?exam_instance_id=<id>
+    URL pattern: /subject_dropdown_for_exam_instance/<exam_id>/?exam_instance_id=<id>&category_id=<id>
     """
     permission_classes = [IsAuthenticated]
     serializer_class = SubjectDropdownSerializer
     http_method_names = ['get']
- 
+
     def get_queryset(self):
         exam_id = self.kwargs.get('exam_id')
-        exam_instance_id = self.request.query_params.get('exam_instance_id')  # ✅ optional for update
+        category_id = self.request.query_params.get('category_id')
+        exam_instance_id = self.request.query_params.get('exam_instance_id')
+
         if not exam_id:
             raise ValidationError({'exam_id': "This field is required in the URL."})
- 
-        exam = (Exam.objects.filter(exam_id=exam_id, is_active=True).prefetch_related('student_classes').first())
- 
+
+        exam = (
+            Exam.objects.filter(exam_id=exam_id, is_active=True)
+            .prefetch_related('student_classes')
+            .first()
+        )
         if not exam:
             raise ValidationError({'exam_id': f"Exam with ID {exam_id} not found or inactive."})
- 
+
         class_names = exam.student_classes.all()
- 
         if not class_names.exists():
             return Subject.objects.none()
-       
+
+        # Optional category filter
+        category = None
+        if category_id:
+            try:
+                category = SubjectCategory.objects.get(id=category_id)
+            except SubjectCategory.DoesNotExist:
+                raise ValidationError({'category_id': 'Category not found.'})
+
+        # Subjects already assigned to this exam (except current instance if editing)
+        exam_subjects_qs = ExamInstance.objects.filter(exam=exam, is_active=True)
         if exam_instance_id:
-            exam_subjects = ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True).exclude(exam_instance_id=exam_instance_id)
-        else:
-        # Subjects already assigned in active ExamInstances
-            exam_subjects =  ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True)
- 
-        # ✅ Base queryset: subjects matching all classes
-        subjects_qs = Subject.objects.filter(
-            is_active=True,
-            class_names__in=class_names
-        ).annotate(
-            class_count=Count('class_names', filter=Q(class_names__in=class_names), distinct=True)
-        ).filter(
-            class_count=class_names.count()
-        ).exclude(subject_id__in=exam_subjects).distinct().order_by('name')
- 
+            exam_subjects_qs = exam_subjects_qs.exclude(exam_instance_id=exam_instance_id)
+        exam_subjects = exam_subjects_qs.values_list('subject__subject_id', flat=True)
+
+        # Subjects available for all classes of the exam
+        subjects_qs = (
+            Subject.objects.filter(is_active=True, class_names__in=class_names)
+            .annotate(class_count=Count('class_names', filter=Q(class_names__in=class_names), distinct=True))
+            .filter(class_count=class_names.count())
+            .exclude(subject_id__in=exam_subjects)
+            .distinct()
+            .order_by('name')
+        )
+
+        # Apply category filter if provided
+        if category:
+            subjects_qs = subjects_qs.filter(category_id=category.id)
+
         return subjects_qs
 
 
@@ -104,26 +139,29 @@ class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
 #     permission_classes = [IsAuthenticated]
 #     serializer_class = SubjectDropdownSerializer
 #     http_method_names = ['get']
-
+ 
 #     def get_queryset(self):
 #         exam_id = self.kwargs.get('exam_id')
 #         exam_instance_id = self.request.query_params.get('exam_instance_id')  # ✅ optional for update
 #         if not exam_id:
 #             raise ValidationError({'exam_id': "This field is required in the URL."})
-
+ 
 #         exam = (Exam.objects.filter(exam_id=exam_id, is_active=True).prefetch_related('student_classes').first())
-
+ 
 #         if not exam:
 #             raise ValidationError({'exam_id': f"Exam with ID {exam_id} not found or inactive."})
-
+ 
 #         class_names = exam.student_classes.all()
-
+ 
 #         if not class_names.exists():
 #             return Subject.objects.none()
-
+       
+#         if exam_instance_id:
+#             exam_subjects = ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True).exclude(exam_instance_id=exam_instance_id)
+#         else:
 #         # Subjects already assigned in active ExamInstances
-#         exam_subjects = ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True)
-
+#             exam_subjects =  ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True)
+ 
 #         # ✅ Base queryset: subjects matching all classes
 #         subjects_qs = Subject.objects.filter(
 #             is_active=True,
@@ -132,80 +170,9 @@ class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
 #             class_count=Count('class_names', filter=Q(class_names__in=class_names), distinct=True)
 #         ).filter(
 #             class_count=class_names.count()
-#         )
-
-#         # ✅ If editing an ExamInstance, include its subject even if already used
-#         if exam_instance_id:
-#             current_instance = ExamInstance.objects.filter(
-#                 exam_instance_id=exam_instance_id,
-#                 exam=exam,
-#                 is_active=True
-#             ).select_related('subject').first()
-
-#             if current_instance and current_instance.subject:
-#                 subjects_qs = subjects_qs.filter(
-#                     Q(subject_id__notin=exam_subjects) | Q(subject_id=current_instance.subject.subject_id)
-#                 )
-#             else:
-#                 subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
-#         else:
-#             subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
-
-#         return subjects_qs.distinct().order_by('name')
-
-
-        # # ✅ If editing an ExamInstance, include its subject even if already used
-        # if exam_instance_id:
-        #     current_instance = ExamInstance.objects.filter(
-        #         exam_instance_id=exam_instance_id,
-        #         exam=exam,
-        #         is_active=True
-        #     ).select_related('subject').first()
-
-        #     if current_instance and current_instance.subject:
-        #         subjects_qs = subjects_qs.filter(
-        #             Q(subject_id__notin=exam_subjects) | Q(subject_id=current_instance.subject.subject_id)
-        #         )
-        #     else:
-        #         subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
-        # else:
-        #     subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
-
-        # return subjects_qs.distinct().order_by('name')
-
-
-
-
-# class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
-#     """
-#     Provides a dropdown list of subjects associated with the classes of a given Exam.
-#     URL pattern: /subject_dropdown_for_exam_instance/<exam_id>/
-#     """
-#     permission_classes = [IsAuthenticated]
-#     serializer_class = SubjectDropdownSerializer
-#     http_method_names = ['get']
-
-#     def get_queryset(self):
-#         exam_id = self.kwargs.get('exam_id')
-#         if not exam_id:
-#             return Response({'exam_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
-
-#         # ✅ Get the exam safely (avoids DoesNotExist errors)
-#         exam = Exam.objects.filter(exam_id=exam_id, is_active=True).prefetch_related('student_classes').first()
-#         if not exam:
-#             return Response({'exam_id': f"Exam with ID {exam_id} not found or inactive."}, status=status.HTTP_400_BAD_REQUEST)
-
-#         # ✅ Fetch all subjects linked to the exam's classes
-#         subjects = (
-#             Subject.objects.filter(
-#                 is_active=True,
-#                 class_names__in=exam.student_classes.all()
-#             )
-#             .distinct()
-#             .order_by('name')
-#         )
-
-#         return subjects
+#         ).exclude(subject_id__in=exam_subjects).distinct().order_by('name')
+ 
+#         return subjects_qs
 
 
 # ---------------- SubjectSkill ----------------
@@ -271,9 +238,9 @@ class SubjectViewSet(ModelViewSet):
     serializer_class = SubjectSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ['name', 'display_name', 'description']  # text fields to search
-    filterset_fields = ['academic_devisions', 'class_names', 'is_active']  # FK/many2many and boolean
-    ordering_fields = ['name', 'display_name', 'created_at', 'updated_at']  # fields users can order by
+    search_fields = ['name', 'display_name', 'description', 'category__name']  # text fields to search
+    filterset_fields = ['academic_devisions', 'class_names', 'is_active', 'category']  # FK/many2many and boolean
+    ordering_fields = ['name', 'display_name', 'created_at', 'updated_at', 'category__name']  # fields users can order by
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
@@ -348,22 +315,72 @@ class ExamTypeViewSet(ModelViewSet):
             permission_classes = [permissions.AllowAny]
         return [permission() for permission in permission_classes]
 
+# ==================== Grade Boundary ====================
+class GradeBoundaryViewSet(ModelViewSet):
+    queryset = GradeBoundary.objects.filter(is_active=True).order_by('-min_percentage')
+    serializer_class = GradeBoundarySerializer
+    http_method_names = ['get', 'post', 'put']
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['grade', 'remarks', 'category__name']
+    filterset_fields = ['category', 'is_active']
+    ordering_fields = ['min_percentage', 'max_percentage', 'grade', 'category__name', 'remarks']
+    pagination_class = CustomPagination
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [CanViewGradeBoundary]
+        elif self.action == 'create':
+            permission_classes = [CanAddGradeBoundary]
+        elif self.action in ['update', 'partial_update']:
+            permission_classes = [CanChangeGradeBoundary]
+        else:
+            permission_classes = [permissions.AllowAny]
+        return [permission() for permission in permission_classes]
+
+# ==================== Co-Scholastic Grade ====================
+class CoScholasticGradeViewSet(ModelViewSet):
+    queryset = CoScholasticGrade.objects.filter(is_active=True).order_by('-point')
+    serializer_class = CoScholasticGradeSerializer
+    http_method_names = ['get', 'post', 'put']
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['name', 'description', 'category__name']
+    filterset_fields = ['category', 'is_active']
+    ordering_fields = ['name', 'point', 'created_at', 'updated_at', 'category__name']
+    pagination_class = CustomPagination
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [CanViewCoScholasticGrade]
+        elif self.action == 'create':
+            permission_classes = [CanAddCoScholasticGrade]
+        elif self.action in ['update', 'partial_update']:
+            permission_classes = [CanChangeCoScholasticGrade]
+        else:
+            permission_classes = [permissions.AllowAny]
+        return [permission() for permission in permission_classes]
+
 #
 # ==================== Exam ====================
 class ExamViewSet(ModelViewSet):
     serializer_class = ExamSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ['name', 'exam_type__name', 'academic_year__name', 'exam_status__name']
+    search_fields = ['name', 'exam_type__name', 'academic_year__name', 'exam_status__name', 'category__name']
     filterset_fields = [
         'exam_type', 'is_visible', 'is_progress_card_visible',
         'is_active', 'academic_year', 'name', 'start_date',
-        'end_date', 'marks_entry_expiry_datetime', 'exam_status',
+        'end_date', 'marks_entry_expiry_datetime', 'exam_status', 'category',
     ]
     ordering_fields = [
         'exam_type__name', 'start_date', 'end_date', 'name',
         'is_visible', 'created_at', 'updated_at', 'exam_status__name',
-        'academic_year', 'marks_entry_expiry_datetime',
+        'academic_year', 'marks_entry_expiry_datetime', 'category__name',
     ]
     pagination_class = CustomPagination
 
@@ -373,7 +390,7 @@ class ExamViewSet(ModelViewSet):
             raise NotFound("Current academic year not found.")
         return (
             Exam.objects.filter(academic_year=current_academic_year, is_active=True)
-            .order_by('is_visible', '-exam_id')
+            .order_by('-exam_id')
         )
 
     def perform_create(self, serializer):
@@ -505,13 +522,15 @@ class ExamInstanceViewSet(ModelViewSet):
         'subject__name',
         'exam__name',
         'exam__exam_type__name',
+        'subject_category__name',
     ]
     filterset_fields = [
         'subject',
         'has_external_marks',
         'has_internal_marks',
         'has_subject_skills',
-        'has_subject_co_scholastic_grade'
+        'has_subject_co_scholastic_grade',
+        'subject_category',
     ]
     ordering_fields = [
         'date',
@@ -521,6 +540,7 @@ class ExamInstanceViewSet(ModelViewSet):
         'has_external_marks',
         'has_internal_marks',
         'has_subject_skills',
+        'subject_category',
     ]
     pagination_class = CustomPagination
     lookup_field = 'pk'
@@ -538,7 +558,7 @@ class ExamInstanceViewSet(ModelViewSet):
         return ExamInstance.objects.filter(
             exam__exam_id=exam_id,
             is_active=True
-        ).order_by('date')
+        ).order_by('sequence')
 
     # # ✅ Override list() to include overall exam info
     # def list(self, request, *args, **kwargs):
@@ -825,7 +845,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
                 academic_year=current_academic_year,
             )
             .select_related('academic_year', 'branch', 'exam', 'status')  # optimization
-            .order_by('-academic_year', 'marks_completion_percentage', '-id') 
+            .order_by('-academic_year', 'marks_completion_percentage')
         )
         return queryset
 
