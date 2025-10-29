@@ -11,6 +11,11 @@ urlpatterns = [
     path('usermgmt/', include('usermgmt.urls')),
     path('branches/', include('branches.urls')),
     path('students/', include('students.urls')),
+    path('exams/', include('exams.urls')),
+    path('api/', include('apibridge.urls')),
+    path('progresscard/',include('progresscard.urls')),
+    path('api_source/',include('apisource.urls')),
+    
 ]
 
 if settings.DEBUG:

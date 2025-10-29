@@ -1,6 +1,12 @@
 from rest_framework import serializers
 from .models import AcademicYear, AcademicDevision, State, Zone, Branch
 
+#===================== AcademicYear ========================
+class AcademicYearDropdownSerialzier(serializers.ModelSerializer):
+    class Meta:
+        model = AcademicYear
+        fields = ['academic_year_id', 'name']
+
 
 # ==================== AcademicDevision ====================
 class AcademicDevisionDropdownSerializer(serializers.ModelSerializer):

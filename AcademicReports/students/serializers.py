@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from branches.models import ClassName, Orientation
+from branches.models import *
 
 # ==================== ClassName ====================
 class ClassNameDropdownSerializer(serializers.ModelSerializer):
@@ -12,3 +12,11 @@ class OrientationDropdownSerializer(serializers.ModelSerializer):
     class Meta:
         model = Orientation
         fields = ['orientation_id', 'name']  
+
+
+# ==================== Student Serializer ====================
+class StudentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Student
+        fields = '__all__'
+        read_only_fields = ('is_active')

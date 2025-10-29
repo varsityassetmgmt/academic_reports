@@ -46,11 +46,18 @@ INSTALLED_APPS = [
     "corsheaders",
     'django_filters', 
     'rest_framework.authtoken',
+    'django_celery_results',
+    'django_celery_beat',
 
     'usermgmt',
     'branches',
     'students',
     'exams',
+    'apibridge',
+    'progresscard',
+    'apisource',
+
+   
     
 ]
 
@@ -58,6 +65,10 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=12),
 
 }
+
+# # optional: explicit path to wkhtmltopdf executable (Windows example)
+# WKHTMLTOPDF_CMD = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+# # On linux/mac you can omit if wkhtmltopdf is in PATH
 
 
 REST_FRAMEWORK = {
@@ -168,13 +179,56 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR,'static/')
+# STATIC_URL = 'static/'
+# STATIC_ROOT = os.path.join(BASE_DIR,'static/')
+
+# STATIC_URL = '/static/'
+# STATIC_ROOT = os.path.join(BASE_DIR,'static')
+
+# STATIC_URL = '/static/'
+# STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "static"),  # If you have a project-level static folder
+]
+# STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")  # for collectstatic
+# If on Windows and wkhtmltopdf is installed in Program Files:
+# WKHTMLTOPDF_CMD = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+# On Linux you can omit WKHTMLTOPDF_CMD if wkhtmltopdf is in PATH
+WKHTMLTOPDF_CMD = (
+    r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+    if os.name == "nt"
+    else "/usr/bin/wkhtmltopdf"
+)
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+
+
+
+#================================================  Celery  starts ========================================================
+
+# CELERY_BROKER_URL = 'redis://127.0.0.1:6379'
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
+# CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT =  ['application/json']
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TASK_SERIALIZER = 'json'
+CELRY_TIMEZONE = 'Asia/Kolkata'
+CELERY_ENABLE_UTC = False
+CELERY_RESULT_BACKEND = 'django-db'
+# CELERY BEAT
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+#================================================ Celery Ends      ========================================================
+
+# WKHTMLTOPDF_CMD = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"  # Windows example
