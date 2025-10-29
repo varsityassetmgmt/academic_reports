@@ -64,48 +64,69 @@ class ExamCategoryDropdownViewSet(ModelViewSet):
 
 
  
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError
+from django.db.models import Count, Q
+
 class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
     """
     Provides a dropdown list of subjects associated with the classes of a given Exam.
     Includes the subject of the current ExamInstance if `exam_instance_id` is provided (for update view).
-    URL pattern: /subject_dropdown_for_exam_instance/<exam_id>/?exam_instance_id=<id>
+    URL pattern: /subject_dropdown_for_exam_instance/<exam_id>/?exam_instance_id=<id>&category_id=<id>
     """
     permission_classes = [IsAuthenticated]
     serializer_class = SubjectDropdownSerializer
     http_method_names = ['get']
- 
+
     def get_queryset(self):
         exam_id = self.kwargs.get('exam_id')
-        exam_instance_id = self.request.query_params.get('exam_instance_id')  # ✅ optional for update
+        category_id = self.request.query_params.get('category_id')
+        exam_instance_id = self.request.query_params.get('exam_instance_id')
+
         if not exam_id:
             raise ValidationError({'exam_id': "This field is required in the URL."})
- 
-        exam = (Exam.objects.filter(exam_id=exam_id, is_active=True).prefetch_related('student_classes').first())
- 
+
+        exam = (
+            Exam.objects.filter(exam_id=exam_id, is_active=True)
+            .prefetch_related('student_classes')
+            .first()
+        )
         if not exam:
             raise ValidationError({'exam_id': f"Exam with ID {exam_id} not found or inactive."})
- 
+
         class_names = exam.student_classes.all()
- 
         if not class_names.exists():
             return Subject.objects.none()
-       
+
+        # Optional category filter
+        category = None
+        if category_id:
+            try:
+                category = SubjectCategory.objects.get(id=category_id)
+            except SubjectCategory.DoesNotExist:
+                raise ValidationError({'category_id': 'Category not found.'})
+
+        # Subjects already assigned to this exam (except current instance if editing)
+        exam_subjects_qs = ExamInstance.objects.filter(exam=exam, is_active=True)
         if exam_instance_id:
-            exam_subjects = ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True).exclude(exam_instance_id=exam_instance_id)
-        else:
-        # Subjects already assigned in active ExamInstances
-            exam_subjects =  ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True)
- 
-        # ✅ Base queryset: subjects matching all classes
-        subjects_qs = Subject.objects.filter(
-            is_active=True,
-            class_names__in=class_names
-        ).annotate(
-            class_count=Count('class_names', filter=Q(class_names__in=class_names), distinct=True)
-        ).filter(
-            class_count=class_names.count()
-        ).exclude(subject_id__in=exam_subjects).distinct().order_by('name')
- 
+            exam_subjects_qs = exam_subjects_qs.exclude(exam_instance_id=exam_instance_id)
+        exam_subjects = exam_subjects_qs.values_list('subject__subject_id', flat=True)
+
+        # Subjects available for all classes of the exam
+        subjects_qs = (
+            Subject.objects.filter(is_active=True, class_names__in=class_names)
+            .annotate(class_count=Count('class_names', filter=Q(class_names__in=class_names), distinct=True))
+            .filter(class_count=class_names.count())
+            .exclude(subject_id__in=exam_subjects)
+            .distinct()
+            .order_by('name')
+        )
+
+        # Apply category filter if provided
+        if category:
+            subjects_qs = subjects_qs.filter(category_id=category.id)
+
         return subjects_qs
 
 
@@ -118,26 +139,29 @@ class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
 #     permission_classes = [IsAuthenticated]
 #     serializer_class = SubjectDropdownSerializer
 #     http_method_names = ['get']
-
+ 
 #     def get_queryset(self):
 #         exam_id = self.kwargs.get('exam_id')
 #         exam_instance_id = self.request.query_params.get('exam_instance_id')  # ✅ optional for update
 #         if not exam_id:
 #             raise ValidationError({'exam_id': "This field is required in the URL."})
-
+ 
 #         exam = (Exam.objects.filter(exam_id=exam_id, is_active=True).prefetch_related('student_classes').first())
-
+ 
 #         if not exam:
 #             raise ValidationError({'exam_id': f"Exam with ID {exam_id} not found or inactive."})
-
+ 
 #         class_names = exam.student_classes.all()
-
+ 
 #         if not class_names.exists():
 #             return Subject.objects.none()
-
+       
+#         if exam_instance_id:
+#             exam_subjects = ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True).exclude(exam_instance_id=exam_instance_id)
+#         else:
 #         # Subjects already assigned in active ExamInstances
-#         exam_subjects = ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True)
-
+#             exam_subjects =  ExamInstance.objects.filter(exam=exam, is_active=True).values_list('subject__subject_id', flat=True)
+ 
 #         # ✅ Base queryset: subjects matching all classes
 #         subjects_qs = Subject.objects.filter(
 #             is_active=True,
@@ -146,80 +170,9 @@ class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
 #             class_count=Count('class_names', filter=Q(class_names__in=class_names), distinct=True)
 #         ).filter(
 #             class_count=class_names.count()
-#         )
-
-#         # ✅ If editing an ExamInstance, include its subject even if already used
-#         if exam_instance_id:
-#             current_instance = ExamInstance.objects.filter(
-#                 exam_instance_id=exam_instance_id,
-#                 exam=exam,
-#                 is_active=True
-#             ).select_related('subject').first()
-
-#             if current_instance and current_instance.subject:
-#                 subjects_qs = subjects_qs.filter(
-#                     Q(subject_id__notin=exam_subjects) | Q(subject_id=current_instance.subject.subject_id)
-#                 )
-#             else:
-#                 subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
-#         else:
-#             subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
-
-#         return subjects_qs.distinct().order_by('name')
-
-
-        # # ✅ If editing an ExamInstance, include its subject even if already used
-        # if exam_instance_id:
-        #     current_instance = ExamInstance.objects.filter(
-        #         exam_instance_id=exam_instance_id,
-        #         exam=exam,
-        #         is_active=True
-        #     ).select_related('subject').first()
-
-        #     if current_instance and current_instance.subject:
-        #         subjects_qs = subjects_qs.filter(
-        #             Q(subject_id__notin=exam_subjects) | Q(subject_id=current_instance.subject.subject_id)
-        #         )
-        #     else:
-        #         subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
-        # else:
-        #     subjects_qs = subjects_qs.exclude(subject_id__in=exam_subjects)
-
-        # return subjects_qs.distinct().order_by('name')
-
-
-
-
-# class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
-#     """
-#     Provides a dropdown list of subjects associated with the classes of a given Exam.
-#     URL pattern: /subject_dropdown_for_exam_instance/<exam_id>/
-#     """
-#     permission_classes = [IsAuthenticated]
-#     serializer_class = SubjectDropdownSerializer
-#     http_method_names = ['get']
-
-#     def get_queryset(self):
-#         exam_id = self.kwargs.get('exam_id')
-#         if not exam_id:
-#             return Response({'exam_id': "This field is required in the URL."}, status=status.HTTP_400_BAD_REQUEST)
-
-#         # ✅ Get the exam safely (avoids DoesNotExist errors)
-#         exam = Exam.objects.filter(exam_id=exam_id, is_active=True).prefetch_related('student_classes').first()
-#         if not exam:
-#             return Response({'exam_id': f"Exam with ID {exam_id} not found or inactive."}, status=status.HTTP_400_BAD_REQUEST)
-
-#         # ✅ Fetch all subjects linked to the exam's classes
-#         subjects = (
-#             Subject.objects.filter(
-#                 is_active=True,
-#                 class_names__in=exam.student_classes.all()
-#             )
-#             .distinct()
-#             .order_by('name')
-#         )
-
-#         return subjects
+#         ).exclude(subject_id__in=exam_subjects).distinct().order_by('name')
+ 
+#         return subjects_qs
 
 
 # ---------------- SubjectSkill ----------------
