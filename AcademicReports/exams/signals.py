@@ -12,7 +12,18 @@ from decimal import Decimal
 def sync_exam_subject_skills(sender, instance, action, pk_set, **kwargs):
     """
     Keep ExamSubjectSkillInstance in sync whenever subject_skills M2M is updated.
+    Also deactivate all ExamSubjectSkillInstances if ExamInstance.has_subject_skills == False.
     """
+    if instance is None:
+        return
+
+    # ✅ If has_subject_skills is False → deactivate all related ExamSubjectSkillInstances
+    if not getattr(instance, "has_subject_skills", True):
+        ExamSubjectSkillInstance.objects.filter(
+            exam_instance=instance, is_active=True
+        ).update(is_active=False)
+        return  # Nothing else to do
+
     if action in ['post_add', 'post_remove', 'post_clear']:
         # Fetch the current subject skills
         current_skills = instance.subject_skills.all()
@@ -29,14 +40,45 @@ def sync_exam_subject_skills(sender, instance, action, pk_set, **kwargs):
             )
             if not obj.is_active:
                 obj.is_active = True
-                obj.save()
+                obj.save(update_fields=["is_active"])
 
         # Step 2: Deactivate instances for removed skills
         existing_instances = ExamSubjectSkillInstance.objects.filter(exam_instance=instance)
         for existing in existing_instances:
             if existing.subject_skill not in current_skills:
                 existing.is_active = False
-                existing.save()
+                existing.save(update_fields=["is_active"])
+
+
+# @receiver(m2m_changed, sender=ExamInstance.subject_skills.through)
+# def sync_exam_subject_skills(sender, instance, action, pk_set, **kwargs):
+#     """
+#     Keep ExamSubjectSkillInstance in sync whenever subject_skills M2M is updated.
+#     """
+#     if action in ['post_add', 'post_remove', 'post_clear']:
+#         # Fetch the current subject skills
+#         current_skills = instance.subject_skills.all()
+
+#         # Step 1: Create missing ExamSubjectSkillInstances
+#         for skill in current_skills:
+#             obj, created = ExamSubjectSkillInstance.objects.get_or_create(
+#                 exam_instance=instance,
+#                 subject_skill=skill,
+#                 defaults={
+#                     "created_by": instance.created_by,
+#                     "updated_by": instance.updated_by,
+#                 },
+#             )
+#             if not obj.is_active:
+#                 obj.is_active = True
+#                 obj.save()
+
+#         # Step 2: Deactivate instances for removed skills
+#         existing_instances = ExamSubjectSkillInstance.objects.filter(exam_instance=instance)
+#         for existing in existing_instances:
+#             if existing.subject_skill not in current_skills:
+#                 existing.is_active = False
+#                 existing.save()
 
 
 
