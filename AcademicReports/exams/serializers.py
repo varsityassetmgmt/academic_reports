@@ -1448,8 +1448,10 @@ class ViewExamInstanceSerializer(serializers.ModelSerializer):
         return obj.exam_end_time.strftime("%I:%M %p") if obj.exam_end_time else None
 
     def get_subject_skills(self, obj):
-        skills_qs = obj.exam_subject_skills_instance_exam_instance.filter(is_active=True)
-        return ViewExamSubjectSkillInstanceSerializer(skills_qs, many=True).data
+        if obj.has_subject_skills:
+            skills_qs = obj.exam_subject_skills_instance_exam_instance.filter(is_active=True)
+            return ViewExamSubjectSkillInstanceSerializer(skills_qs, many=True).data
+        return []  # instead of None
 
 
 class ViewExamSerializer(serializers.ModelSerializer):

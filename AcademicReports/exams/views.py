@@ -2210,18 +2210,18 @@ class ExportSectionExamResultsCSVViewSet(APIView):
                     internal_row = True
                 if instance.has_subject_co_scholastic_grade:
                     grade_row = True
-
-            # Skill-level columns
-            for skill in instance.subject_skills.all():
-                si = skill_instance_map.get((instance.exam_instance_id, skill.id))
-                if si and (si.has_external_marks or si.has_internal_marks or si.has_subject_co_scholastic_grade):
-                    headers.append(f"{instance.subject.name} - {skill.name}")
-                    if si.has_external_marks:
-                        external_row = True
-                    if si.has_internal_marks:
-                        internal_row = True
-                    if si.has_subject_co_scholastic_grade:
-                        grade_row = True
+            if instance.has_subject_skills:
+                # Skill-level columns
+                for skill in instance.subject_skills.all():
+                    si = skill_instance_map.get((instance.exam_instance_id, skill.id))
+                    if si and (si.has_external_marks or si.has_internal_marks or si.has_subject_co_scholastic_grade):
+                        headers.append(f"{instance.subject.name} - {skill.name}")
+                        if si.has_external_marks:
+                            external_row = True
+                        if si.has_internal_marks:
+                            internal_row = True
+                        if si.has_subject_co_scholastic_grade:
+                            grade_row = True
 
         writer.writerow(headers)
         yield from self._flush_buffer(buffer)
@@ -2250,26 +2250,26 @@ class ExportSectionExamResultsCSVViewSet(APIView):
                         if instance.has_subject_co_scholastic_grade and exam_result.co_scholastic_grade:
                             marks['grade'][col_index] = exam_result.co_scholastic_grade.name
                     col_index += 1
+                if instance.has_subject_skills:
+                    for skill in instance.subject_skills.all():
+                        si = skill_instance_map.get((instance.exam_instance_id, skill.id))
+                        if not si or not exam_result:
+                            col_index += 1
+                            continue
 
-                for skill in instance.subject_skills.all():
-                    si = skill_instance_map.get((instance.exam_instance_id, skill.id))
-                    if not si or not exam_result:
+                        sr = skill_result_map.get((exam_result.exam_result_id, skill.id))
+                        if sr:
+                            att = sr.exam_attendance
+                            if si.has_external_marks:
+                                marks['external_marks'][col_index] = (
+                                    sr.external_marks if att and att.exam_attendance_status_id == 1
+                                    else (att.short_code if att else '')
+                                )
+                            if si.has_internal_marks:
+                                marks['internal_marks'][col_index] = sr.internal_marks or ''
+                            if si.has_subject_co_scholastic_grade and sr.co_scholastic_grade:
+                                marks['grade'][col_index] = sr.co_scholastic_grade.name
                         col_index += 1
-                        continue
-
-                    sr = skill_result_map.get((exam_result.exam_result_id, skill.id))
-                    if sr:
-                        att = sr.exam_attendance
-                        if si.has_external_marks:
-                            marks['external_marks'][col_index] = (
-                                sr.external_marks if att and att.exam_attendance_status_id == 1
-                                else (att.short_code if att else '')
-                            )
-                        if si.has_internal_marks:
-                            marks['internal_marks'][col_index] = sr.internal_marks or ''
-                        if si.has_subject_co_scholastic_grade and sr.co_scholastic_grade:
-                            marks['grade'][col_index] = sr.co_scholastic_grade.name
-                    col_index += 1
 
             # === Write student data rows ===
             if external_row:
@@ -2735,17 +2735,17 @@ class BranchSectionsExamResultsXLSXView(APIView):
                         internal_row = True
                     if instance.has_subject_co_scholastic_grade:
                         grade_row = True
-
-                for skill in instance.subject_skills.all():
-                    si = skill_instance_map.get((instance.exam_instance_id, skill.id))
-                    if si and (si.has_external_marks or si.has_internal_marks or si.has_subject_co_scholastic_grade):
-                        headers.append(f"{instance.subject.name} - {skill.name}")
-                        if si.has_external_marks:
-                            external_row = True
-                        if si.has_internal_marks:
-                            internal_row = True
-                        if si.has_subject_co_scholastic_grade:
-                            grade_row = True
+                if instance.has_subject_skills:
+                    for skill in instance.subject_skills.all():
+                        si = skill_instance_map.get((instance.exam_instance_id, skill.id))
+                        if si and (si.has_external_marks or si.has_internal_marks or si.has_subject_co_scholastic_grade):
+                            headers.append(f"{instance.subject.name} - {skill.name}")
+                            if si.has_external_marks:
+                                external_row = True
+                            if si.has_internal_marks:
+                                internal_row = True
+                            if si.has_subject_co_scholastic_grade:
+                                grade_row = True
 
             ws.append(headers)
             for col_idx in range(1, len(headers) + 1):
@@ -2786,28 +2786,28 @@ class BranchSectionsExamResultsXLSXView(APIView):
                             if instance.has_subject_co_scholastic_grade and exam_result.co_scholastic_grade:
                                 marks['grade'][col_index] = exam_result.co_scholastic_grade.name
                         col_index += 1
-
-                    # Skills
-                    for skill in instance.subject_skills.all():
-                        si = skill_instance_map.get((instance.exam_instance_id, skill.id))
-                        if not si:
-                            continue
-                        skill_result = exam_result and skill_result_map.get((exam_result.exam_result_id, skill.id))
-                        if skill_result:
-                            attendance = skill_result.exam_attendance
-                            # External
-                            if si.has_external_marks:
-                                marks['external_marks'][col_index] = (
-                                    skill_result.external_marks if attendance and attendance.exam_attendance_status_id == 1
-                                    else (attendance.short_code if attendance else '')
-                                )
-                            # Internal
-                            if si.has_internal_marks:
-                                marks['internal_marks'][col_index] = skill_result.internal_marks or ''
-                            # Grade
-                            if si.has_subject_co_scholastic_grade and skill_result.co_scholastic_grade:
-                                marks['grade'][col_index] = skill_result.co_scholastic_grade.name
-                        col_index += 1
+                    if instance.has_subject_skills:
+                        # Skills
+                        for skill in instance.subject_skills.all():
+                            si = skill_instance_map.get((instance.exam_instance_id, skill.id))
+                            if not si:
+                                continue
+                            skill_result = exam_result and skill_result_map.get((exam_result.exam_result_id, skill.id))
+                            if skill_result:
+                                attendance = skill_result.exam_attendance
+                                # External
+                                if si.has_external_marks:
+                                    marks['external_marks'][col_index] = (
+                                        skill_result.external_marks if attendance and attendance.exam_attendance_status_id == 1
+                                        else (attendance.short_code if attendance else '')
+                                    )
+                                # Internal
+                                if si.has_internal_marks:
+                                    marks['internal_marks'][col_index] = skill_result.internal_marks or ''
+                                # Grade
+                                if si.has_subject_co_scholastic_grade and skill_result.co_scholastic_grade:
+                                    marks['grade'][col_index] = skill_result.co_scholastic_grade.name
+                            col_index += 1
 
                 # Rows to write
                 row_start = ws.max_row + 1
@@ -3177,16 +3177,16 @@ class ExportSectionExamResultsTemplateXLSXView(APIView):
                 has_external |= instance.has_external_marks
                 has_internal |= instance.has_internal_marks
                 has_grade |= instance.has_subject_co_scholastic_grade
-
-            for skill in instance.subject_skills.all():
-                si = skill_instance_map.get((instance.exam_instance_id, skill.id))
-                if si and (
-                    si.has_external_marks or si.has_internal_marks or si.has_subject_co_scholastic_grade
-                ):
-                    headers.append(f"{instance.subject.name} - {skill.name}")
-                    has_external |= si.has_external_marks
-                    has_internal |= si.has_internal_marks
-                    has_grade |= si.has_subject_co_scholastic_grade
+            if instance.has_subject_skills:
+                for skill in instance.subject_skills.all():
+                    si = skill_instance_map.get((instance.exam_instance_id, skill.id))
+                    if si and (
+                        si.has_external_marks or si.has_internal_marks or si.has_subject_co_scholastic_grade
+                    ):
+                        headers.append(f"{instance.subject.name} - {skill.name}")
+                        has_external |= si.has_external_marks
+                        has_internal |= si.has_internal_marks
+                        has_grade |= si.has_subject_co_scholastic_grade
 
         ws.append(headers)
 
