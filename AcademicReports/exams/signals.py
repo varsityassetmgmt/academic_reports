@@ -39,7 +39,7 @@ def sync_exam_subject_skills(sender, instance, action, pk_set, **kwargs):
         if not instance.has_subject_skills:
             ExamSubjectSkillInstance.objects.filter(exam_instance=instance).update(is_active=False)
 
-
+        print(instance.has_subject_skills)
 
 
 # @receiver(m2m_changed, sender=ExamInstance.subject_skills.through)
