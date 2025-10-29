@@ -1339,8 +1339,20 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 "subject_category": "Subject Category is required."
             })
+        
+        try:
+            db_subject = Subject.objects.get(subject_id=subject.id)
+        except Subject.DoesNotExist:
+            raise serializers.ValidationError({
+                "subject": f"Subject with ID {subject.id} not found."
+            })
 
-        sequence = attrs.get('sequence') or getattr(self.instance, 'sequence', None)
+        if db_subject.category_id != subject_category:
+            raise serializers.ValidationError({
+                "subject_category": (
+                    f"The selected Subject '{db_subject.name}' does not belong to the chosen Subject Category."
+                )
+            })
 
         # ✅ Uniqueness check: (exam, sequence)
         if exam and sequence is not None:
