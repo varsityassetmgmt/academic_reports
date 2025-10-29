@@ -23,6 +23,6 @@ urlpatterns = [
 
     path('groups_dropdown/', get_groups_dropdown, name='groups_dropdown'),
     path('permissions_dropdown/', get_permissions_dropdown, name='permissions_dropdown'),   # for Groups
-    path('permissions_dropdown_exclude_groups/<str:group_list>/', get_permissions_dropdown_exclude_groups, name='permissions_dropdown_exclude_groups')  # for Users
-    
+    path('permissions_dropdown_exclude_groups/<str:group_list>/', get_permissions_dropdown_exclude_groups, name='permissions_dropdown_exclude_groups'),  # for Users
+    path('varna_user_data/',VarnaUserDataAPIView.as_view()),
 ]+ router.urls
