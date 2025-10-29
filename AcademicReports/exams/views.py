@@ -2143,9 +2143,14 @@ class ExportSectionExamResultsCSVViewSet(APIView):
             ExamInstance.objects.filter(exam=exam, is_active=True).order_by('sequence')
             .prefetch_related('subject_skills')
         )
+        skill_ids = exam_instances and list(
+            ExamSubjectSkillInstance.objects.filter(exam_instance__in=exam_instances, is_active=True)
+            .values_list('subject_skill_id', flat=True)
+        )
 
+        # === Map skill instances for quick access ===
         skill_instances_qs = ExamSubjectSkillInstance.objects.filter(
-            exam_instance__in=exam_instances, is_active=True
+            exam_instance__in=exam_instances, is_active=True, subject_skill_id__in=skill_ids
         ).select_related('subject_skill', 'exam_instance')
         skill_instance_map = {(si.exam_instance_id, si.subject_skill_id): si for si in skill_instances_qs}
 
@@ -2684,10 +2689,14 @@ class BranchSectionsExamResultsXLSXView(APIView):
 
         # Fetch exam instances
         exam_instances = list(ExamInstance.objects.filter(exam=exam, is_active=True).order_by('sequence').prefetch_related('subject_skills'))
+        skill_ids = exam_instances and list(
+                    ExamSubjectSkillInstance.objects.filter(exam_instance__in=exam_instances, is_active=True)
+                    .values_list('subject_skill_id', flat=True)
+                )
 
-        # Map skill and result data for quick lookup
+        # === Map skill instances for quick access ===
         skill_instances_qs = ExamSubjectSkillInstance.objects.filter(
-            exam_instance__in=exam_instances, is_active=True
+            exam_instance__in=exam_instances, is_active=True, subject_skill_id__in=skill_ids
         ).select_related('subject_skill', 'exam_instance')
         skill_instance_map = {(si.exam_instance_id, si.subject_skill_id): si for si in skill_instances_qs}
 
@@ -3133,10 +3142,15 @@ class ExportSectionExamResultsTemplateXLSXView(APIView):
             ExamInstance.objects.filter(exam=exam, is_active=True).order_by('sequence')
             .prefetch_related("subject_skills")
         )
+        skill_ids = exam_instances and list(
+                    ExamSubjectSkillInstance.objects.filter(exam_instance__in=exam_instances, is_active=True)
+                    .values_list('subject_skill_id', flat=True)
+                )
 
+        # === Map skill instances for quick access ===
         skill_instances_qs = ExamSubjectSkillInstance.objects.filter(
-            exam_instance__in=exam_instances, is_active=True
-        ).select_related("subject_skill", "exam_instance")
+            exam_instance__in=exam_instances, is_active=True, subject_skill_id__in=skill_ids
+        ).select_related('subject_skill', 'exam_instance')
         skill_instance_map = {(si.exam_instance_id, si.subject_skill_id): si for si in skill_instances_qs}
 
         students = list(
