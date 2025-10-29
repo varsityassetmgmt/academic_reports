@@ -1337,7 +1337,7 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
         subject_category = self.initial_data.get('subject_category') or getattr(self.instance, 'subject_category', None)
         if not subject_category:
             raise serializers.ValidationError({
-                "subject_category": "Sequence is required."
+                "subject_category": "Subject Category is required."
             })
 
         sequence = attrs.get('sequence') or getattr(self.instance, 'sequence', None)

@@ -62,13 +62,6 @@ class ExamCategoryDropdownViewSet(ModelViewSet):
 #         return subjects
 
 
-
- 
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import ValidationError
-from django.db.models import Count, Q
-
 class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
     """
     Provides a dropdown list of subjects associated with the classes of a given Exam.
