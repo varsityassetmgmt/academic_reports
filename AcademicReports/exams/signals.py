@@ -17,18 +17,28 @@ def sync_exam_subject_skills(sender, instance, action, pk_set, **kwargs):
     if instance is None:
         return
 
+    # ✅ Ensure has_subject_skills is up-to-date (if missing or stale)
+    has_subject_skills = getattr(instance, "has_subject_skills", None)
+    if has_subject_skills is None:
+        has_subject_skills = (
+            ExamInstance.objects.filter(pk=instance.pk)
+            .values_list("has_subject_skills", flat=True)
+            .first()
+        )
+
     # ✅ If has_subject_skills is False → deactivate all related ExamSubjectSkillInstances
-    if not getattr(instance, "has_subject_skills", True):
+    if has_subject_skills is False:
         ExamSubjectSkillInstance.objects.filter(
             exam_instance=instance, is_active=True
         ).update(is_active=False)
-        return  # Nothing else to do
+        return  # Stop further processing
 
+    # Handle M2M changes only for active skill tracking
     if action in ['post_add', 'post_remove', 'post_clear']:
         # Fetch the current subject skills
         current_skills = instance.subject_skills.all()
 
-        # Step 1: Create missing ExamSubjectSkillInstances
+        # Step 1: Create or reactivate missing ExamSubjectSkillInstances
         for skill in current_skills:
             obj, created = ExamSubjectSkillInstance.objects.get_or_create(
                 exam_instance=instance,
@@ -42,12 +52,13 @@ def sync_exam_subject_skills(sender, instance, action, pk_set, **kwargs):
                 obj.is_active = True
                 obj.save(update_fields=["is_active"])
 
-        # Step 2: Deactivate instances for removed skills
+        # Step 2: Deactivate removed skills
         existing_instances = ExamSubjectSkillInstance.objects.filter(exam_instance=instance)
         for existing in existing_instances:
             if existing.subject_skill not in current_skills:
                 existing.is_active = False
                 existing.save(update_fields=["is_active"])
+
 
 
 # @receiver(m2m_changed, sender=ExamInstance.subject_skills.through)
