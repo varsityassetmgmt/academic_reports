@@ -1436,7 +1436,6 @@ class ViewExamInstanceSerializer(serializers.ModelSerializer):
             'has_subject_co_scholastic_grade',
             'has_subject_skills',
             'subject_skills',
-            'sequence',
         ]
 
     def get_date(self, obj):
@@ -1478,9 +1477,25 @@ class ViewExamSerializer(serializers.ModelSerializer):
             'marks_entry_expiry_datetime_backup',
             'is_visible',
             'is_progress_card_visible',
-            'Subjects',
+            'Subjects'
         ]
 
+    def get_start_date(self, obj):
+        return obj.start_date.strftime("%d-%b-%Y") if obj.start_date else None
+
+    def get_end_date(self, obj):
+        return obj.end_date.strftime("%d-%b-%Y") if obj.end_date else None
+
+    def get_marks_entry_expiry_datetime(self, obj):
+        if obj.marks_entry_expiry_datetime:
+            return timezone.localtime(obj.marks_entry_expiry_datetime).strftime("%d-%b-%Y %I:%M %p")
+        return None
+
+    def get_marks_entry_expiry_datetime_backup(self, obj):
+        if obj.marks_entry_expiry_datetime:
+            return timezone.localtime(obj.marks_entry_expiry_datetime).strftime("%Y-%m-%d %H:%M:%S")
+        return None
+    
     def get_Subjects(self, obj):
         """Return ExamInstances ordered by sequence."""
         exam_instances = ExamInstance.objects.filter(exam=obj, is_active=True).order_by('sequence')
