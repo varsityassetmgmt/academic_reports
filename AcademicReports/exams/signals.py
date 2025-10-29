@@ -8,38 +8,60 @@ from exams.models import *
 from students.models import Student
 from decimal import Decimal
 
+def _sync_exam_subject_skills(instance):
+    """
+    Internal helper to sync ExamSubjectSkillInstances for a given ExamInstance.
+    """
+    # Ensure we have a fresh has_subject_skills value from DB if not loaded
+    if not hasattr(instance, 'has_subject_skills'):
+        instance = ExamInstance.objects.only('has_subject_skills').get(pk=instance.pk)
+
+    current_skills = instance.subject_skills.all()
+
+    # Step 1: Create or activate ExamSubjectSkillInstances for selected skills
+    for skill in current_skills:
+        obj, created = ExamSubjectSkillInstance.objects.get_or_create(
+            exam_instance=instance,
+            subject_skill=skill,
+            defaults={
+                "created_by": getattr(instance, 'created_by', None),
+                "updated_by": getattr(instance, 'updated_by', None),
+            },
+        )
+        if not obj.is_active:
+            obj.is_active = True
+            obj.save(update_fields=["is_active"])
+
+    # Step 2: Deactivate instances for removed skills
+    existing_instances = ExamSubjectSkillInstance.objects.filter(exam_instance=instance)
+    for existing in existing_instances:
+        if existing.subject_skill not in current_skills:
+            existing.is_active = False
+            existing.save(update_fields=["is_active"])
+
+    # Step 3: Handle has_subject_skills = False
+    if not instance.has_subject_skills:
+        ExamSubjectSkillInstance.objects.filter(exam_instance=instance).update(is_active=False)
+
+
+
 @receiver(m2m_changed, sender=ExamInstance.subject_skills.through)
-def sync_exam_subject_skills(sender, instance, action, pk_set, **kwargs):
-    # if action in ['post_add', 'post_remove', 'post_clear']:
-        # Fetch current subject skills
-        current_skills = instance.subject_skills.all()
+def exam_instance_subject_skills_changed(sender, instance, action, **kwargs):
+    """
+    Runs when subject_skills M2M field changes.
+    """
+    if action in ['post_add', 'post_remove', 'post_clear']:
+        _sync_exam_subject_skills(instance)
 
-        # Step 1: Create missing ExamSubjectSkillInstances
-        for skill in current_skills:
-            obj, created = ExamSubjectSkillInstance.objects.get_or_create(
-                exam_instance=instance,
-                subject_skill=skill,
-                defaults={
-                    "created_by": instance.created_by,
-                    "updated_by": instance.updated_by,
-                },
-            )
-            if not obj.is_active:
-                obj.is_active = True
-                obj.save()
 
-        # Step 2: Deactivate instances for removed skills
-        existing_instances = ExamSubjectSkillInstance.objects.filter(exam_instance=instance)
-        for existing in existing_instances:
-            if existing.subject_skill not in current_skills:
-                existing.is_active = False
-                existing.save()
+@receiver(post_save, sender=ExamInstance)
+def exam_instance_saved(sender, instance, created, **kwargs):
+    """
+    Runs every time ExamInstance is created or updated.
+    Useful for syncing when has_subject_skills or other fields change.
+    """
+    _sync_exam_subject_skills(instance)
 
-        # Step 3: Handle has_subject_skills = False
-        if not instance.has_subject_skills:
-            ExamSubjectSkillInstance.objects.filter(exam_instance=instance).update(is_active=False)
-
-        print(instance.has_subject_skills)
 
 
 # @receiver(m2m_changed, sender=ExamInstance.subject_skills.through)
