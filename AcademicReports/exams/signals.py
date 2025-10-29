@@ -8,7 +8,7 @@ from exams.models import *
 from students.models import Student
 from decimal import Decimal
 
-def _sync_exam_subject_skills(instance):
+def _sync_exam_subject_skills(instance, triggered_by_m2m=False):
     """
     Internal helper to sync ExamSubjectSkillInstances for a given ExamInstance.
     """
@@ -41,8 +41,10 @@ def _sync_exam_subject_skills(instance):
 
     # Step 3: Handle has_subject_skills = False
     if not instance.has_subject_skills:
+        # Avoid recursive loop when clearing M2M
+        if instance.subject_skills.exists() and not triggered_by_m2m:
+            instance.subject_skills.clear()
         ExamSubjectSkillInstance.objects.filter(exam_instance=instance).update(is_active=False)
-
 
 
 @receiver(m2m_changed, sender=ExamInstance.subject_skills.through)
@@ -51,7 +53,7 @@ def exam_instance_subject_skills_changed(sender, instance, action, **kwargs):
     Runs when subject_skills M2M field changes.
     """
     if action in ['post_add', 'post_remove', 'post_clear']:
-        _sync_exam_subject_skills(instance)
+        _sync_exam_subject_skills(instance, triggered_by_m2m=True)
 
 
 @receiver(post_save, sender=ExamInstance)
@@ -61,6 +63,7 @@ def exam_instance_saved(sender, instance, created, **kwargs):
     Useful for syncing when has_subject_skills or other fields change.
     """
     _sync_exam_subject_skills(instance)
+
 
 
 
