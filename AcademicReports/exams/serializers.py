@@ -1353,7 +1353,8 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
                     f"The selected Subject '{db_subject.name}' does not belong to the chosen Subject Category."
                 )
             })
-
+        
+        sequence = attrs.get('sequence') or getattr(self.instance, 'sequence', None)
         # ✅ Uniqueness check: (exam, sequence)
         if exam and sequence is not None:
             qs = ExamInstance.objects.filter(exam=exam, sequence=sequence)
