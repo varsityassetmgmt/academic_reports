@@ -1337,11 +1337,24 @@ class CreateExamInstanceSerializer(serializers.ModelSerializer):
         subject_category = self.initial_data.get('subject_category') or getattr(self.instance, 'subject_category', None)
         if not subject_category:
             raise serializers.ValidationError({
-                "subject_category": "Sequence is required."
+                "subject_category": "Subject Category is required."
+            })
+        
+        try:
+            db_subject = Subject.objects.get(subject_id=subject.subject_id)
+        except Subject.DoesNotExist:
+            raise serializers.ValidationError({
+                "subject": f"Subject with ID {subject.subject_id} not found."
             })
 
+        if db_subject.category_id != subject_category:
+            raise serializers.ValidationError({
+                "subject_category": (
+                    f"The selected Subject '{db_subject.name}' does not belong to the chosen Subject Category."
+                )
+            })
+        
         sequence = attrs.get('sequence') or getattr(self.instance, 'sequence', None)
-
         # ✅ Uniqueness check: (exam, sequence)
         if exam and sequence is not None:
             qs = ExamInstance.objects.filter(exam=exam, sequence=sequence)
@@ -1435,8 +1448,10 @@ class ViewExamInstanceSerializer(serializers.ModelSerializer):
         return obj.exam_end_time.strftime("%I:%M %p") if obj.exam_end_time else None
 
     def get_subject_skills(self, obj):
-        skills_qs = obj.exam_subject_skills_instance_exam_instance.filter(is_active=True)
-        return ViewExamSubjectSkillInstanceSerializer(skills_qs, many=True).data
+        if obj.has_subject_skills:
+            skills_qs = obj.exam_subject_skills_instance_exam_instance.filter(is_active=True)
+            return ViewExamSubjectSkillInstanceSerializer(skills_qs, many=True).data
+        return []  # instead of None
 
 
 class ViewExamSerializer(serializers.ModelSerializer):
@@ -1447,7 +1462,7 @@ class ViewExamSerializer(serializers.ModelSerializer):
     end_date = serializers.SerializerMethodField()
     marks_entry_expiry_datetime = serializers.SerializerMethodField()
     marks_entry_expiry_datetime_backup = serializers.SerializerMethodField()
-    Subjects = ViewExamInstanceSerializer(source='exam_instance_exam', many=True)
+    Subjects = serializers.SerializerMethodField()  # ✅ change this
 
     class Meta:
         model = Exam
@@ -1480,3 +1495,8 @@ class ViewExamSerializer(serializers.ModelSerializer):
         if obj.marks_entry_expiry_datetime:
             return timezone.localtime(obj.marks_entry_expiry_datetime).strftime("%Y-%m-%d %H:%M:%S")
         return None
+    
+    def get_Subjects(self, obj):
+        """Return ExamInstances ordered by sequence."""
+        exam_instances = ExamInstance.objects.filter(exam=obj, is_active=True).order_by('sequence')
+        return ViewExamInstanceSerializer(exam_instances, many=True).data
