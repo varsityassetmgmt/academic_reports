@@ -10,7 +10,7 @@ from decimal import Decimal
 
 @receiver(m2m_changed, sender=ExamInstance.subject_skills.through)
 def sync_exam_subject_skills(sender, instance, action, pk_set, **kwargs):
-    if action in ['post_add', 'post_remove', 'post_clear']:
+    # if action in ['post_add', 'post_remove', 'post_clear']:
         # Fetch current subject skills
         current_skills = instance.subject_skills.all()
 
