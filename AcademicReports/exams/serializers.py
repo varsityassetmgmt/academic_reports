@@ -1483,5 +1483,5 @@ class ViewExamSerializer(serializers.ModelSerializer):
 
     def get_Subjects(self, obj):
         """Return ExamInstances ordered by sequence."""
-        exam_instances = obj.exam_instance_exam.filter(is_active=True).order_by("sequence")
+        exam_instances = ExamInstance.objects.filter(exam=obj, is_active=True).order_by('sequence')
         return ViewExamInstanceSerializer(exam_instances, many=True).data
