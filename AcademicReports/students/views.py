@@ -214,7 +214,7 @@ class OrientationDropdownForStudentsViewSet(ModelViewSet):
         return queryset
     
 class AdmissionStatusDropdownForStudentsViewSet(ModelViewSet):
-    queryset = AdmissionStatus.objects.filter(is_active=True).order_by('id')
+    queryset = AdmissionStatus.objects.filter(is_active=True).order_by('admission_status_id')
     serializer_class = AdmissionStatusSerializer
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
