@@ -14,7 +14,7 @@ from branches.models import *
 from rest_framework.exceptions import NotFound
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError, NotFound
+from rest_framework.exceptions import ValidationError, NotFound, ParseError
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from usermgmt.authentication import QueryParameterTokenAuthentication
@@ -322,7 +322,7 @@ class GradeBoundaryViewSet(ModelViewSet):
     def get_queryset(self):
         category_id = self.request.query_params.get('category_id')
         if not category_id:
-            raise ValidationError(
+            raise ParseError(
                 {"detail": "The 'category_id' query parameter is required."}
             )
         return GradeBoundary.objects.filter(is_active=True, category_id=category_id).order_by('-min_percentage')
@@ -358,7 +358,7 @@ class CoScholasticGradeViewSet(ModelViewSet):
     def get_queryset(self):
         category_id = self.request.query_params.get('category_id')
         if not category_id:
-            raise ValidationError(
+            raise ParseError(
                 {"detail": "The 'category_id' query parameter is required."}
             )
         return CoScholasticGrade.objects.filter(is_active=True, category_id=category_id).order_by('name')

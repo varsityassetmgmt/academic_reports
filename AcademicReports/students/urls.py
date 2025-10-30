@@ -14,6 +14,7 @@ router.register(r'classname_dropdown_for_exam', ClassNameDropdownForExamViewSet,
 router.register(r'orientation_dropdown_for_exam', OrientationDropdownForExamViewSet, basename='orientation_dropdown_for_exam')
 
 router.register(r'students', StudentViewSet, basename='students')
+router.register(r'sections', SectionViewSet, basename='sections')
 
 urlpatterns = [
 
