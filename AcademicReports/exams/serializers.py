@@ -543,6 +543,8 @@ class ExamAttendanceStatusSerializer(serializers.ModelSerializer):
 
 # ==================== GradeBoundary ====================
 class GradeBoundarySerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    
     class Meta:
         model = GradeBoundary
         fields = '__all__'
@@ -550,6 +552,8 @@ class GradeBoundarySerializer(serializers.ModelSerializer):
 
 # ==================== CoScholasticGrade ====================
 class CoScholasticGradeSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+
     class Meta:
         model = CoScholasticGrade
         fields = '__all__'
