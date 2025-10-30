@@ -51,6 +51,7 @@ class UserProfile(models.Model):
     varna_user_id = models.CharField(max_length=250, null=True, blank=True, unique=True)
     varna_profile_short_code = models.CharField(max_length=250, null=True, blank=True)
     varna_profile = models.ForeignKey(VarnaProfiles,on_delete=models.PROTECT,null=True,blank=True,related_name="user_profiles_varna_profile")
+    is_varna_user_first_login = models.BooleanField(default=True)
 
     
     def __str__(self):

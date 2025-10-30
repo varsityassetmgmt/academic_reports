@@ -3,8 +3,7 @@ from django.contrib.auth.models import User, Permission
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 
-from .models import UserProfile
-
+from usermgmt.models import *
 
 @admin.register(Permission)
 class PermissionAdmin(admin.ModelAdmin):
@@ -74,3 +73,25 @@ class UserProfileAdmin(admin.ModelAdmin):
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
 
+@admin.register(VarnaProfiles)
+class VarnaProfilesAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "varna_profile_short_code",
+        "is_active",
+    )
+    list_filter = ("is_active", "groups")
+    search_fields = ("name", "varna_profile_short_code")
+    filter_horizontal = ("groups",)
+    ordering = ("name",)
+
+    fieldsets = (
+        (None, {
+            "fields": (
+                "name",
+                "varna_profile_short_code",
+                "groups",
+                "is_active",
+            ),
+        }),
+    )
