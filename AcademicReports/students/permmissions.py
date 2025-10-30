@@ -88,5 +88,22 @@ class CanChangeStudent(BasePermission):
 class CanDeleteStudent(BasePermission):
     def has_permission(self, request, view):
         return request.user.has_perm('students.delete_student')
+    
+# ==================== Section Permissions =====================
+class CanViewSection(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('students.view_section')
+
+class CanAddSection(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('students.add_section')
+
+class CanChangeSection(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('students.change_section')
+
+class CanDeleteSection(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.has_perm('students.delete_section')
 
 

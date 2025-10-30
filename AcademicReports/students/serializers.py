@@ -33,6 +33,7 @@ class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = [
+            'student_id'
             'academic_year',
             'SCS_Number',
             'name',
@@ -48,6 +49,33 @@ class StudentSerializer(serializers.ModelSerializer):
             'student_class_name',
             'section',
             'section_name',
+            'is_active',
+        ]
+        read_only_fields = ('is_active',)
+
+class SectionSerializer(serializers.ModelSerializer):
+    state_name = serializers.CharField(source='branch.state.name', read_only=True)
+    zone_name = serializers.CharField(source='branch.zone.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
+    orientation_name = serializers.CharField(source='orientation.name', read_only=True)
+    class_name_name = serializers.CharField(source='class_name.name', read_only=True)
+
+    class Meta:
+        model = Section
+        fields = [
+            'section_id',
+            'academic_year',
+            'branch',
+            'state_name',
+            'zone_name',
+            'branch_name',
+            'orientation',
+            'orientation_name',
+            'class_name',
+            'class_name_name',
+            'name',
+            'strength',
+            'has_students',
             'is_active',
         ]
         read_only_fields = ('is_active',)

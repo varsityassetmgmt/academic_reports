@@ -271,7 +271,7 @@ class StudentViewSet(ModelViewSet):
                 academic_year = current_academic_year,
             )
             # .exclude(admission_status_id=3)
-            .order_by('branch', 'student_class__class_sequence', 'section', 'name')
+            .order_by('branch', 'student_class__class_sequence', 'orientation', 'section', 'name')
         )
 
     def get_permissions(self):
@@ -297,3 +297,61 @@ def trigger_branch_orientation_sync(request):
         {"message": "Branch orientation sync task triggered successfully."},
     )
         
+class SectionViewSet(ModelViewSet):
+    serializer_class = SectionSerializer
+    http_method_names = ['get']
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = [
+        'branch__name', 'zone__name', 'state__name',
+        'class_name__name', 'orientation__name', 'name',
+    ]
+    ordering_fields = [
+        'branch__name', 'zone__name', 'state__name',
+        'class_name__name', 'orientation__name', 'name',    
+        'has_students', 'strength',
+    ]
+    filterset_fields=[
+        'branch', 'branch__state', 'branch__zone',
+        'class_name', 'orientation', 'name'
+    ]
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.groups.filter(id=1).exists():  # Super admin or system user
+            branch_ids = Branch.objects.filter(is_active=True)
+        else:
+            branch_ids = (
+                UserProfile.objects.filter(user=user)
+                .values_list('branches', flat=True)
+                .distinct()
+            )
+
+        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+        if not current_academic_year:
+            raise NotFound("Current academic year not found.")
+        
+        return Section.objects.filter(
+            is_active=True, 
+            academic_year=current_academic_year, 
+            branch__branch_id__in=branch_ids,
+            class_name__is_active=True,
+        ).order_by(
+            'branch',
+            'class_name__class_sequence',
+            'orientation',
+            'name'
+        )
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [CanViewSection]
+        elif self.action == 'create':
+            permission_classes = [CanAddSection]
+        elif self.action in ['update', 'partial_update']:
+            permission_classes = [CanChangeSection]
+        else:
+            permission_classes = [permissions.AllowAny]
+        return [permission() for permission in permission_classes]
+
