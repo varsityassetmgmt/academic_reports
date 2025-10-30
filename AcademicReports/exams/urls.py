@@ -10,6 +10,7 @@ router.register(r'exam_dropdown', ExamDropdownViewSet, basename='exam_dropdown')
 router.register(r'examinstance_dropdown', ExamInstanceDropdownViewSet, basename='examinstance_dropdown')
 router.register(r'examattendancestatus_dropdown', ExamAttendanceStatusDropdownViewSet, basename='examattendancestatus_dropdown')
 router.register(r'co_scholastic_grade_dropdown', CoScholasticGradeDropdownViewSet, basename='co_scholastic_grade_dropdown')
+router.register(r'co_scholastic_grade_dropdown_for_marks_entry', CoScholasticGradeDropdownForMarksEntryViewSet, basename='co_scholastic_grade_dropdown_for_marks_entry')
 router.register(r'exam_result_status_dropdown', ExamResultStatusDropdownViewSet, basename='exam_result_status_dropdown')
 
 router.register(r'subject', SubjectViewSet, basename='subject')

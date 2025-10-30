@@ -1705,6 +1705,29 @@ class CoScholasticGradeDropdownViewSet(ModelViewSet):
     serializer_class = CoScholasticGradeDropdownSerializer
     http_method_names = ['get']
 
+class CoScholasticGradeDropdownForMarksEntryViewSet(ModelViewSet):
+    """
+    Provides a dropdown list of Co-Scholastic Grades filtered by the exam's category.
+    Requires `exam_id` query parameter.
+    Example: /co_scholastic_grade_dropdown_for_marks_entry/?exam_id=<exam_id>
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = CoScholasticGradeDropdownSerializer
+    http_method_names = ['get']
+
+    def get_queryset(self):
+        exam_id = self.request.query_params.get('exam_id')  # ✅ corrected method name
+        if not exam_id:
+            raise ParseError({'exam_id': "The 'exam_id' query parameter is required."})
+
+        exam = get_object_or_404(Exam, exam_id=exam_id, is_active=True)
+
+        return CoScholasticGrade.objects.filter(
+            is_active=True,
+            category=exam.category
+        ).order_by('id')
+
+
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_marks_entry_expiry_datetime_in_exam_instance(request, exam_id):
