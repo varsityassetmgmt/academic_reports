@@ -788,6 +788,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'status__name',
         'exam__exam_type__name',
         'is_progress_card_downloaded',
+        'exam__category__name',
     ]
 
     filterset_fields = [
@@ -799,6 +800,8 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'is_active',
         'exam__exam_type',
         'is_progress_card_downloaded',
+        'exam__category',
+
     ]
 
     ordering_fields = [
@@ -811,6 +814,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'updated_at',
         'exam__exam_type__name',
         'is_progress_card_downloaded',
+        'exam__category__name',
     ]
 
     def get_queryset(self):
