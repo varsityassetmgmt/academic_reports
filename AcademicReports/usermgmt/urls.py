@@ -25,4 +25,7 @@ urlpatterns = [
     path('permissions_dropdown/', get_permissions_dropdown, name='permissions_dropdown'),   # for Groups
     path('permissions_dropdown_exclude_groups/<str:group_list>/', get_permissions_dropdown_exclude_groups, name='permissions_dropdown_exclude_groups'),  # for Users
     path('varna_user_data/',VarnaUserDataAPIView.as_view()),
+
+    path('varna_login/', VarnaLoginAPIView.as_view(), name="varna_login"),
+    path('varna_change_password/',VarnaChangePasswordAPIView.as_view()),
 ]+ router.urls

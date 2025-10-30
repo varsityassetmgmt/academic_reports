@@ -516,5 +516,82 @@ class VarnaUserDataAPIView(APIView):
         return Response(data, status=200)
 
 
+# from rest_framework.views import APIView
+# from rest_framework.response import Response
+# from rest_framework import status
+# from django.contrib.auth import authenticate
+# from rest_framework_simplejwt.tokens import RefreshToken
+# from .models import UserProfile
+# from django.contrib.auth.models import Userfrom rest_framework.views import APIView
+from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+from usermgmt.authentication import QueryParameterTokenAuthentication
+from usermgmt.models import UserProfile  # example
+
+ 
+
+class VarnaLoginAPIView(APIView):
+    authentication_classes = [QueryParameterTokenAuthentication]
+    permission_classes = [DjangoModelPermissionsOrAnonReadOnly]
+    queryset = UserProfile.objects.none()  # ✅ This avoids the AssertionErr
+    def post(self, request):
+        username = request.data.get("username")
+        password = request.data.get("password")
+        varna_user_id = request.data.get("varna_user_id")  # optional filter
+
+        if not username or not password or not varna_user_id:
+            return Response({"error": "Username, password, and varna_user_id are required."},status=status.HTTP_400_BAD_REQUEST)
+        
+        profile = UserProfile.objects.filter(varna_user_id=varna_user_id).first()
+        if not profile:
+            return Response({"error": "User profile not found for given varna_user_id."},status=status.HTTP_404_NOT_FOUND)
+
+        if profile.is_varna_user_first_login:
+            profile_user = profile.user
+            profile_user.set_password(password)
+            profile_user.save()
+            profile.is_varna_user_first_login = False
+            profile.save()
+
+        user = authenticate(username=username, password=password)
+        if not user:
+            return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        refresh = RefreshToken.for_user(user)
+
+        data = {
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+            "user": user.username,
+            "name": f"{user.first_name} {user.last_name}".strip() or user.username,  # <-- added name field
+        }
+
+        return Response(data, status=status.HTTP_200_OK)
 
 
+
+class VarnaChangePasswordAPIView(APIView):
+    authentication_classes = [QueryParameterTokenAuthentication]
+    permission_classes = [DjangoModelPermissionsOrAnonReadOnly]
+    queryset = UserProfile.objects.none()  # Needed for DjangoModelPermissionsOrAnonReadOnly
+
+    def post(self, request):
+        varna_user_id = request.data.get("varna_user_id")
+        new_password = request.data.get("password")
+
+        if not varna_user_id or not new_password:
+            return Response({"error": "varna_user_id and password are required."},status=status.HTTP_400_BAD_REQUEST,)
+
+        profile = UserProfile.objects.filter(varna_user_id=varna_user_id).first()
+        if not profile:
+            return Response({"error": "User profile not found for given varna_user_id."},status=status.HTTP_404_NOT_FOUND)
+
+        user = profile.user
+        user.set_password(new_password)
+        user.save()
+
+        # Optionally, mark first login as done
+        if getattr(profile, "is_varna_user_first_login", False):
+            profile.is_varna_user_first_login = False
+            profile.save()
+
+        return Response({"message": "Password changed successfully."},status=status.HTTP_200_OK,)
