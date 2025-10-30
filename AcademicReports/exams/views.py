@@ -310,7 +310,7 @@ class ExamTypeViewSet(ModelViewSet):
 
 # ==================== Grade Boundary ====================
 class GradeBoundaryViewSet(ModelViewSet):
-    queryset = GradeBoundary.objects.filter(is_active=True).order_by('-min_percentage')
+    # queryset = GradeBoundary.objects.filter(is_active=True).order_by('-min_percentage')
     serializer_class = GradeBoundarySerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -318,6 +318,14 @@ class GradeBoundaryViewSet(ModelViewSet):
     filterset_fields = ['category', 'is_active']
     ordering_fields = ['min_percentage', 'max_percentage', 'grade', 'category__name', 'remarks']
     pagination_class = CustomPagination
+
+    def get_queryset(self):
+        category_id = self.request.query_params.get('category_id')
+        if not category_id:
+            raise ValidationError(
+                {"detail": "The 'category_id' query parameter is required."}
+            )
+        return GradeBoundary.objects.filter(is_active=True, category_id=category_id).order_by('-min_percentage')
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -332,7 +340,7 @@ class GradeBoundaryViewSet(ModelViewSet):
 
 # ==================== Co-Scholastic Grade ====================
 class CoScholasticGradeViewSet(ModelViewSet):
-    queryset = CoScholasticGrade.objects.filter(is_active=True).order_by('-point')
+    # queryset = CoScholasticGrade.objects.filter(is_active=True).order_by('-point')
     serializer_class = CoScholasticGradeSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -346,6 +354,14 @@ class CoScholasticGradeViewSet(ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
+
+    def get_queryset(self):
+        category_id = self.request.query_params.get('category_id')
+        if not category_id:
+            raise ValidationError(
+                {"detail": "The 'category_id' query parameter is required."}
+            )
+        return CoScholasticGrade.objects.filter(is_active=True, category_id=category_id).order_by('name')
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
