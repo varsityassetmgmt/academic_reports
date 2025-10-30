@@ -13,6 +13,7 @@ from students import tasks
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from usermgmt.models import UserProfile
 
 # Create your views here.
 class ClassNameDropdownViewSet(ModelViewSet):
@@ -123,18 +124,58 @@ class OrientationDropdownForExamViewSet(ModelViewSet):
 
 # ========================== Student ViewSet ==========================
 class StudentViewSet(ModelViewSet):
-    queryset = Student.objects.filter().order_by('name')
+    # queryset = Student.objects.filter().order_by('name')
     serializer_class = StudentSerializer
-    http_method_names = ['get', 'post', 'put']
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    http_method_names = ['get']
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = [
-        'SCS_Number', 'name', 'varna_student_id',
+        'SCS_Number', 'name',
         'branch__name', 'zone__name', 'state__name',
         'student_class__name', 'section__name',
-        'gender__name', 'admission_status__admission_status',
+        'admission_status__admission_status',
         'orientation__name'
     ]
+    ordering_fields = [
+        'SCS_Number', 'name',
+        'branch__name', 'zone__name', 'state__name',
+        'student_class__name', 'section__name',
+        'admission_status__admission_status',
+        'orientation__name'
+    ]
+    filterset_fields=[
+        'SCS_Number', 'name',
+        'branch', 'branch__state', 'branch__zone',
+        'student_class', 'section__name', 'orientation',
+        'admission_status',
+    ]
     pagination_class = CustomPagination
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.groups.filter(id=1).exists():  # Super admin or system user
+            branch_ids = Branch.objects.filter(is_active=True)
+        else:
+            branch_ids = (
+                UserProfile.objects.filter(user=user)
+                .values_list('branches', flat=True)
+                .distinct()
+            )
+
+        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+        if not current_academic_year:
+            raise NotFound("Current academic year not found.")
+
+        return (
+            Student.objects.filter(
+                is_active=True,
+                branch__branch_id__in=branch_ids,
+                student_class__is_active=True,
+                academic_year = current_academic_year,
+            )
+            # .exclude(admission_status_id=3)
+            .order_by('branch', 'student_class__class_sequence', 'section', 'name')
+        )
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:

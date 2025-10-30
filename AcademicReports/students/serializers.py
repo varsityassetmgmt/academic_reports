@@ -16,7 +16,33 @@ class OrientationDropdownSerializer(serializers.ModelSerializer):
 
 # ==================== Student Serializer ====================
 class StudentSerializer(serializers.ModelSerializer):
+    admission_status_name = serializers.CharField(source='admission_status.admission_status', read_only=True)
+    state_name = serializers.CharField(source='branch.state.name', read_only=True)
+    zone_name = serializers.CharField(source='branch.zone.name', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
+    orientation_name = serializers.CharField(source='orientation.name', read_only=True)
+    student_class_name = serializers.CharField(source='student_class.name', read_only=True)
+    section_name = serializers.CharField(source='section.name', read_only=True)
+
     class Meta:
         model = Student
-        fields = '__all__'
-        read_only_fields = ('is_active')
+        fields = [
+            'academic_year',
+            'SCS_Number',
+            'name',
+            'admission_status',
+            'admission_status_name',
+            'state_name',
+            'zone_name',
+            'branch',
+            'branch_name',
+            'orientation',
+            'orientation_name',
+            'student_class',
+            'student_class_name',
+            'section',
+            'section_name',
+            'is_active',
+        ]
+        read_only_fields = ('is_active',)
+
