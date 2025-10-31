@@ -97,38 +97,109 @@ class ClassNameDropdownForStudentsViewSet(ModelViewSet):
 
 
 class OrientationDropdownViewSet(ModelViewSet):
-    queryset = Orientation.objects.filter(is_active=True).order_by('name')
-    permission_classes = [IsAuthenticated]
+    """
+    Returns orientations available for students based on user branch access and the current academic year.
+    - Superusers see all active branches.
+    - Other users see orientations linked to their allowed branches.
+    """
     serializer_class = OrientationDropdownSerializer
-    http_method_names = ['get',]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get_queryset(self):
+        # Get current academic year
+        current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
+        if not current_academic_year:
+            raise NotFound("Current academic year not found.")
+
+        user = self.request.user
+        branch_param = self.request.query_params.get('branch_ids')
+
+        # --- Determine accessible branches ---
+        if user.groups.filter(id=1).exists():  # super admin
+            branches_qs = Branch.objects.filter(is_active=True)
+        else:
+            # Branches assigned to user via UserProfile
+            user_branch_ids = (
+                UserProfile.objects.filter(user=user)
+                .values_list('branches__branch_id', flat=True)
+                .distinct()
+            )
+            branches_qs = Branch.objects.filter(is_active=True, branch_id__in=user_branch_ids)
+
+        # --- Override with explicit branch_ids param if provided ---
+        if branch_param:
+            branch_ids = [int(x) for x in branch_param.split(',') if x.isdigit()]
+            if branch_ids:
+                branches_qs = branches_qs.filter(branch_id__in=branch_ids)
+
+        # --- No valid branches → return none ---
+        if not branches_qs.exists():
+            return Orientation.objects.none()
+
+        # --- Fetch orientations linked to these branches for the current academic year ---
+        orientation_ids = (
+            BranchOrientations.objects.filter(
+                branch__in=branches_qs,
+                academic_year=current_academic_year,
+                is_active=True
+            )
+            .values_list('orientations__orientation_id', flat=True)
+            .distinct()
+        )
+
+        # --- Return matching orientations ---
+        if not orientation_ids:
+            return Orientation.objects.none()
+
+        return Orientation.objects.filter(is_active=True, orientation_id__in=orientation_ids).order_by('name')
 
 # ==================== OrientationDropdownForExamViewSet ====================
 class OrientationDropdownForExamViewSet(ModelViewSet):
+    """
+    Returns orientations available for students based on user branch access and the current academic year.
+    - Superusers see all active branches.
+    - Other users see orientations linked to their allowed branches.
+    """
     serializer_class = OrientationDropdownSerializer
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
 
     def get_queryset(self):
-        queryset = Orientation.objects.filter(is_active=True).order_by('name')
+        # Get current academic year
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
             raise NotFound("Current academic year not found.")
-        branch_ids = self.request.query_params.get('branch_ids')
 
-        # Hierarchical branch selection
-        branches = Branch.objects.none()
+        user = self.request.user
+        branch_param = self.request.query_params.get('branch_ids')
 
-        if branch_ids:
-            branch_ids = [int(x) for x in branch_ids.split(',') if x.isdigit()]
+        # --- Determine accessible branches ---
+        if user.groups.filter(id=1).exists():  # super admin
+            branches_qs = Branch.objects.filter(is_active=True)
+        else:
+            # Branches assigned to user via UserProfile
+            user_branch_ids = (
+                UserProfile.objects.filter(user=user)
+                .values_list('branches__branch_id', flat=True)
+                .distinct()
+            )
+            branches_qs = Branch.objects.filter(is_active=True, branch_id__in=user_branch_ids)
+
+        # --- Override with explicit branch_ids param if provided ---
+        if branch_param:
+            branch_ids = [int(x) for x in branch_param.split(',') if x.isdigit()]
             if branch_ids:
-                branches = Branch.objects.filter(branch_id__in=branch_ids, is_active=True)
+                branches_qs = branches_qs.filter(branch_id__in=branch_ids)
 
-        if not branches.exists():
+        # --- No valid branches → return none ---
+        if not branches_qs.exists():
             return Orientation.objects.none()
 
+        # --- Fetch orientations linked to these branches for the current academic year ---
         orientation_ids = (
             BranchOrientations.objects.filter(
-                branch__in=branches,
+                branch__in=branches_qs,
                 academic_year=current_academic_year,
                 is_active=True
             )
@@ -136,54 +207,57 @@ class OrientationDropdownForExamViewSet(ModelViewSet):
             .distinct()
         )
 
-        if orientation_ids:
-            queryset = queryset.filter(orientation_id__in=orientation_ids)
-        else:
-            queryset = Orientation.objects.none()
+        # --- Return matching orientations ---
+        if not orientation_ids:
+            return Orientation.objects.none()
 
-        return queryset
+        return Orientation.objects.filter(is_active=True, orientation_id__in=orientation_ids).order_by('name')
 
 class OrientationDropdownForStudentsViewSet(ModelViewSet):
+    """
+    Returns orientations available for students based on user branch access and the current academic year.
+    - Superusers see all active branches.
+    - Other users see orientations linked to their allowed branches.
+    """
     serializer_class = OrientationDropdownSerializer
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
 
     def get_queryset(self):
-        queryset = Orientation.objects.filter(is_active=True).order_by('name')
+        # Get current academic year
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
             raise NotFound("Current academic year not found.")
 
-        # state_ids = self.request.query_params.get('state_ids')
-        # zone_ids = self.request.query_params.get('zone_ids')
-        branch_ids = self.request.query_params.get('branch_ids')
+        user = self.request.user
+        branch_param = self.request.query_params.get('branch_ids')
 
-        # Hierarchical branch selection
-        branches = Branch.objects.none()
+        # --- Determine accessible branches ---
+        if user.groups.filter(id=1).exists():  # super admin
+            branches_qs = Branch.objects.filter(is_active=True)
+        else:
+            # Branches assigned to user via UserProfile
+            user_branch_ids = (
+                UserProfile.objects.filter(user=user)
+                .values_list('branches__branch_id', flat=True)
+                .distinct()
+            )
+            branches_qs = Branch.objects.filter(is_active=True, branch_id__in=user_branch_ids)
 
-        if branch_ids:
-            branch_ids = [int(x) for x in branch_ids.split(',') if x.isdigit()]
+        # --- Override with explicit branch_ids param if provided ---
+        if branch_param:
+            branch_ids = [int(x) for x in branch_param.split(',') if x.isdigit()]
             if branch_ids:
-                branches = Branch.objects.filter(branch_id__in=branch_ids, is_active=True)
+                branches_qs = branches_qs.filter(branch_id__in=branch_ids)
 
-        # elif zone_ids:
-        #     zone_ids = [int(x) for x in zone_ids.split(',') if x.isdigit()]
-        #     if zone_ids:
-        #         branches = Branch.objects.filter(zone__zone_id__in=zone_ids, is_active=True)
-
-        # elif state_ids:
-        #     state_ids = [int(x) for x in state_ids.split(',') if x.isdigit()]
-        #     if state_ids:
-        #         branches = Branch.objects.filter(state__state_id__in=state_ids, is_active=True)
-
-        # If no filters provided or no branches found → return empty queryset
-        if not branches.exists():
+        # --- No valid branches → return none ---
+        if not branches_qs.exists():
             return Orientation.objects.none()
 
-        # Get orientations linked to the selected branches for current academic year
+        # --- Fetch orientations linked to these branches for the current academic year ---
         orientation_ids = (
             BranchOrientations.objects.filter(
-                branch__in=branches,
+                branch__in=branches_qs,
                 academic_year=current_academic_year,
                 is_active=True
             )
@@ -191,12 +265,12 @@ class OrientationDropdownForStudentsViewSet(ModelViewSet):
             .distinct()
         )
 
-        if orientation_ids:
-            queryset = queryset.filter(orientation_id__in=orientation_ids)
-        else:
-            queryset = Orientation.objects.none()
+        # --- Return matching orientations ---
+        if not orientation_ids:
+            return Orientation.objects.none()
 
-        return queryset
+        return Orientation.objects.filter(is_active=True, orientation_id__in=orientation_ids).order_by('name')
+
     
 class AdmissionStatusDropdownForStudentsViewSet(ModelViewSet):
     queryset = AdmissionStatus.objects.filter(is_active=True).order_by('admission_status_id')
