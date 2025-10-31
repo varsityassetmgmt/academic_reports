@@ -14,7 +14,7 @@ from branches.models import *
 from rest_framework.exceptions import NotFound
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError, NotFound
+from rest_framework.exceptions import ValidationError, NotFound, ParseError
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from usermgmt.authentication import QueryParameterTokenAuthentication
@@ -44,6 +44,20 @@ class ExamCategoryDropdownViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ExamCategoryDropdownSerializer
     http_method_names = ['get']
+
+class ExamCategoryForCoScholasticGradeViewSet(ModelViewSet):
+    queryset = ExamCategory.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ExamCategorySerializer
+    http_method_names = ['get']
+    pagination_class = CustomPagination
+
+class ExamCategoryGradeBoundaryViewSet(ModelViewSet):
+    queryset = ExamCategory.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ExamCategorySerializer
+    http_method_names = ['get']
+    pagination_class = CustomPagination
 
 # class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
 #     # queryset = Subject.objects.filter(is_active=True).order_by('name')
@@ -310,7 +324,7 @@ class ExamTypeViewSet(ModelViewSet):
 
 # ==================== Grade Boundary ====================
 class GradeBoundaryViewSet(ModelViewSet):
-    queryset = GradeBoundary.objects.filter(is_active=True).order_by('-min_percentage')
+    # queryset = GradeBoundary.objects.filter(is_active=True).order_by('-min_percentage')
     serializer_class = GradeBoundarySerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -318,6 +332,14 @@ class GradeBoundaryViewSet(ModelViewSet):
     filterset_fields = ['category', 'is_active']
     ordering_fields = ['min_percentage', 'max_percentage', 'grade', 'category__name', 'remarks']
     pagination_class = CustomPagination
+
+    def get_queryset(self):
+        category_id = self.request.query_params.get('category_id')
+        if not category_id:
+            raise ParseError(
+                {"detail": "The 'category_id' query parameter is required."}
+            )
+        return GradeBoundary.objects.filter(is_active=True, category_id=category_id).order_by('-min_percentage')
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -332,7 +354,7 @@ class GradeBoundaryViewSet(ModelViewSet):
 
 # ==================== Co-Scholastic Grade ====================
 class CoScholasticGradeViewSet(ModelViewSet):
-    queryset = CoScholasticGrade.objects.filter(is_active=True).order_by('-point')
+    # queryset = CoScholasticGrade.objects.filter(is_active=True).order_by('-point')
     serializer_class = CoScholasticGradeSerializer
     http_method_names = ['get', 'post', 'put']
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -346,6 +368,14 @@ class CoScholasticGradeViewSet(ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
+
+    def get_queryset(self):
+        category_id = self.request.query_params.get('category_id')
+        if not category_id:
+            raise ParseError(
+                {"detail": "The 'category_id' query parameter is required."}
+            )
+        return CoScholasticGrade.objects.filter(is_active=True, category_id=category_id).order_by('name')
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -788,6 +818,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'status__name',
         'exam__exam_type__name',
         'is_progress_card_downloaded',
+        'exam__category__name',
     ]
 
     filterset_fields = [
@@ -799,6 +830,8 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'is_active',
         'exam__exam_type',
         'is_progress_card_downloaded',
+        'exam__category',
+
     ]
 
     ordering_fields = [
@@ -811,6 +844,7 @@ class BranchWiseExamResultStatusViewSet(ModelViewSet):
         'updated_at',
         'exam__exam_type__name',
         'is_progress_card_downloaded',
+        'exam__category__name',
     ]
 
     def get_queryset(self):
@@ -1684,6 +1718,29 @@ class CoScholasticGradeDropdownViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = CoScholasticGradeDropdownSerializer
     http_method_names = ['get']
+
+class CoScholasticGradeDropdownForMarksEntryViewSet(ModelViewSet):
+    """
+    Provides a dropdown list of Co-Scholastic Grades filtered by the exam's category.
+    Requires `exam_id` query parameter.
+    Example: /co_scholastic_grade_dropdown_for_marks_entry/?exam_id=<exam_id>
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = CoScholasticGradeDropdownSerializer
+    http_method_names = ['get']
+
+    def get_queryset(self):
+        exam_id = self.request.query_params.get('exam_id')  # ✅ corrected method name
+        if not exam_id:
+            raise ParseError({'exam_id': "The 'exam_id' query parameter is required."})
+
+        exam = get_object_or_404(Exam, exam_id=exam_id, is_active=True)
+
+        return CoScholasticGrade.objects.filter(
+            is_active=True,
+            category=exam.category
+        ).order_by('id')
+
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])

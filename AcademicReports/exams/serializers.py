@@ -543,6 +543,8 @@ class ExamAttendanceStatusSerializer(serializers.ModelSerializer):
 
 # ==================== GradeBoundary ====================
 class GradeBoundarySerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    
     class Meta:
         model = GradeBoundary
         fields = '__all__'
@@ -550,6 +552,8 @@ class GradeBoundarySerializer(serializers.ModelSerializer):
 
 # ==================== CoScholasticGrade ====================
 class CoScholasticGradeSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+
     class Meta:
         model = CoScholasticGrade
         fields = '__all__'
@@ -659,6 +663,7 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
     marks_entry_expiry_datetime_display = serializers.DateTimeField(source='marks_entry_expiry_datetime', format="%Y-%m-%d %H:%M:%S", read_only = True )
     finalized_at_display = serializers.DateTimeField(source='finalized_at', format="%Y-%m-%d %H:%M:%S", read_only = True )
     no_of_pending_vs_total_sections = serializers.SerializerMethodField()
+    exam_category_name = serializers.CharField(source='exam.category.name', read_only=True)
 
     class Meta:
         model = BranchWiseExamResultStatus
@@ -687,6 +692,7 @@ class BranchWiseExamResultStatusSerializer(serializers.ModelSerializer):
             'is_visible',
             'updated_at',
             'no_of_pending_vs_total_sections',
+            'exam_category_name',
         ]
         read_only_fields = [
             'id',
