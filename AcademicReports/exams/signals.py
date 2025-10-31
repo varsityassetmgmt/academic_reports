@@ -421,6 +421,7 @@ def handle_exam_result_post_save(sender, instance, created, **kwargs):
     exam = instance.exam_instance.exam
     student = instance.student
 
+    print(instance.pk)
     # Async grade update
     update_exam_result_grade.delay(instance.pk)
 
@@ -432,6 +433,7 @@ def handle_exam_result_post_save(sender, instance, created, **kwargs):
 def handle_exam_skill_result_post_save(sender, instance, created, **kwargs):
     exam = instance.exam_result.exam_instance.exam
     student = instance.exam_result.student
+    print(instance.pk)
 
     # Async skill grade update
     update_exam_skill_result_grade.delay(instance.pk)
