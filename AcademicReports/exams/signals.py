@@ -7,6 +7,7 @@ from django.db.models import Q
 from exams.models import *
 from students.models import Student
 from decimal import Decimal
+from .tasks import *
 
 # def _sync_exam_subject_skills(instance, triggered_by_m2m=False):
 #     """
@@ -416,16 +417,26 @@ def compute_section_wise_completion(exam, student):
 #
 
 @receiver(post_save, sender=ExamResult)
-def update_section_wise_status_on_exam_result(sender, instance, **kwargs):
+def handle_exam_result_post_save(sender, instance, created, **kwargs):
     exam = instance.exam_instance.exam
     student = instance.student
+
+    # Async grade update
+    update_exam_result_grade.delay(instance.pk)
+
+    # Sync section completion
     compute_section_wise_completion(exam, student)
 
 
 @receiver(post_save, sender=ExamSkillResult)
-def update_section_wise_status_on_skill_result(sender, instance, **kwargs):
+def handle_exam_skill_result_post_save(sender, instance, created, **kwargs):
     exam = instance.exam_result.exam_instance.exam
     student = instance.exam_result.student
+
+    # Async skill grade update
+    update_exam_skill_result_grade.delay(instance.pk)
+
+    # Sync section completion
     compute_section_wise_completion(exam, student)
 
 @receiver(post_save, sender=SectionWiseExamResultStatus)
