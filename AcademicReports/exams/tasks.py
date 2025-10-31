@@ -280,6 +280,7 @@ def update_exam_result_grade(exam_result_id):
         exam = instance.exam_instance.exam
         percentage = instance.percentage
         print(percentage)
+        print(exam.category.name)
         grade = GradeBoundary.objects.filter(
             category=exam.category,
             min_percentage__lte=percentage,
