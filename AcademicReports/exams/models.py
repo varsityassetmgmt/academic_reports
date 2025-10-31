@@ -449,10 +449,10 @@ class ExamResult(models.Model):
             self.percentage = None
 
         # --- Assign grade automatically ---
-        if self.percentage is not None:
-            self.grade = GradeBoundary.get_grade_for_percentage(self.percentage)
-        else:
-            self.grade = None
+        # if self.percentage is not None:
+        #     self.grade = GradeBoundary.get_grade_for_percentage(self.percentage)
+        # else:
+        #     self.grade = None
 
         # --- Default exam attendance ---
         if not self.exam_attendance:
@@ -549,10 +549,10 @@ class ExamSkillResult(models.Model):
             self.percentage = None
 
         # --- Assign grade automatically ---
-        if self.percentage is not None:
-            self.grade = GradeBoundary.get_grade_for_percentage(self.percentage)
-        else:
-            self.grade = None
+        # if self.percentage is not None:
+        #     self.grade = GradeBoundary.get_grade_for_percentage(self.percentage)
+        # else:
+        #     self.grade = None
 
         # --- Default exam attendance ---
         if not self.exam_attendance:
