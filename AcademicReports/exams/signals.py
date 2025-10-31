@@ -7,7 +7,7 @@ from django.db.models import Q
 from exams.models import *
 from students.models import Student
 from decimal import Decimal
-from .tasks import *
+from . import tasks
 
 # def _sync_exam_subject_skills(instance, triggered_by_m2m=False):
 #     """
@@ -422,7 +422,7 @@ def handle_exam_result_post_save(sender, instance, created, **kwargs):
     student = instance.student
 
     # Async grade update
-    update_exam_result_grade.delay(instance.pk)
+    tasks.update_exam_result_grade.delay(instance.pk)
 
     # Sync section completion
     compute_section_wise_completion(exam, student)
@@ -435,7 +435,7 @@ def handle_exam_skill_result_post_save(sender, instance, created, **kwargs):
     print(instance.pk)
 
     # Async skill grade update
-    update_exam_skill_result_grade.delay(instance.pk)
+    tasks.update_exam_skill_result_grade.delay(instance.pk)
 
     # Sync section completion
     compute_section_wise_completion(exam, student)
