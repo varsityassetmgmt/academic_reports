@@ -274,11 +274,13 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
 
 @shared_task
 def update_exam_result_grade(exam_result_id):
+    print('task called')
     try:
         instance = ExamResult.objects.get(pk=exam_result_id)
         exam = instance.exam_instance.exam
         percentage = instance.percentage
-
+        print(percentage)
+        print(exam.category.name)
         grade = GradeBoundary.objects.filter(
             category=exam.category,
             min_percentage__lte=percentage,
