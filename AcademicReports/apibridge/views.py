@@ -1734,15 +1734,20 @@ from django.contrib.auth import get_user_model
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import UserProfile, VarnaProfiles
+from usermgmt.models import *
 
 User = get_user_model()
 
 
-class SyncAllVarnaProfilesUsersAPIView(APIView):
-    """
-    Fetch and sync users for all active VarnaProfiles from the Varna API.
-    """
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from apibridge.tasks import update_user_profile_task
+import requests
+
+class SyncAllVarnaUsersAPIView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         base_url = "http://192.168.0.6/varna_api/academics_user_management.php"
@@ -1764,7 +1769,7 @@ class SyncAllVarnaProfilesUsersAPIView(APIView):
             }
 
             try:
-                response = requests.get(base_url, params=params, timeout=10)
+                response = requests.get(base_url, params=params, timeout=20)
                 response.raise_for_status()
                 users_data = response.json()
             except requests.exceptions.RequestException as e:
@@ -1781,7 +1786,6 @@ class SyncAllVarnaProfilesUsersAPIView(APIView):
             for item in users_data:
                 varna_user_id = item.get("user_id")
                 username = item.get("login")
-                varna_profile_short_code = item.get("profile_id")
 
                 if not username or not varna_user_id:
                     continue
@@ -1792,39 +1796,21 @@ class SyncAllVarnaProfilesUsersAPIView(APIView):
                     defaults={"is_active": True}
                 )
 
-                # Set default password if newly created
                 if created_user:
-                    user.set_password("password123")
+                    user.set_password("Scts@1234")
                     user.save()
-
-                # Create or update UserProfile
-                user_profile, created_profile = UserProfile.objects.get_or_create(
-                    user=user,
-                    defaults={
-                        "varna_user": True,
-                        "varna_user_id": varna_user_id,
-                        "varna_profile_short_code": varna_profile_short_code,
-                        "varna_profile": profile,
-                        "must_change_password": True,
-                    },
-                )
-
-                if not created_profile:
-                    user_profile.varna_user = True
-                    user_profile.varna_user_id = varna_user_id
-                    user_profile.varna_profile_short_code = varna_profile_short_code
-                    user_profile.varna_profile = profile
-                    user_profile.save()
-                    updated_count += 1
-                else:
                     created_count += 1
+
+                # Offload profile work to Celery
+                update_user_profile_task.delay(varna_user_id, username, profile_code)
+                updated_count += 1  # Counting as "updated" since it's scheduled
 
             total_created += created_count
             total_updated += updated_count
             profile_summary.append({
                 "profile_short_code": profile_code,
                 "created": created_count,
-                "updated": updated_count,
+                "updated_scheduled": updated_count,
                 "status": "success"
             })
 
@@ -1832,6 +1818,88 @@ class SyncAllVarnaProfilesUsersAPIView(APIView):
             "message": "Varna user synchronization completed successfully.",
             "total_profiles_processed": len(active_profiles),
             "total_users_created": total_created,
-            "total_users_updated": total_updated,
+            "total_user_profiles_scheduled": total_updated,
             "details": profile_summary
         }, status=status.HTTP_200_OK)
+
+
+import requests
+from django.db import transaction
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+ 
+from branches.models import Branch
+
+
+class SyncVarnaUserProfileBranchesAPIView(APIView):
+   
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        base_url = "http://192.168.0.6/varna_api/academics_user_management.php"
+        token = "chaitanya"
+
+        params = {
+            "token": token,
+            "type": "userbranches",
+        }
+
+        try:
+            response = requests.get(base_url, params=params, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.RequestException as e:
+            return Response({
+                "status": "error",
+                "message": f"Failed to fetch data from Varna API: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        updated_count = 0
+        skipped_count = 0
+
+        for item in data:
+            varna_user_id = str(item.get("user_id"))
+            user_branches_str = item.get("user_branches")
+
+            if not varna_user_id or not user_branches_str:
+                skipped_count += 1
+                continue
+
+            user_profile = UserProfile.objects.filter(varna_user_id = varna_user_id).first()
+            if not user_profile:
+                continue
+            branch_ids = [int(b) for b in user_branches_str.split(",") if b.strip().isdigit()]
+
+            if not branch_ids:
+                skipped_count += 1
+                continue
+
+            branches = Branch.objects.filter(branch_id__in=branch_ids)
+
+            if not branches.exists():
+                skipped_count += 1
+                continue
+
+            # Set the branches (overwrite old ones)
+            user_profile.branches.add(*branches)
+            updated_count += 1
+            
+        return Response({
+            "status": "success",
+            "message": "Task completed successfully.",
+            "updated_users": updated_count,
+            "skipped_users": skipped_count
+        }, status=status.HTTP_200_OK)
+
+
+
+
+
+
+
+
+
+
+

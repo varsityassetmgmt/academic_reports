@@ -62,6 +62,9 @@ urlpatterns = [
 
     # Testing 
     # path('testing_process_sections/<int:branch_id>/', views.process_sections_api, name='process_sections_api'),
+
+    path('sync_all_varna_user/',SyncAllVarnaUsersAPIView.as_view()),
+    path("sync_user_profiles_from_varna/",SyncVarnaUserProfileBranchesAPIView.as_view()),
  
 ]
 
