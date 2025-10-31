@@ -1736,7 +1736,7 @@ class EditExamResultsViewSet(ModelViewSet):
         serializer.save()
 
         # Trigger async grade recalculation task
-        update_exam_result_grade.delay(instance.pk)
+        update_exam_result_grade.delay(instance.exam_result_id)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
