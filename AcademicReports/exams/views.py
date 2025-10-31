@@ -340,6 +340,18 @@ class GradeBoundaryViewSet(ModelViewSet):
                 {"detail": "The 'category_id' query parameter is required."}
             )
         return GradeBoundary.objects.filter(is_active=True, category_id=category_id).order_by('-min_percentage')
+    
+    def perform_create(self, serializer):
+        category_id = self.request.query_params.get('category_id')
+        if not category_id:
+            raise ParseError({"detail": "The 'category_id' query parameter is required to create a GradeBoundary."})
+        serializer.save(category_id=category_id)
+
+    def perform_update(self, serializer):
+        category_id = self.request.query_params.get('category_id')
+        if not category_id:
+            raise ParseError({"detail": "The 'category_id' query parameter is required to update a GradeBoundary."})
+        serializer.save(category_id=category_id)
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -364,10 +376,23 @@ class CoScholasticGradeViewSet(ModelViewSet):
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        category_id = self.request.query_params.get('category_id')
+        if not category_id:
+            raise ParseError({"detail": "The 'category_id' query parameter is required to create a Co-Scholastic Grade."})
+        serializer.save(
+            category_id=category_id,
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
 
     def perform_update(self, serializer):
-        serializer.save(updated_by=self.request.user)
+        category_id = self.request.query_params.get('category_id')
+        if not category_id:
+            raise ParseError({"detail": "The 'category_id' query parameter is required to update a Co-Scholastic Grade."})
+        serializer.save(
+            category_id=category_id,
+            updated_by=self.request.user
+        )
 
     def get_queryset(self):
         category_id = self.request.query_params.get('category_id')
