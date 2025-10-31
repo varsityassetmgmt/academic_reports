@@ -600,3 +600,44 @@ def process_all_branches_students():
 #     except requests.exceptions.RequestException as e:
 #         logger.error(f"Request error: {e}")
 #         return {"error": str(e), "status": 500}
+
+
+
+
+#=========================================  user profiles from varna  =====================================================
+
+# tasks.py
+# from celery import shared_task
+from usermgmt.models import *
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
+@shared_task
+def update_user_profile_task(varna_user_id, username, profile_code):
+    try:
+        profile = VarnaProfiles.objects.get(varna_profile_short_code=profile_code)
+    except VarnaProfiles.DoesNotExist:
+        return {"status": "failed", "error": f"Profile {profile_code} not found"}
+
+    user = User.objects.get(username=username)
+
+    user_profile, created_profile = UserProfile.objects.get_or_create(
+        user=user,
+        defaults={
+            "varna_user": True,
+            "varna_user_id": varna_user_id,
+            "varna_profile_short_code": profile_code,
+            "varna_profile": profile,
+            "must_change_password": True,
+        }
+    )
+
+    if not created_profile:
+        user_profile.varna_user = True
+        user_profile.varna_user_id = varna_user_id
+        user_profile.varna_profile_short_code = profile_code
+        user_profile.varna_profile = profile
+        user_profile.save()
+        return {"status": "updated"}
+    else:
+        return {"status": "created"}

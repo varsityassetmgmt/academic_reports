@@ -18,6 +18,7 @@ class VarnaProfiles(models.Model):
     name = models.CharField(max_length=250,unique=True)
     varna_profile_short_code = models.CharField(max_length=100,unique=True)
     groups = models.ManyToManyField(Group,related_name="varna_profiles_groups",blank=True)
+    varna_profile_id = models.CharField(max_length=100,null=True,blank=True,unique=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:
