@@ -113,9 +113,6 @@ class OrientationDropdownForExamViewSet(ModelViewSet):
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
             raise NotFound("Current academic year not found.")
-
-        # state_ids = self.request.query_params.get('state_ids')
-        # zone_ids = self.request.query_params.get('zone_ids')
         branch_ids = self.request.query_params.get('branch_ids')
 
         # Hierarchical branch selection
@@ -126,21 +123,9 @@ class OrientationDropdownForExamViewSet(ModelViewSet):
             if branch_ids:
                 branches = Branch.objects.filter(branch_id__in=branch_ids, is_active=True)
 
-        # elif zone_ids:
-        #     zone_ids = [int(x) for x in zone_ids.split(',') if x.isdigit()]
-        #     if zone_ids:
-        #         branches = Branch.objects.filter(zone__zone_id__in=zone_ids, is_active=True)
-
-        # elif state_ids:
-        #     state_ids = [int(x) for x in state_ids.split(',') if x.isdigit()]
-        #     if state_ids:
-        #         branches = Branch.objects.filter(state__state_id__in=state_ids, is_active=True)
-
-        # If no filters provided or no branches found → return empty queryset
         if not branches.exists():
             return Orientation.objects.none()
 
-        # Get orientations linked to the selected branches for current academic year
         orientation_ids = (
             BranchOrientations.objects.filter(
                 branch__in=branches,

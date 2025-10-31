@@ -31,6 +31,8 @@ router.register(r'exam_status_dropdown', ExamStatusDropDownViewset, basename='ex
 
 router.register(r'subject_category_dropdown', SubjectCategoryDropdownViewSet, basename='subject_category_dropdown')
 router.register(r'exam_category_dropdown', ExamCategoryDropdownViewSet, basename='exam_category_dropdown')
+router.register(r'exam_category_for_co_scholastic_grade', ExamCategoryForCoScholasticGradeViewSet, basename='exam_category_for_co_scholastic_grade')
+router.register(r'exam_category_for_grade_boundary', ExamCategoryGradeBoundaryViewSet, basename='exam_category_for_grade_boundary')
 router.register(r'grade_boundary', GradeBoundaryViewSet, basename='grade_boundary')
 router.register(r'co_scholastic_grade', CoScholasticGradeViewSet, basename='co_scholastic_grade')
 
