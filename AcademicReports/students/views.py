@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from usermgmt.models import UserProfile
+from django.db.models import Count
 
 # Create your views here.
 class ClassNameDropdownViewSet(ModelViewSet):
@@ -157,38 +158,38 @@ class OrientationDropdownViewSet(ModelViewSet):
 # ==================== OrientationDropdownForExamViewSet ====================
 class OrientationDropdownForExamViewSet(ModelViewSet):
     """
-    Returns orientations available for students based on user branch access and the current academic year.
+    Returns ONLY the orientations common to *all* selected branches
+    (intersection), for the current academic year.
     - Superusers see all active branches.
-    - Other users see orientations linked to their allowed branches.
+    - Other users see only their assigned branches via UserProfile.
     """
     serializer_class = OrientationDropdownSerializer
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
 
     def get_queryset(self):
-        # Get current academic year
+        # --- Get current academic year ---
         current_academic_year = AcademicYear.objects.filter(is_current_academic_year=True).first()
         if not current_academic_year:
             raise NotFound("Current academic year not found.")
 
         user = self.request.user
-        branch_param = self.request.query_params.get('branch_ids')
+        branch_param = self.request.query_params.get("branch_ids")
 
         # --- Determine accessible branches ---
         if user.groups.filter(id=1).exists():  # super admin
             branches_qs = Branch.objects.filter(is_active=True)
         else:
-            # Branches assigned to user via UserProfile
             user_branch_ids = (
                 UserProfile.objects.filter(user=user)
-                .values_list('branches__branch_id', flat=True)
+                .values_list("branches__branch_id", flat=True)
                 .distinct()
             )
             branches_qs = Branch.objects.filter(is_active=True, branch_id__in=user_branch_ids)
 
         # --- Override with explicit branch_ids param if provided ---
         if branch_param:
-            branch_ids = [int(x) for x in branch_param.split(',') if x.isdigit()]
+            branch_ids = [int(x) for x in branch_param.split(",") if x.isdigit()]
             if branch_ids:
                 branches_qs = branches_qs.filter(branch_id__in=branch_ids)
 
@@ -196,22 +197,29 @@ class OrientationDropdownForExamViewSet(ModelViewSet):
         if not branches_qs.exists():
             return Orientation.objects.none()
 
-        # --- Fetch orientations linked to these branches for the current academic year ---
+        # --- Compute intersection of orientations across all branches ---
+        branch_count = branches_qs.count()
+
         orientation_ids = (
             BranchOrientations.objects.filter(
                 branch__in=branches_qs,
                 academic_year=current_academic_year,
                 is_active=True
             )
-            .values_list('orientations__orientation_id', flat=True)
-            .distinct()
+            .values("orientations__orientation_id")
+            .annotate(branch_match_count=Count("branch", distinct=True))
+            .filter(branch_match_count=branch_count)  # appear in all selected branches
+            .values_list("orientations__orientation_id", flat=True)
         )
 
-        # --- Return matching orientations ---
         if not orientation_ids:
             return Orientation.objects.none()
 
-        return Orientation.objects.filter(is_active=True, orientation_id__in=orientation_ids).order_by('name')
+        return Orientation.objects.filter(
+            is_active=True,
+            orientation_id__in=orientation_ids
+        ).order_by("name")
+
 
 class OrientationDropdownForStudentsViewSet(ModelViewSet):
     """
@@ -371,7 +379,8 @@ class SectionViewSet(ModelViewSet):
     ]
     filterset_fields=[
         'branch', 'branch__state', 'branch__zone',
-        'class_name', 'orientation', 'name'
+        'class_name', 'orientation', 'name', 
+        'has_students',
     ]
     pagination_class = CustomPagination
 
