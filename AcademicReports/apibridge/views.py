@@ -1724,3 +1724,114 @@ def trigger_process_all_branches_students(request):
 #         "message": f"Score centers sync completed. {updated_count} branches updated.",
 #         "skipped": skipped,
 #     })
+
+
+
+
+#======================================================== collect users from varna  ========================================================================
+import requests
+from django.contrib.auth import get_user_model
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import UserProfile, VarnaProfiles
+
+User = get_user_model()
+
+
+class SyncAllVarnaProfilesUsersAPIView(APIView):
+    """
+    Fetch and sync users for all active VarnaProfiles from the Varna API.
+    """
+
+    def get(self, request):
+        base_url = "http://192.168.0.6/varna_api/academics_user_management.php"
+        token = "chaitanya"
+
+        total_created = 0
+        total_updated = 0
+        profile_summary = []
+
+        active_profiles = VarnaProfiles.objects.filter(is_active=True)
+
+        for profile in active_profiles:
+            profile_code = profile.varna_profile_short_code
+
+            params = {
+                "token": token,
+                "type": "users",
+                "profile_short_code": profile_code,
+            }
+
+            try:
+                response = requests.get(base_url, params=params, timeout=10)
+                response.raise_for_status()
+                users_data = response.json()
+            except requests.exceptions.RequestException as e:
+                profile_summary.append({
+                    "profile_short_code": profile_code,
+                    "status": "failed",
+                    "error": str(e)
+                })
+                continue
+
+            created_count = 0
+            updated_count = 0
+
+            for item in users_data:
+                varna_user_id = item.get("user_id")
+                username = item.get("login")
+                varna_profile_short_code = item.get("profile_id")
+
+                if not username or not varna_user_id:
+                    continue
+
+                # Create or get User
+                user, created_user = User.objects.get_or_create(
+                    username=username,
+                    defaults={"is_active": True}
+                )
+
+                # Set default password if newly created
+                if created_user:
+                    user.set_password("password123")
+                    user.save()
+
+                # Create or update UserProfile
+                user_profile, created_profile = UserProfile.objects.get_or_create(
+                    user=user,
+                    defaults={
+                        "varna_user": True,
+                        "varna_user_id": varna_user_id,
+                        "varna_profile_short_code": varna_profile_short_code,
+                        "varna_profile": profile,
+                        "must_change_password": True,
+                    },
+                )
+
+                if not created_profile:
+                    user_profile.varna_user = True
+                    user_profile.varna_user_id = varna_user_id
+                    user_profile.varna_profile_short_code = varna_profile_short_code
+                    user_profile.varna_profile = profile
+                    user_profile.save()
+                    updated_count += 1
+                else:
+                    created_count += 1
+
+            total_created += created_count
+            total_updated += updated_count
+            profile_summary.append({
+                "profile_short_code": profile_code,
+                "created": created_count,
+                "updated": updated_count,
+                "status": "success"
+            })
+
+        return Response({
+            "message": "Varna user synchronization completed successfully.",
+            "total_profiles_processed": len(active_profiles),
+            "total_users_created": total_created,
+            "total_users_updated": total_updated,
+            "details": profile_summary
+        }, status=status.HTTP_200_OK)

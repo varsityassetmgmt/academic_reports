@@ -78,10 +78,11 @@ class VarnaProfilesAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "varna_profile_short_code",
+        'varna_profile_id',
         "is_active",
     )
     list_filter = ("is_active", "groups")
-    search_fields = ("name", "varna_profile_short_code")
+    search_fields = ("name",'varna_profile_id', "varna_profile_short_code")
     filter_horizontal = ("groups",)
     ordering = ("name",)
 
@@ -90,6 +91,7 @@ class VarnaProfilesAdmin(admin.ModelAdmin):
             "fields": (
                 "name",
                 "varna_profile_short_code",
+                'varna_profile_id',
                 "groups",
                 "is_active",
             ),
