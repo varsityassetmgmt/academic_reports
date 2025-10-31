@@ -1,4 +1,3 @@
-from django.db import transaction
 from celery import shared_task
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Sum
@@ -276,46 +275,23 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
 @shared_task
 def update_exam_result_grade(exam_result_id):
     try:
-        instance = ExamResult.objects.select_related("exam_instance__exam").get(pk=exam_result_id)
+        instance = ExamResult.objects.get(pk=exam_result_id)
+        exam = instance.exam_instance.exam
+        percentage = instance.percentage
+
+        grade = GradeBoundary.objects.filter(
+            category=exam.category,
+            min_percentage__lte=percentage,
+            max_percentage__gte=percentage,
+            is_active=True
+        ).first()
+
+        if grade:
+            # Use update() to prevent post_save recursion
+            ExamResult.objects.filter(pk=instance.pk).update(grade=grade)
+
     except ExamResult.DoesNotExist:
-        return
-
-    exam = instance.exam_instance.exam
-
-    # Safely compute marks
-    external = instance.external_marks or 0
-    internal = instance.internal_marks or 0
-    total_marks = external + internal
-
-    max_external = getattr(instance.exam_instance, "maximum_marks_external", 0) or 0
-    max_internal = getattr(instance.exam_instance, "maximum_marks_internal", 0) or 0
-    total_max = max_external + max_internal
-
-    # Calculate percentage
-    percentage = (total_marks / total_max * 100) if total_max > 0 else None
-
-    # Get grade based on percentage
-    grade = None
-    if percentage is not None:
-        grade = (
-            GradeBoundary.objects.filter(
-                category=exam.category,
-                min_percentage__lte=percentage,
-                max_percentage__gte=percentage,
-                is_active=True
-            )
-            .order_by("-min_percentage")
-            .first()
-        )
-
-    # --- Update without triggering signals ---
-    with transaction.atomic():
-        ExamResult.objects.filter(pk=instance.pk).update(
-            total_marks=total_marks,
-            percentage=percentage,
-            grade=grade
-        )
-
+        pass
 
 
 @shared_task

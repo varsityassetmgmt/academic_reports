@@ -434,19 +434,19 @@ class ExamResult(models.Model):
     def save(self, *args, **kwargs):
     
     # --- Compute obtained & total marks ---
-        # external = self.external_marks or 0
-        # internal = self.internal_marks or 0
-        # self.total_marks = external + internal
+        external = self.external_marks or 0
+        internal = self.internal_marks or 0
+        self.total_marks = external + internal
 
-        # # --- Compute percentage safely ---
-        # max_external = getattr(self.exam_instance, "maximum_marks_external", 0) or 0
-        # max_internal = getattr(self.exam_instance, "maximum_marks_internal", 0) or 0
-        # total_max = max_external + max_internal
+        # --- Compute percentage safely ---
+        max_external = getattr(self.exam_instance, "maximum_marks_external", 0) or 0
+        max_internal = getattr(self.exam_instance, "maximum_marks_internal", 0) or 0
+        total_max = max_external + max_internal
 
-        # if total_max > 0:
-        #     self.percentage = (self.total_marks / total_max) * 100
-        # else:
-        #     self.percentage = None
+        if total_max > 0:
+            self.percentage = (self.total_marks / total_max) * 100
+        else:
+            self.percentage = None
 
         # --- Assign grade automatically ---
         # if self.percentage is not None:
