@@ -45,6 +45,20 @@ class ExamCategoryDropdownViewSet(ModelViewSet):
     serializer_class = ExamCategoryDropdownSerializer
     http_method_names = ['get']
 
+class ExamCategoryForCoScholasticGradeViewSet(ModelViewSet):
+    queryset = ExamCategory.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ExamCategorySerializer
+    http_method_names = ['get']
+    pagination_class = CustomPagination
+
+class ExamCategoryGradeBoundaryViewSet(ModelViewSet):
+    queryset = ExamCategory.objects.filter(is_active=True).order_by('name')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ExamCategorySerializer
+    http_method_names = ['get']
+    pagination_class = CustomPagination
+
 # class SubjectDropdownForExamInstanceViewSet(ModelViewSet):
 #     # queryset = Subject.objects.filter(is_active=True).order_by('name')
 #     permission_classes = [IsAuthenticated]
