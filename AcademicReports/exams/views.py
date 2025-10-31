@@ -1725,20 +1725,20 @@ class EditExamResultsViewSet(ModelViewSet):
     serializer_class = EditExamResultSerializer
     http_method_names = ['put']
 
-    def update(self, request, *args, **kwargs):
-        """
-        Override update() to trigger Celery grade recalculation
-        after saving the exam result.
-        """
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+    # def update(self, request, *args, **kwargs):
+    #     """
+    #     Override update() to trigger Celery grade recalculation
+    #     after saving the exam result.
+    #     """
+    #     instance = self.get_object()
+    #     serializer = self.get_serializer(instance, data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+    #     serializer.save()
 
-        # Trigger async grade recalculation task
-        update_exam_result_grade.delay(instance.exam_result_id)
+    #     # Trigger async grade recalculation task
+    #     update_exam_result_grade.delay(instance.exam_result_id)
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
         
@@ -1752,20 +1752,20 @@ class EditExamSkillResultViewSet(ModelViewSet):
     serializer_class = EditExamSkillResultSerializer
     http_method_names = ['put']
 
-    def update(self, request, *args, **kwargs):
-        """
-        Override update() to trigger Celery grade recalculation
-        after saving the exam result.
-        """
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+    # def update(self, request, *args, **kwargs):
+    #     """
+    #     Override update() to trigger Celery grade recalculation
+    #     after saving the exam result.
+    #     """
+    #     instance = self.get_object()
+    #     serializer = self.get_serializer(instance, data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+    #     serializer.save()
 
-        # Trigger async grade recalculation task
-        update_exam_skill_result_grade.delay(instance.pk)
+    #     # Trigger async grade recalculation task
+    #     update_exam_skill_result_grade.delay(instance.pk)
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
 
 class CoScholasticGradeDropdownViewSet(ModelViewSet):
     queryset = CoScholasticGrade.objects.filter(is_active=True).order_by('id')
