@@ -19,4 +19,6 @@ router.register(r'sections', SectionViewSet, basename='sections')
 urlpatterns = [
 
     path('get_branch_wise_orientations/',trigger_branch_orientation_sync),
+    
+
 ]+ router.urls
