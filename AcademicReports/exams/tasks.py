@@ -3,12 +3,13 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Sum
 from exams.models import *
 from students.models import Student
-from .models import GradeBoundary, StudentExamSummary
-import logging
+from exams.models import GradeBoundary, StudentExamSummary
 from django.db.models import Q
 from decimal import Decimal
-
+import logging
 logger = logging.getLogger(__name__)
+
+ 
 
 @shared_task
 def create_update_student_exam_summary(section_wise_exam_result_status_id):
@@ -269,7 +270,7 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
 #     return {"status": "success", "message": "Student exam summaries updated successfully"}
 
 
-@shared_task
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
 def update_exam_result_grade(exam_result_id):
     try:
         exam_result = ExamResult.objects.get(exam_result_id=exam_result_id)
@@ -310,7 +311,7 @@ def update_exam_result_grade(exam_result_id):
         )
 
 
-@shared_task
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
 def update_exam_skill_result_grade(exam_skill_result_id):
     try:
         exam_skill_result = ExamSkillResult.objects.get(exam_skill_result_id=exam_skill_result_id)
@@ -372,7 +373,7 @@ def update_exam_skill_result_grade(exam_skill_result_id):
         pass
 
 
-@shared_task
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
 def compute_section_wise_completion(exam_id, result_student_id):
     exam = Exam.objects.get(exam_id=exam_id)
     result_student = Student.objects.get(student_id=result_student_id)
