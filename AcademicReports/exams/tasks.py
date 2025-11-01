@@ -275,13 +275,27 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
 @shared_task
 def update_exam_result_grade(exam_result_id):
     try:
-        instance = ExamResult.objects.get(pk=exam_result_id)
+        instance = ExamResult.objects.get(exam_result_id = exam_result_id)
         exam = instance.exam_instance.exam
         percentage = instance.percentage
 
         # ✅ Guard against missing data
         if not percentage:
             return
+        
+        # external = self.external_marks or 0
+        # internal = self.internal_marks or 0
+        # self.total_marks = external + internal
+
+        # # --- Compute percentage safely ---
+        # max_external = getattr(self.exam_instance, "maximum_marks_external", 0) or 0
+        # max_internal = getattr(self.exam_instance, "maximum_marks_internal", 0) or 0
+        # total_max = max_external + max_internal
+
+        # if total_max > 0:
+        #     self.percentage = (self.total_marks / total_max) * 100
+        # else:
+        #     self.percentage = None
 
         if exam and exam.category:
             grade = GradeBoundary.objects.filter(
