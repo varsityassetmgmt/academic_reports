@@ -457,8 +457,6 @@ def handle_exam_skill_result_post_save(sender, instance, created, **kwargs):
     exam = instance.exam_result.exam_instance.exam
     student = instance.exam_result.student
 
-
-
     # Async skill grade update
     tasks.update_exam_skill_result_grade.delay(instance.exam_skill_result_id)
 
