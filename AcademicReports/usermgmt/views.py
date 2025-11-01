@@ -23,6 +23,91 @@ from students.models import *
 
 
 #========================================= Login Views ===========================================
+
+
+class CustomTokenObtainPairSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        login_input = attrs.get('username')
+        password = attrs.get('password')
+
+        if not login_input:
+            raise serializers.ValidationError({"username": "This field is required."})
+
+        # 1. Try finding user by username or email
+        user = get_user_model().objects.filter(
+            Q(username=login_input) | Q(email=login_input)
+        ).first()
+
+        if not user:
+            try:
+                user_profile = UserProfile.objects.get(phone_number=login_input)
+                user = user_profile.user
+            except UserProfile.DoesNotExist:
+                raise serializers.ValidationError({"username": "Invalid login id / email / phone number."})
+
+        user = authenticate(
+            request=self.context.get('request'),
+            username=user.username,  # Use username here even if logged in via email
+            password=password
+        )
+
+        if user is None:
+            raise serializers.ValidationError({"password": "Password is incorrect."})
+
+        user_profile = UserProfile.objects.filter(user=user).select_related('varna_profile').first()
+
+        # Send login signal
+        # user_logged_in.send(sender=user.__class__, request=self.context.get("request"), user=user)
+
+        # Generate token
+        refresh = RefreshToken.for_user(user)
+        refresh["custom_field"] = "Custom value"
+
+        data = {
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+        }
+
+        # Add user data
+        user_serializer = CurrentUserSerializer(user)
+        data['userData'] = user_serializer.data
+
+        # Add user profile
+        # user_profile = UserProfile.objects.filter(user=user).first()
+        if user_profile:
+            data['userProfileData'] = UserProfileSerializer(user_profile).data
+            data["is_firstlogin"] = user_profile.must_change_password
+        else:
+            data['userProfileData'] = None
+            data["is_firstlogin"] = False
+        
+        # Collect all permissions (user, user.groups, varna_profile.groups)
+        varna_group_permissions = Permission.objects.none()
+        if user_profile and user_profile.varna_profile:
+            varna_groups = user_profile.varna_profile.groups.all()
+            varna_group_permissions = Permission.objects.filter(group__in=varna_groups)
+
+        permissions_user_abilities = Permission.objects.filter(
+            Q(user=user) | Q(group__user=user)
+        ).union(varna_group_permissions).distinct()
+
+        permission_serializer = PermissionSerializer_user_abilities(permissions_user_abilities, many=True)
+        
+        data["userAbilities"] = permission_serializer.data
+        data["is_login_from_varna"] = False
+
+        return data
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+
+
+
+
+"""   OLD Version working fine
+
 class CustomTokenObtainPairSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
@@ -91,6 +176,8 @@ class CustomTokenObtainPairSerializer(serializers.Serializer):
         return data
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+"""
 
 #================================= User ViewSet =============================================
 class UserViewset(ModelViewSet):
@@ -497,7 +584,8 @@ class VarnaUserDataAPIView(APIView):
         data = {}
         data['userData'] = CurrentUserSerializer(user).data
 
-        user_profile = UserProfile.objects.filter(user=user).first()
+        user_profile = UserProfile.objects.filter(user=user).select_related('varna_profile').first()
+
         if not user_profile:
             data['userProfileData'] = None
             data["is_firstlogin"] = False
@@ -505,10 +593,16 @@ class VarnaUserDataAPIView(APIView):
             data['userProfileData'] = UserProfileSerializer(user_profile).data
             data["is_firstlogin"] = user_profile.must_change_password
 
+        varna_group_permissions = Permission.objects.none()
+        if user_profile and user_profile.varna_profile:
+            varna_groups = user_profile.varna_profile.groups.all()
+            varna_group_permissions = Permission.objects.filter(group__in=varna_groups)
+
         # Add permissions
         permissions_user_abilities = Permission.objects.filter(
             Q(user=user) | Q(group__user=user)
-        ).distinct()
+        ).union(varna_group_permissions).distinct()
+        
         permission_serializer = PermissionSerializer_user_abilities(permissions_user_abilities, many=True)
         data["userAbilities"] = permission_serializer.data
         data["is_login_from_varna"] = True
