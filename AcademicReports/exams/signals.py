@@ -421,11 +421,9 @@ def sync_exam_subject_skills(sender, instance, action, pk_set, **kwargs):
 #     exam = instance.exam_instance.exam
 #     student = instance.student
 
-#     # Async grade update
-#     tasks.update_exam_result_grade.delay(instance.exam_result_id)
 
 #     # Sync section completion
-#     tasks.compute_section_wise_completion(exam, student)
+#     compute_section_wise_completion(exam, student)
 
 
 # @receiver(post_save, sender=ExamSkillResult)
@@ -433,11 +431,8 @@ def sync_exam_subject_skills(sender, instance, action, pk_set, **kwargs):
 #     exam = instance.exam_result.exam_instance.exam
 #     student = instance.exam_result.student
 
-#     # Async skill grade update
-#     tasks.update_exam_skill_result_grade.delay(instance.pk)
-
 #     # Sync section completion
-#     tasks.compute_section_wise_completion(exam, student)
+#     compute_section_wise_completion(exam, student)
 
 
 @receiver(post_save, sender=ExamResult)
