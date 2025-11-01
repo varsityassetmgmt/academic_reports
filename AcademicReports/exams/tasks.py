@@ -279,12 +279,20 @@ def update_exam_result_grade(exam_result_id):
         exam = instance.exam_instance.exam
         percentage = instance.percentage
 
-        grade = GradeBoundary.objects.filter(
-            category=exam.category,
-            min_percentage__lte=percentage,
-            max_percentage__gte=percentage,
-            is_active=True
-        ).first()
+        if not exam.category:
+            grade = GradeBoundary.objects.filter(
+                category__isnull=True,
+                min_percentage__lte=percentage,
+                max_percentage__gte=percentage,
+                is_active=True
+            ).first()
+        else:
+            grade = GradeBoundary.objects.filter(
+                category=exam.category,
+                min_percentage__lte=percentage,
+                max_percentage__gte=percentage,
+                is_active=True
+            ).first()
 
         if grade:
             # Use update() to prevent post_save recursion
@@ -301,12 +309,20 @@ def update_exam_skill_result_grade(exam_skill_result_id):
         exam = instance.exam_result.exam_instance.exam
         percentage = instance.percentage
 
-        grade = GradeBoundary.objects.filter(
-            category=exam.category,
-            min_percentage__lte=percentage,
-            max_percentage__gte=percentage,
-            is_active=True
-        ).first()
+        if not exam.category:
+            grade = GradeBoundary.objects.filter(
+                category__isnull=True,
+                min_percentage__lte=percentage,
+                max_percentage__gte=percentage,
+                is_active=True
+            ).first()
+        else:
+            grade = GradeBoundary.objects.filter(
+                category=exam.category,
+                min_percentage__lte=percentage,
+                max_percentage__gte=percentage,
+                is_active=True
+            ).first()
 
         if grade:
             # Use update() to avoid triggering signals
