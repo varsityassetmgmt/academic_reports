@@ -279,7 +279,11 @@ def update_exam_result_grade(exam_result_id):
         exam = instance.exam_instance.exam
         percentage = instance.percentage
 
-        if exam.category:
+        # ✅ Guard against missing data
+        if not percentage:
+            return
+
+        if exam and exam.category:
             grade = GradeBoundary.objects.filter(
                 category=exam.category,
                 min_percentage__lte=percentage,
@@ -296,7 +300,6 @@ def update_exam_result_grade(exam_result_id):
             ).first()
 
         if grade:
-            # Use update() to prevent post_save recursion
             ExamResult.objects.filter(pk=instance.pk).update(grade=grade)
 
     except ExamResult.DoesNotExist:
@@ -310,7 +313,11 @@ def update_exam_skill_result_grade(exam_skill_result_id):
         exam = instance.exam_result.exam_instance.exam
         percentage = instance.percentage
 
-        if exam.category:
+        # ✅ Guard against missing percentage
+        if not percentage:
+            return
+
+        if exam and exam.category:
             grade = GradeBoundary.objects.filter(
                 category=exam.category,
                 min_percentage__lte=percentage,
@@ -327,7 +334,6 @@ def update_exam_skill_result_grade(exam_skill_result_id):
             ).first()
 
         if grade:
-            # Use update() to avoid triggering signals
             ExamSkillResult.objects.filter(pk=instance.pk).update(grade=grade)
 
     except ExamSkillResult.DoesNotExist:
