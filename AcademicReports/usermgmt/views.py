@@ -20,6 +20,7 @@ from django.contrib.auth import update_session_auth_hash
 from branches.serializers import *
 from students.serializers import *
 from students.models import *
+from itertools import chain
 
 
 #========================================= Login Views ===========================================
@@ -85,16 +86,33 @@ class CustomTokenObtainPairSerializer(serializers.Serializer):
             data["is_firstlogin"] = False
         
         # Collect all permissions (user, user.groups, varna_profile.groups)
+        # varna_group_permissions = Permission.objects.none()
+        # if user_profile and user_profile.varna_profile:
+        #     varna_groups = user_profile.varna_profile.groups.all()
+        #     varna_group_permissions = Permission.objects.filter(group__in=varna_groups)
+
+        # permissions_user_abilities = Permission.objects.filter(
+        #     Q(user=user) | Q(group__user=user)
+        # ).union(varna_group_permissions).distinct()
+
+        # ✅ Step 7: Collect all permissions (user, user.groups, varna_profile.groups)
+
+        user_permissions = Permission.objects.filter(user=user)
+        group_permissions = Permission.objects.filter(group__user=user)
+
         varna_group_permissions = Permission.objects.none()
         if user_profile and user_profile.varna_profile:
             varna_groups = user_profile.varna_profile.groups.all()
             varna_group_permissions = Permission.objects.filter(group__in=varna_groups)
 
-        permissions_user_abilities = Permission.objects.filter(
-            Q(user=user) | Q(group__user=user)
-        ).union(varna_group_permissions).distinct()
+        # Merge & remove duplicates
+        all_permissions = list({
+            perm.id: perm
+            for perm in chain(user_permissions, group_permissions, varna_group_permissions)
+        }.values())
 
-        permission_serializer = PermissionSerializer_user_abilities(permissions_user_abilities, many=True)
+        # Step 8: Serialize permissions
+        permission_serializer = PermissionSerializer_user_abilities(all_permissions, many=True)
         
         data["userAbilities"] = permission_serializer.data
         data["is_login_from_varna"] = False
@@ -593,17 +611,23 @@ class VarnaUserDataAPIView(APIView):
             data['userProfileData'] = UserProfileSerializer(user_profile).data
             data["is_firstlogin"] = user_profile.must_change_password
 
+        user_permissions = Permission.objects.filter(user=user)
+        group_permissions = Permission.objects.filter(group__user=user)
+
         varna_group_permissions = Permission.objects.none()
         if user_profile and user_profile.varna_profile:
             varna_groups = user_profile.varna_profile.groups.all()
             varna_group_permissions = Permission.objects.filter(group__in=varna_groups)
 
-        # Add permissions
-        permissions_user_abilities = Permission.objects.filter(
-            Q(user=user) | Q(group__user=user)
-        ).union(varna_group_permissions).distinct()
+        # Merge & remove duplicates
+        all_permissions = list({
+            perm.id: perm
+            for perm in chain(user_permissions, group_permissions, varna_group_permissions)
+        }.values())
+
+        # Step 8: Serialize permissions
+        permission_serializer = PermissionSerializer_user_abilities(all_permissions, many=True)
         
-        permission_serializer = PermissionSerializer_user_abilities(permissions_user_abilities, many=True)
         data["userAbilities"] = permission_serializer.data
         data["is_login_from_varna"] = True
 
