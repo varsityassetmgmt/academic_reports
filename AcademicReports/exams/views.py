@@ -2032,6 +2032,93 @@ class ExamStatusDropDownViewset(ModelViewSet):
     http_method_names = ['get']
 
 
+def get_section_marks_completion(section_wise_exam_result_status_id):
+    section_status = SectionWiseExamResultStatus.objects.get(id=section_wise_exam_result_status_id, is_active=True)
+    exam = section_status.exam
+    section = section_status.section
+
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+    students = Student.objects.filter(
+        section=section,
+        is_active=True,
+        academic_year=exam.academic_year,
+    ).exclude(admission_status__admission_status_id=3)
+
+    total_results = 0
+    pending_results = 0
+
+    for exam_instance in exam_instances:
+        subject_results = ExamResult.objects.filter(
+            student__in=students,
+            exam_instance=exam_instance,
+            is_active=True,
+        )
+
+        ext = exam_instance.has_external_marks
+        intl = exam_instance.has_internal_marks
+        grade = exam_instance.has_subject_co_scholastic_grade
+        enabled_components = sum([bool(ext), bool(intl), bool(grade)])
+
+        total_results += subject_results.count() * enabled_components
+
+        if ext:
+            # Pending only if attended and marks missing
+            pending_results += subject_results.filter(
+                exam_attendance__exam_attendance_status_id=1
+            ).filter(
+                Q(external_marks__isnull=True) | Q(external_marks=None)
+            ).count()
+
+        if intl:
+            pending_results += subject_results.filter(
+                Q(internal_marks__isnull=True) | Q(internal_marks=None)
+            ).count()
+
+        if grade:
+            pending_results += subject_results.filter(
+                Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
+            ).count()
+
+        # --- SKILL LEVEL ---
+        if exam_instance.has_subject_skills:
+            skill_instances = ExamSubjectSkillInstance.objects.filter(
+                exam_instance=exam_instance, is_active=True
+            )
+
+            for skill_instance in skill_instances:
+                ext = skill_instance.has_external_marks
+                intl = skill_instance.has_internal_marks
+                grade = skill_instance.has_subject_co_scholastic_grade
+                enabled_components = sum([bool(ext), bool(intl), bool(grade)])
+
+                skill_results = ExamSkillResult.objects.filter(
+                    exam_result__in=subject_results,
+                    skill=skill_instance.subject_skill,
+                )
+
+                total_results += skill_results.count() * enabled_components
+
+                if ext:
+                    pending_results += skill_results.filter(
+                        exam_attendance__exam_attendance_status_id=1
+                    ).filter(
+                        Q(external_marks__isnull=True) | Q(external_marks=None)
+                    ).count()
+
+                if intl:
+                    pending_results += skill_results.filter(
+                        Q(internal_marks__isnull=True) | Q(internal_marks=None)
+                    ).count()
+
+                if grade:
+                    pending_results += skill_results.filter(
+                        Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
+                    ).count()
+
+    completed = total_results - pending_results if total_results else 0
+    percentage = round((completed / total_results * 100), 2) if total_results else 0
+    return percentage
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def finalize_section_results(request):
@@ -2042,30 +2129,40 @@ def finalize_section_results(request):
     
     try:
         section_status = SectionWiseExamResultStatus.objects.get(id=section_status_id, is_active=True)
-
     except SectionWiseExamResultStatus.DoesNotExist:
         return Response({'section_wise_exam_result_status_id': "Invalid id"},status=status.HTTP_400_BAD_REQUEST)
-    
-    if section_status.marks_completion_percentage != 100:
-        return Response({'Section Status': f'Marks Entry Not Completed ({section_status.marks_completion_percentage}%)'}, status=status.HTTP_400_BAD_REQUEST)
+
+    marks_completion_percentage = get_section_marks_completion(section_status.id)
+
+    if marks_completion_percentage == 0:
+        status_id = 1
+    elif marks_completion_percentage < 100:
+        status_id = 2
+    else:
+        status_id = 4
 
     try:
-        finalized_status = ExamResultStatus.objects.get(id=4)
+        finalized_status = ExamResultStatus.objects.get(id=status_id)
     except ExamResultStatus.DoesNotExist:
-        return Response({'status': "ExamResultStatus with id=4 not found."},status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({'status': f"ExamResultStatus with id={status_id} not found."},status=status.HTTP_400_BAD_REQUEST)
+    
+    if marks_completion_percentage < 100:
+        section_status.marks_completion_percentage = marks_completion_percentage
+        section_status.status = finalized_status
+        section_status.save()
+        return Response({'Section Status': f'Marks Entry Not Completed ({marks_completion_percentage}%)'},status=status.HTTP_400_BAD_REQUEST)
 
-    # Finalize section result
     section_status.finalized_by = request.user
     section_status.finalized_at = timezone.now()
+    section_status.marks_completion_percentage = marks_completion_percentage
     section_status.status = finalized_status
-    section_status.save(update_fields=['finalized_by', 'finalized_at', 'status'])
+    section_status.save()
 
+    calculate_grades_exam_results.delay(section_status.id)
     create_update_student_exam_summary.delay(section_status_id)
 
-    return Response({
-        'message': f'Section "{section_status.section.name}" results finalized successfully.'
-    }, status=status.HTTP_200_OK)
+    
+    return Response({'message': f'Section "{section_status.section.name}" results finalized successfully.'}, status=status.HTTP_200_OK)
 
 class ExportBranchWiseExamResultStatusCSVViewSet(APIView):
     authentication_classes = [QueryParameterTokenAuthentication, SessionAuthentication]
@@ -2150,7 +2247,7 @@ class ExportBranchWiseExamResultStatusCSVViewSet(APIView):
         writer = csv.writer(buffer)
 
         header = [ 'Sl.No.',
-            "Academic Year", "Branch", "Exam Type", "Exam", "Status", "Marks Completion Percentage", 
+            "Academic Year", "Branch","Exam Category", "Exam Type", "Exam", "Status", "Marks Completion Percentage", 
             "Total Sections", "Pending Sections", "Completed Sections", "Marks Entry Expiry Date ",
         ]
 
@@ -2170,6 +2267,7 @@ class ExportBranchWiseExamResultStatusCSVViewSet(APIView):
             for obj in chunk:
                 academic_year = getattr(obj.academic_year, 'name', 'N/A') if obj.academic_year else 'N/A'
                 branch = getattr(obj.branch, 'name' ,'N/A') if obj.branch else "N/A"
+                exam_category = getattr(obj.exam.category, 'name', 'N/A') if obj.exam.category else 'N/A'
                 exam_type = getattr(obj.exam.exam_type, 'name', 'N/A') if obj.exam.exam_type else 'N/A'
                 exam = getattr(obj.exam, 'name', 'N/A') if obj.exam else 'N/A'
                 status = getattr(obj.status, 'name')if obj.status else 'N/A'
@@ -2179,6 +2277,7 @@ class ExportBranchWiseExamResultStatusCSVViewSet(APIView):
                     sl_no,
                     academic_year,
                     branch,
+                    exam_category,
                     exam_type,
                     exam,
                     status,

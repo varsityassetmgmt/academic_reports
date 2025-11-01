@@ -423,19 +423,19 @@ class ExamResult(models.Model):
     def save(self, *args, **kwargs):
     
     # --- Compute obtained & total marks ---
-        # external = self.external_marks or 0
-        # internal = self.internal_marks or 0
-        # self.total_marks = external + internal
+        external = self.external_marks or 0
+        internal = self.internal_marks or 0
+        self.total_marks = external + internal
 
-        # # --- Compute percentage safely ---
-        # max_external = getattr(self.exam_instance, "maximum_marks_external", 0) or 0
-        # max_internal = getattr(self.exam_instance, "maximum_marks_internal", 0) or 0
-        # total_max = max_external + max_internal
+        # --- Compute percentage safely ---
+        max_external = getattr(self.exam_instance, "maximum_marks_external", 0) or 0
+        max_internal = getattr(self.exam_instance, "maximum_marks_internal", 0) or 0
+        total_max = max_external + max_internal
 
-        # if total_max > 0:
-        #     self.percentage = (self.total_marks / total_max) * 100
-        # else:
-        #     self.percentage = None
+        if total_max > 0:
+            self.percentage = (self.total_marks / total_max) * 100
+        else:
+            self.percentage = None
 
         # --- Default exam attendance ---
         if not self.exam_attendance:
@@ -488,29 +488,29 @@ class ExamSkillResult(models.Model):
     def save(self, *args, **kwargs):
 
         # # --- Compute obtained & total marks ---
-        # external = self.external_marks or 0
-        # internal = self.internal_marks or 0
-        # self.marks_obtained = external + internal
+        external = self.external_marks or 0
+        internal = self.internal_marks or 0
+        self.marks_obtained = external + internal
 
-        # exam_instance = self.exam_result.exam_instance
+        exam_instance = self.exam_result.exam_instance
 
-        # exam_skill_instance = (ExamSubjectSkillInstance.objects.filter(exam_instance=exam_instance,subject_skill=self.skill,is_active=True).only("maximum_marks_external","maximum_marks_internal","has_external_marks","has_internal_marks").first())
+        exam_skill_instance = (ExamSubjectSkillInstance.objects.filter(exam_instance=exam_instance,subject_skill=self.skill,is_active=True).only("maximum_marks_external","maximum_marks_internal","has_external_marks","has_internal_marks").first())
 
-        # max_external = 0
-        # max_internal = 0
-        # if exam_skill_instance:
-        #     if getattr(exam_skill_instance, "has_external_marks", False):
-        #         max_external = getattr(exam_skill_instance, "maximum_marks_external", 0) or 0
-        #     if getattr(exam_skill_instance, "has_internal_marks", False):
-        #         max_internal = getattr(exam_skill_instance, "maximum_marks_internal", 0) or 0
+        max_external = 0
+        max_internal = 0
+        if exam_skill_instance:
+            if getattr(exam_skill_instance, "has_external_marks", False):
+                max_external = getattr(exam_skill_instance, "maximum_marks_external", 0) or 0
+            if getattr(exam_skill_instance, "has_internal_marks", False):
+                max_internal = getattr(exam_skill_instance, "maximum_marks_internal", 0) or 0
 
-        # total_max = max_external + max_internal
+        total_max = max_external + max_internal
 
-        # # --- Compute percentage safely ---
-        # if total_max > 0:
-        #     self.percentage = (self.marks_obtained / total_max) * 100
-        # else:
-        #     self.percentage = None
+        # --- Compute percentage safely ---
+        if total_max > 0:
+            self.percentage = (self.marks_obtained / total_max) * 100
+        else:
+            self.percentage = None
 
         # --- Default exam attendance ---
         if not self.exam_attendance:
