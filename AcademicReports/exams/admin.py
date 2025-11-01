@@ -271,6 +271,7 @@ class SectionWiseExamResultStatusAdmin(admin.ModelAdmin):
         'id',
         "academic_year",
         "branch",
+        "section__class_name",
         "section",
         "exam",
         "status",

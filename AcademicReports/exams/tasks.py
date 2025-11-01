@@ -8,6 +8,7 @@ from django.db.models import Q
 from decimal import Decimal
 import logging
 logger = logging.getLogger(__name__)
+from django.db import transaction
 
  
 @shared_task
@@ -324,3 +325,146 @@ def compute_section_wise_completion(self,exam_id, result_student_id):
     return percentage
 
 """
+
+# from celery import shared_task
+# from django.db import transaction
+
+# @shared_task
+# def calculate_grades_exam_results(section_wise_exam_result_status_id):
+#     try:
+#         section_status = SectionWiseExamResultStatus.objects.get(
+#             id=section_wise_exam_result_status_id, is_active=True
+#         )
+#     except SectionWiseExamResultStatus.DoesNotExist:
+#         return
+
+#     exam = section_status.exam
+#     section = section_status.section
+#     exam_category = exam.category
+
+#     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+#     students = Student.objects.filter(
+#         section=section,
+#         is_active=True,
+#         academic_year=exam.academic_year,
+#     ).exclude(admission_status__admission_status_id=3)
+
+#     # subject_results = ExamResult.objects.filter(
+#     #     student__in=students,
+#     #     exam_instance__in=exam_instances,
+#     #     is_active=True,
+#     # )
+
+#     with transaction.atomic():
+#         for exam_instance in exam_instances:
+#             subject_results = ExamResult.objects.filter(
+#                 student__in=students,
+#                 exam_instance=exam_instance,
+#                 is_active=True,
+#             ).only("id", "percentage", "has_subject_skills")
+#             for result in subject_results.iterator(chunk_size=1000):
+#                 grade = GradeBoundary.objects.filter(
+#                     category=exam_category,
+#                     min_percentage__lte=result.percentage,
+#                     max_percentage__gte=result.percentage,
+#                     is_active=True,
+#                 ).first()
+
+#                 # if grade:
+#                 #     # Update directly in DB — no signal triggered
+#                 #     ExamResult.objects.filter(id=result.id).update(grade=grade)
+#                 # else:
+#                 #     # Optional: clear grade if no match
+#                 #     ExamResult.objects.filter(id=result.id).update(grade=None)
+
+#                 result.grade = grade
+#                 result.save(update_fields=["grade"])
+
+#                 if exam_instance.has_subject_skills:
+#                     skill_instances = ExamSubjectSkillInstance.objects.filter(
+#                         exam_instance=exam_instance, is_active=True
+#                     )
+
+#                     for skill_instance in skill_instances:
+#                         skill_results = ExamSkillResult.objects.filter(
+#                         exam_result__in=subject_results,
+#                         skill=skill_instance.subject_skill,
+#                     )
+#                     for skill_result in skill_results.iterator(chunk_size=1000):
+#                         grade = GradeBoundary.objects.filter(
+#                             category=exam_category,
+#                             min_percentage__lte=skill_result.percentage,
+#                             max_percentage__gte=skill_result.percentage,
+#                             is_active=True,
+#                         ).first()
+
+#                         skill_result.grade = grade
+#                         skill_result.save(update_fields=["grade"])
+
+from django.db.models import Case, When, Value
+from django.db import transaction
+
+@shared_task
+def calculate_grades_exam_results(section_wise_exam_result_status_id):
+    try:
+        section_status = SectionWiseExamResultStatus.objects.get(
+            id=section_wise_exam_result_status_id, is_active=True
+        )
+    except SectionWiseExamResultStatus.DoesNotExist:
+        return
+
+    exam = section_status.exam
+    section = section_status.section
+    exam_category = exam.category
+
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+    students = Student.objects.filter(
+        section=section,
+        is_active=True,
+        academic_year=exam.academic_year,
+    ).exclude(admission_status__admission_status_id=3)
+
+    grade_boundaries = GradeBoundary.objects.filter(
+        category=exam_category,
+        is_active=True
+    )
+
+    if not grade_boundaries.exists():
+        return
+
+    with transaction.atomic():
+        # --- SUBJECT GRADES ---
+        for exam_instance in exam_instances:
+            subject_results = ExamResult.objects.filter(
+                student__in=students,
+                exam_instance=exam_instance,
+                is_active=True,
+                exam_attendance__exam_attendance_status_id=1,  # ✅ only present students
+            ).exclude(percentage__isnull=True)
+
+            # Build CASE expression for efficient bulk update
+            cases = [
+                When(
+                    percentage__gte=g.min_percentage,
+                    percentage__lte=g.max_percentage,
+                    then=Value(g.id)  # ✅ use g.id (primary key)
+                )
+                for g in grade_boundaries
+            ]
+
+            subject_results.update(grade_id=Case(*cases, default=None))
+
+            # --- SKILL GRADES ---
+            if exam_instance.has_subject_skills:
+                skill_instances = ExamSubjectSkillInstance.objects.filter(
+                    exam_instance=exam_instance, is_active=True
+                )
+
+                for skill_instance in skill_instances:
+                    skill_results = ExamSkillResult.objects.filter(
+                        exam_result__in=subject_results,
+                        skill=skill_instance.subject_skill,
+                        exam_attendance__exam_attendance_status_id=1,  # ✅ only present
+                    ).exclude(percentage__isnull=True)
+
+                    skill_results.update(grade_id=Case(*cases, default=None))
