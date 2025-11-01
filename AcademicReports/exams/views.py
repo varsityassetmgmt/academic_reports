@@ -2036,33 +2036,23 @@ class ExamStatusDropDownViewset(ModelViewSet):
 @permission_classes([IsAuthenticated])
 def finalize_section_results(request):
     section_status_id = request.query_params.get('section_wise_exam_result_status_id')
+
     if not section_status_id:
-        return Response(
-            {'section_wise_exam_result_status_id': "This field is required in the URL."},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
+        return Response({'section_wise_exam_result_status_id': "This field is required in the URL."},status=status.HTTP_400_BAD_REQUEST)
+    
     try:
-        section_status = SectionWiseExamResultStatus.objects.get(
-            id=section_status_id, is_active=True
-        )
-    except SectionWiseExamResultStatus.DoesNotExist:
-        return Response(
-            {'section_wise_exam_result_status_id': "Invalid id"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        section_status = SectionWiseExamResultStatus.objects.get(id=section_status_id, is_active=True)
 
+    except SectionWiseExamResultStatus.DoesNotExist:
+        return Response({'section_wise_exam_result_status_id': "Invalid id"},status=status.HTTP_400_BAD_REQUEST)
+    
     if section_status.marks_completion_percentage != 100:
-        return Response({
-            'Section Status': f'Marks Entry Not Completed ({section_status.marks_completion_percentage}%)'
-        }, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'Section Status': f'Marks Entry Not Completed ({section_status.marks_completion_percentage}%)'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         finalized_status = ExamResultStatus.objects.get(id=4)
     except ExamResultStatus.DoesNotExist:
-        return Response(
-            {'status': "ExamResultStatus with id=3 not found."},
-            status=status.HTTP_400_BAD_REQUEST
+        return Response({'status': "ExamResultStatus with id=4 not found."},status=status.HTTP_400_BAD_REQUEST
         )
 
     # Finalize section result
