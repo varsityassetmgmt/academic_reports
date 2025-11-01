@@ -373,11 +373,11 @@ def update_exam_skill_result_grade(exam_skill_result_id):
 
 
 @shared_task
-def compute_section_wise_completion(exam, student):
+def compute_section_wise_completion(exam_id, student_id):
 
-    exam = Exam.objects.get(exam_id=exam)
-    student = Student.objects.get(student_id=student)
-    
+    exam = Exam.objects.get(exam_id=exam_id)
+    student = Student.objects.get(student_id=student_id)
+
     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
     students = Student.objects.filter(
         section=student.section,
