@@ -286,8 +286,8 @@ def update_exam_result_grade(exam_result_id):
 
     percentage = exam_result.percentage or ((total_marks / total_max) * 100 if total_max > 0 else None)
 
-    if not percentage:
-        return
+    # if not percentage:
+    #     return
 
     grade_qs = GradeBoundary.objects.filter(
         min_percentage__lte=percentage,
@@ -343,8 +343,8 @@ def update_exam_skill_result_grade(exam_skill_result_id):
         total_max = max_external + max_internal
         percentage = (marks_obtained / total_max) * 100 if total_max > 0 else None
 
-        if not percentage:
-            return
+        # if not percentage:
+        #     return
 
         if exam and exam.category:
             grade = GradeBoundary.objects.filter(
