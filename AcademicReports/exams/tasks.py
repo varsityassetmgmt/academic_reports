@@ -279,16 +279,17 @@ def update_exam_result_grade(exam_result_id):
         exam = instance.exam_instance.exam
         percentage = instance.percentage
 
-        if not exam.category:
+        if exam.category:
             grade = GradeBoundary.objects.filter(
-                category__isnull=True,
+                category=exam.category,
                 min_percentage__lte=percentage,
                 max_percentage__gte=percentage,
                 is_active=True
             ).first()
         else:
+            # fallback: use default boundaries (category is null)
             grade = GradeBoundary.objects.filter(
-                category=exam.category,
+                category__isnull=True,
                 min_percentage__lte=percentage,
                 max_percentage__gte=percentage,
                 is_active=True
@@ -309,16 +310,17 @@ def update_exam_skill_result_grade(exam_skill_result_id):
         exam = instance.exam_result.exam_instance.exam
         percentage = instance.percentage
 
-        if not exam.category:
+        if exam.category:
             grade = GradeBoundary.objects.filter(
-                category__isnull=True,
+                category=exam.category,
                 min_percentage__lte=percentage,
                 max_percentage__gte=percentage,
                 is_active=True
             ).first()
         else:
+            # fallback: use default boundaries (category is null)
             grade = GradeBoundary.objects.filter(
-                category=exam.category,
+                category__isnull=True,
                 min_percentage__lte=percentage,
                 max_percentage__gte=percentage,
                 is_active=True
