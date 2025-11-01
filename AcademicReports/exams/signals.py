@@ -308,113 +308,137 @@ def sync_exam_subject_skills(sender, instance, action, pk_set, **kwargs):
     # Optionally log update (for debug)
     # print(f"Updated SectionWiseExamResultStatus: {section_status} -> {completion_percentage:.2f}% completed")
 
-def compute_section_wise_completion(exam, student):
+# def compute_section_wise_completion(exam, student):
 
-    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
-    students = Student.objects.filter(
-        section=student.section,
-        is_active=True,
-        academic_year=exam.academic_year,
-    ).exclude(admission_status__admission_status_id=3)
+#     exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+#     students = Student.objects.filter(
+#         section=student.section,
+#         is_active=True,
+#         academic_year=exam.academic_year,
+#     ).exclude(admission_status__admission_status_id=3)
 
-    total_results = 0
-    pending_results = 0
+#     total_results = 0
+#     pending_results = 0
 
-    for exam_instance in exam_instances:
-        subject_results = ExamResult.objects.filter(
-            student__in=students,
-            exam_instance=exam_instance,
-            is_active=True,
-        )
+#     for exam_instance in exam_instances:
+#         subject_results = ExamResult.objects.filter(
+#             student__in=students,
+#             exam_instance=exam_instance,
+#             is_active=True,
+#         )
 
-        # --- SUBJECT LEVEL ---
-        ext = exam_instance.has_external_marks
-        intl = exam_instance.has_internal_marks
-        grade = exam_instance.has_subject_co_scholastic_grade
+#         # --- SUBJECT LEVEL ---
+#         ext = exam_instance.has_external_marks
+#         intl = exam_instance.has_internal_marks
+#         grade = exam_instance.has_subject_co_scholastic_grade
 
-        enabled_components = sum([bool(ext), bool(intl), bool(grade)])
-        total_results += subject_results.count() * enabled_components
+#         enabled_components = sum([bool(ext), bool(intl), bool(grade)])
+#         total_results += subject_results.count() * enabled_components
 
-        if ext:
-            # Pending only if attended and marks missing
-            pending_results += subject_results.filter(
-                exam_attendance__exam_attendance_status_id=1
-            ).filter(
-                Q(external_marks__isnull=True) | Q(external_marks=None)
-            ).count()
+#         if ext:
+#             # Pending only if attended and marks missing
+#             pending_results += subject_results.filter(
+#                 exam_attendance__exam_attendance_status_id=1
+#             ).filter(
+#                 Q(external_marks__isnull=True) | Q(external_marks=None)
+#             ).count()
 
-        if intl:
-            pending_results += subject_results.filter(
-                Q(internal_marks__isnull=True) | Q(internal_marks=None)
-            ).count()
+#         if intl:
+#             pending_results += subject_results.filter(
+#                 Q(internal_marks__isnull=True) | Q(internal_marks=None)
+#             ).count()
 
-        if grade:
-            pending_results += subject_results.filter(
-                Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
-            ).count()
+#         if grade:
+#             pending_results += subject_results.filter(
+#                 Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
+#             ).count()
 
-        # --- SKILL LEVEL ---
-        if exam_instance.has_subject_skills:
-            skill_instances = ExamSubjectSkillInstance.objects.filter(
-                exam_instance=exam_instance, is_active=True
-            )
+#         # --- SKILL LEVEL ---
+#         if exam_instance.has_subject_skills:
+#             skill_instances = ExamSubjectSkillInstance.objects.filter(
+#                 exam_instance=exam_instance, is_active=True
+#             )
 
-            for skill_instance in skill_instances:
-                ext = skill_instance.has_external_marks
-                intl = skill_instance.has_internal_marks
-                grade = skill_instance.has_subject_co_scholastic_grade
-                enabled_components = sum([bool(ext), bool(intl), bool(grade)])
+#             for skill_instance in skill_instances:
+#                 ext = skill_instance.has_external_marks
+#                 intl = skill_instance.has_internal_marks
+#                 grade = skill_instance.has_subject_co_scholastic_grade
+#                 enabled_components = sum([bool(ext), bool(intl), bool(grade)])
 
-                skill_results = ExamSkillResult.objects.filter(
-                    exam_result__in=subject_results,
-                    skill=skill_instance.subject_skill,
-                )
+#                 skill_results = ExamSkillResult.objects.filter(
+#                     exam_result__in=subject_results,
+#                     skill=skill_instance.subject_skill,
+#                 )
 
-                total_results += skill_results.count() * enabled_components
+#                 total_results += skill_results.count() * enabled_components
 
-                if ext:
-                    pending_results += skill_results.filter(
-                        exam_attendance__exam_attendance_status_id=1
-                    ).filter(
-                        Q(external_marks__isnull=True) | Q(external_marks=None)
-                    ).count()
+#                 if ext:
+#                     pending_results += skill_results.filter(
+#                         exam_attendance__exam_attendance_status_id=1
+#                     ).filter(
+#                         Q(external_marks__isnull=True) | Q(external_marks=None)
+#                     ).count()
 
-                if intl:
-                    pending_results += skill_results.filter(
-                        Q(internal_marks__isnull=True) | Q(internal_marks=None)
-                    ).count()
+#                 if intl:
+#                     pending_results += skill_results.filter(
+#                         Q(internal_marks__isnull=True) | Q(internal_marks=None)
+#                     ).count()
 
-                if grade:
-                    pending_results += skill_results.filter(
-                        Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
-                    ).count()
+#                 if grade:
+#                     pending_results += skill_results.filter(
+#                         Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
+#                     ).count()
 
-    # --- COMPUTE ---
-    completed = total_results - pending_results if total_results else 0
-    percentage = (completed / total_results * 100) if total_results else 0
+#     # --- COMPUTE ---
+#     completed = total_results - pending_results if total_results else 0
+#     percentage = (completed / total_results * 100) if total_results else 0
 
-    # --- STATUS ASSIGN ---
-    if percentage == 100:
-        status = ExamResultStatus.objects.get(id=3)
-    elif percentage > 0:
-        status = ExamResultStatus.objects.get(id=2)
-    else:
-        status = ExamResultStatus.objects.get(id=1)
+#     # --- STATUS ASSIGN ---
+#     if percentage == 100:
+#         status = ExamResultStatus.objects.get(id=3)
+#     elif percentage > 0:
+#         status = ExamResultStatus.objects.get(id=2)
+#     else:
+#         status = ExamResultStatus.objects.get(id=1)
 
-    # --- UPSERT ---
-    SectionWiseExamResultStatus.objects.update_or_create(
-        academic_year=exam.academic_year,
-        branch=student.branch,
-        section=student.section,
-        exam=exam,
-        defaults={
-            'marks_completion_percentage': Decimal(round(percentage, 2)),
-            'status': status,
-        },
-    )
+#     # --- UPSERT ---
+#     SectionWiseExamResultStatus.objects.update_or_create(
+#         academic_year=exam.academic_year,
+#         branch=student.branch,
+#         section=student.section,
+#         exam=exam,
+#         defaults={
+#             'marks_completion_percentage': Decimal(round(percentage, 2)),
+#             'status': status,
+#         },
+#     )
 
-    return percentage
+#     return percentage
 #
+
+# @receiver(post_save, sender=ExamResult)
+# def handle_exam_result_post_save(sender, instance, created, **kwargs):
+#     exam = instance.exam_instance.exam
+#     student = instance.student
+
+#     # Async grade update
+#     tasks.update_exam_result_grade.delay(instance.exam_result_id)
+
+#     # Sync section completion
+#     tasks.compute_section_wise_completion(exam, student)
+
+
+# @receiver(post_save, sender=ExamSkillResult)
+# def handle_exam_skill_result_post_save(sender, instance, created, **kwargs):
+#     exam = instance.exam_result.exam_instance.exam
+#     student = instance.exam_result.student
+
+#     # Async skill grade update
+#     tasks.update_exam_skill_result_grade.delay(instance.pk)
+
+#     # Sync section completion
+#     tasks.compute_section_wise_completion(exam, student)
+
 
 @receiver(post_save, sender=ExamResult)
 def handle_exam_result_post_save(sender, instance, created, **kwargs):
@@ -425,7 +449,7 @@ def handle_exam_result_post_save(sender, instance, created, **kwargs):
     tasks.update_exam_result_grade.delay(instance.exam_result_id)
 
     # Sync section completion
-    compute_section_wise_completion(exam, student)
+    tasks.compute_section_wise_completion.delay(exam.exam_id, student.student_id)
 
 
 @receiver(post_save, sender=ExamSkillResult)
@@ -433,11 +457,13 @@ def handle_exam_skill_result_post_save(sender, instance, created, **kwargs):
     exam = instance.exam_result.exam_instance.exam
     student = instance.exam_result.student
 
+
+
     # Async skill grade update
-    tasks.update_exam_skill_result_grade.delay(instance.pk)
+    tasks.update_exam_skill_result_grade.delay(instance.exam_skill_result_id)
 
     # Sync section completion
-    compute_section_wise_completion(exam, student)
+    tasks.compute_section_wise_completion.delay(exam.exam_id, student.student_id)
 
 @receiver(post_save, sender=SectionWiseExamResultStatus)
 def update_branch_wise_result_status(sender, instance, **kwargs):

@@ -1,16 +1,12 @@
 from celery import shared_task
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Sum
-from exams.models import (
-    SectionWiseExamResultStatus,
-    ExamInstance,
-    ExamSubjectSkillInstance,
-    ExamResult,
-    ExamSkillResult,
-)
+from exams.models import *
 from students.models import Student
 from .models import GradeBoundary, StudentExamSummary
 import logging
+from django.db.models import Q
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -272,62 +268,81 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
 
 #     return {"status": "success", "message": "Student exam summaries updated successfully"}
 
+
 @shared_task
 def update_exam_result_grade(exam_result_id):
     try:
-        instance = ExamResult.objects.get(exam_result_id = exam_result_id)
-        exam = instance.exam_instance.exam
-        percentage = instance.percentage
-
-        # ✅ Guard against missing data
-        if not percentage:
-            return
-        
-        # external = self.external_marks or 0
-        # internal = self.internal_marks or 0
-        # self.total_marks = external + internal
-
-        # # --- Compute percentage safely ---
-        # max_external = getattr(self.exam_instance, "maximum_marks_external", 0) or 0
-        # max_internal = getattr(self.exam_instance, "maximum_marks_internal", 0) or 0
-        # total_max = max_external + max_internal
-
-        # if total_max > 0:
-        #     self.percentage = (self.total_marks / total_max) * 100
-        # else:
-        #     self.percentage = None
-
-        if exam and exam.category:
-            grade = GradeBoundary.objects.filter(
-                category=exam.category,
-                min_percentage__lte=percentage,
-                max_percentage__gte=percentage,
-                is_active=True
-            ).first()
-        else:
-            # fallback: use default boundaries (category is null)
-            grade = GradeBoundary.objects.filter(
-                category__isnull=True,
-                min_percentage__lte=percentage,
-                max_percentage__gte=percentage,
-                is_active=True
-            ).first()
-
-        if grade:
-            ExamResult.objects.filter(pk=instance.pk).update(grade=grade)
-
+        exam_result = ExamResult.objects.get(exam_result_id=exam_result_id)
     except ExamResult.DoesNotExist:
-        pass
+        return
+
+    exam_instance = exam_result.exam_instance
+    exam = getattr(exam_instance, "exam", None)
+    total_marks = (exam_result.external_marks or 0) + (exam_result.internal_marks or 0)
+
+    max_external = getattr(exam_instance, "maximum_marks_external", 0) or 0
+    max_internal = getattr(exam_instance, "maximum_marks_internal", 0) or 0
+    total_max = max_external + max_internal
+
+    percentage = exam_result.percentage or ((total_marks / total_max) * 100 if total_max > 0 else None)
+
+    if not percentage:
+        return
+
+    grade_qs = GradeBoundary.objects.filter(
+        min_percentage__lte=percentage,
+        max_percentage__gte=percentage,
+        is_active=True
+    )
+
+    if exam and exam.category:
+        grade_qs = grade_qs.filter(category=exam.category)
+    else:
+        grade_qs = grade_qs.filter(category__isnull=True)
+
+    grade = grade_qs.first()
+
+    if grade:
+        ExamResult.objects.filter(exam_result_id=exam_result_id).update(
+            total_marks=total_marks,
+            percentage=percentage,
+            grade=grade
+        )
 
 
 @shared_task
 def update_exam_skill_result_grade(exam_skill_result_id):
     try:
-        instance = ExamSkillResult.objects.get(pk=exam_skill_result_id)
-        exam = instance.exam_result.exam_instance.exam
-        percentage = instance.percentage
+        exam_skill_result = ExamSkillResult.objects.get(exam_skill_result_id=exam_skill_result_id)
+        exam = exam_skill_result.exam_result.exam_instance.exam
 
-        # ✅ Guard against missing percentage
+        external = exam_skill_result.external_marks or 0
+        internal = exam_skill_result.internal_marks or 0
+        marks_obtained = external + internal
+
+        exam_instance = exam_skill_result.exam_result.exam_instance
+
+        exam_skill_instance = (
+            ExamSubjectSkillInstance.objects.filter(
+                exam_instance=exam_instance,
+                subject_skill=exam_skill_result.skill,
+                is_active=True
+            )
+            .only("maximum_marks_external", "maximum_marks_internal", "has_external_marks", "has_internal_marks")
+            .first()
+        )
+
+        max_external = 0
+        max_internal = 0
+        if exam_skill_instance:
+            if getattr(exam_skill_instance, "has_external_marks", False):
+                max_external = getattr(exam_skill_instance, "maximum_marks_external", 0) or 0
+            if getattr(exam_skill_instance, "has_internal_marks", False):
+                max_internal = getattr(exam_skill_instance, "maximum_marks_internal", 0) or 0
+
+        total_max = max_external + max_internal
+        percentage = (marks_obtained / total_max) * 100 if total_max > 0 else None
+
         if not percentage:
             return
 
@@ -339,7 +354,6 @@ def update_exam_skill_result_grade(exam_skill_result_id):
                 is_active=True
             ).first()
         else:
-            # fallback: use default boundaries (category is null)
             grade = GradeBoundary.objects.filter(
                 category__isnull=True,
                 min_percentage__lte=percentage,
@@ -348,7 +362,115 @@ def update_exam_skill_result_grade(exam_skill_result_id):
             ).first()
 
         if grade:
-            ExamSkillResult.objects.filter(pk=instance.pk).update(grade=grade)
+            ExamSkillResult.objects.filter(exam_skill_result_id=exam_skill_result_id).update(
+                marks_obtained=marks_obtained,
+                percentage=percentage,
+                grade=grade,
+            )
 
     except ExamSkillResult.DoesNotExist:
         pass
+
+
+@shared_task
+def compute_section_wise_completion(exam, student):
+
+    exam = Exam.objects.get(exam_id=exam)
+    student = Student.objects.get(student_id=student)
+    
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+    students = Student.objects.filter(
+        section=student.section,
+        is_active=True,
+        academic_year=exam.academic_year,
+    ).exclude(admission_status__admission_status_id=3)
+
+    total_results = 0
+    pending_results = 0
+
+    for exam_instance in exam_instances:
+        subject_results = ExamResult.objects.filter(
+            student__in=students,
+            exam_instance=exam_instance,
+            is_active=True,
+        )
+
+        # --- SUBJECT LEVEL ---
+        ext = exam_instance.has_external_marks
+        intl = exam_instance.has_internal_marks
+        grade = exam_instance.has_subject_co_scholastic_grade
+
+        enabled_components = sum([bool(ext), bool(intl), bool(grade)])
+        total_results += subject_results.count() * enabled_components
+
+        if ext:
+            pending_results += subject_results.filter(
+                exam_attendance__exam_attendance_status_id=1
+            ).filter(Q(external_marks__isnull=True) | Q(external_marks=None)).count()
+
+        if intl:
+            pending_results += subject_results.filter(
+                Q(internal_marks__isnull=True) | Q(internal_marks=None)
+            ).count()
+
+        if grade:
+            pending_results += subject_results.filter(
+                Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
+            ).count()
+
+        # --- SKILL LEVEL ---
+        if exam_instance.has_subject_skills:
+            skill_instances = ExamSubjectSkillInstance.objects.filter(
+                exam_instance=exam_instance, is_active=True
+            )
+
+            for skill_instance in skill_instances:
+                ext = skill_instance.has_external_marks
+                intl = skill_instance.has_internal_marks
+                grade = skill_instance.has_subject_co_scholastic_grade
+                enabled_components = sum([bool(ext), bool(intl), bool(grade)])
+
+                skill_results = ExamSkillResult.objects.filter(
+                    exam_result__in=subject_results,
+                    skill=skill_instance.subject_skill,
+                )
+
+                total_results += skill_results.count() * enabled_components
+
+                if ext:
+                    pending_results += skill_results.filter(
+                        exam_attendance__exam_attendance_status_id=1
+                    ).filter(Q(external_marks__isnull=True) | Q(external_marks=None)).count()
+
+                if intl:
+                    pending_results += skill_results.filter(
+                        Q(internal_marks__isnull=True) | Q(internal_marks=None)
+                    ).count()
+
+                if grade:
+                    pending_results += skill_results.filter(
+                        Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
+                    ).count()
+
+    completed = total_results - pending_results if total_results else 0
+    percentage = (completed / total_results * 100) if total_results else 0
+
+    if percentage == 100:
+        status = ExamResultStatus.objects.get(id=3)
+    elif percentage > 0:
+        status = ExamResultStatus.objects.get(id=2)
+    else:
+        status = ExamResultStatus.objects.get(id=1)
+
+    SectionWiseExamResultStatus.objects.update_or_create(
+        academic_year=exam.academic_year,
+        branch=student.branch,
+        section=student.section,
+        exam=exam,
+        defaults={
+            'marks_completion_percentage': Decimal(round(percentage, 2)),
+            'status': status,
+        },
+    )
+
+    return percentage
