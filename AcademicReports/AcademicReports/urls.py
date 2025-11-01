@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/', include('apibridge.urls')),
     path('progresscard/',include('progresscard.urls')),
     path('api_source/',include('apisource.urls')),
+    path('dashboard/', include('dashboard.urls')),
     
 ]
 

@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'apibridge',
     'progresscard',
     'apisource',
+    'dashboard',
 
    
     
