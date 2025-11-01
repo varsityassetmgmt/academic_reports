@@ -721,7 +721,7 @@ class SectionWiseExamResultStatus(models.Model):
             except ExamResultStatus.DoesNotExist:
                 pass   
         super().save(*args, **kwargs)
-
+#
         
     def __str__(self):
         return f"{self.exam.name} - {self.section.name} ({self.branch.name} - {self.academic_year.name})"
