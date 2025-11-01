@@ -1,8 +1,6 @@
 
-
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from branches.models import AcademicYear
@@ -332,15 +330,6 @@ class GradeBoundary(models.Model):
 
 
 class CoScholasticGrade(models.Model):
-    """
-    Master table for skill grading (Co-Scholastic).
-    Example:
-    A+ → Outstanding
-    A  → Excellent
-    B+ → Good
-    B  → Average
-    C  → Satisfactory
-    """
     id = models.BigAutoField(primary_key=True)
     category = models.ForeignKey(ExamCategory, on_delete=models.PROTECT,null=True,blank=True, related_name="co_scholastic_grade_category")
     name = models.CharField(max_length=5)  # e.g., A+, A, B+, B, C
@@ -448,12 +437,6 @@ class ExamResult(models.Model):
         # else:
         #     self.percentage = None
 
-        # --- Assign grade automatically ---
-        # if self.percentage is not None:
-        #     self.grade = GradeBoundary.get_grade_for_percentage(self.percentage)
-        # else:
-        #     self.grade = None
-
         # --- Default exam attendance ---
         if not self.exam_attendance:
             default_status = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=1).first()
@@ -462,25 +445,6 @@ class ExamResult(models.Model):
 
         # --- Save record ---
         super().save(*args, **kwargs)
-
-    # def save(self, *args, **kwargs):
-    #     total_max = (self.exam_instance.maximum_marks_external or 0) + (self.exam_instance.maximum_marks_internal or 0)
-    #     obtained = (self.external_marks or 0) + (self.internal_marks or 0)
-    #     self.total_marks = obtained
-    #     if total_max > 0:
-    #         self.percentage = (obtained / total_max) * 100
-
-    #     if self.percentage is not None:
-    #         self.grade = GradeBoundary.get_grade_for_percentage(self.percentage)
-        
-    #     if not self.exam_attendance:
-    #         try:
-    #             self.exam_attendance = ExamAttendanceStatus.objects.get( exam_attendance_status_id = 1 )
-    #         except ExamAttendanceStatus.DoesNotExist:
-    #             pass   
-    #     super().save(*args, **kwargs)
-
-
   
     def __str__(self):
         return f"{self.student} - {self.exam_instance.subject.name}"
@@ -503,7 +467,7 @@ class ExamSkillResult(models.Model):
     grade = models.ForeignKey("GradeBoundary", on_delete=models.SET_NULL, null=True, blank=True,related_name="exam_skill_results_grade")
 
     def __str__(self):
-        return f"{self.exam_result.student} - {self.skill.name}: {self.value}"
+        return f"{self.exam_result.student} - {self.skill.name}"
     
     class Meta:
         constraints = [
@@ -548,12 +512,6 @@ class ExamSkillResult(models.Model):
         # else:
         #     self.percentage = None
 
-        # --- Assign grade automatically ---
-        # if self.percentage is not None:
-        #     self.grade = GradeBoundary.get_grade_for_percentage(self.percentage)
-        # else:
-        #     self.grade = None
-
         # --- Default exam attendance ---
         if not self.exam_attendance:
             default_status = ExamAttendanceStatus.objects.filter(exam_attendance_status_id=1).first()
@@ -579,9 +537,6 @@ class StudentExamSummary(models.Model):
     skills_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     skills_grade = models.ForeignKey("GradeBoundary", on_delete=models.SET_NULL, null=True, blank=True,related_name="student_exam_summary_skills_grade")
     
-    # overall_grade = models.CharField(max_length=3, null=True, blank=True)  # Overall grade (A+, A, B, etc.)
-    # overall_remarks = models.CharField(max_length=100, null=True, blank=True)  # Overall remarks (Very Good, Good, etc.)
-
     # Ranking fields
     section_rank = models.IntegerField(null=True, blank=True)
     class_rank = models.IntegerField(null=True, blank=True)
@@ -603,6 +558,9 @@ class StudentExamSummary(models.Model):
         ]
 
         indexes = [
+
+            
+            models.Index(fields=['academic_year']),
             models.Index(fields=['student']),
             models.Index(fields=['exam']),
 
@@ -763,7 +721,7 @@ class SectionWiseExamResultStatus(models.Model):
             except ExamResultStatus.DoesNotExist:
                 pass   
         super().save(*args, **kwargs)
-
+#
         
     def __str__(self):
         return f"{self.exam.name} - {self.section.name} ({self.branch.name} - {self.academic_year.name})"
