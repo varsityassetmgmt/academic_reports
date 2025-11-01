@@ -373,33 +373,27 @@ def update_exam_skill_result_grade(exam_skill_result_id):
 
 
 @shared_task
-def compute_section_wise_completion(exam_id, student_id):
-
+def compute_section_wise_completion(exam_id, result_student_id):
     exam = Exam.objects.get(exam_id=exam_id)
-    student = Student.objects.get(student_id=student_id)
-
-    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
+    result_student = Student.objects.get(student_id=result_student_id)
     students = Student.objects.filter(
-        section=student.section,
+        section=result_student.section,
         is_active=True,
         academic_year=exam.academic_year,
     ).exclude(admission_status__admission_status_id=3)
 
+    exam_instances = ExamInstance.objects.filter(exam=exam, is_active=True)
     total_results = 0
     pending_results = 0
 
     for exam_instance in exam_instances:
         subject_results = ExamResult.objects.filter(
-            student__in=students,
-            exam_instance=exam_instance,
-            is_active=True,
+            student__in=students, exam_instance=exam_instance, is_active=True
         )
 
-        # --- SUBJECT LEVEL ---
         ext = exam_instance.has_external_marks
         intl = exam_instance.has_internal_marks
         grade = exam_instance.has_subject_co_scholastic_grade
-
         enabled_components = sum([bool(ext), bool(intl), bool(grade)])
         total_results += subject_results.count() * enabled_components
 
@@ -418,7 +412,6 @@ def compute_section_wise_completion(exam_id, student_id):
                 Q(co_scholastic_grade__isnull=True) | Q(co_scholastic_grade=None)
             ).count()
 
-        # --- SKILL LEVEL ---
         if exam_instance.has_subject_skills:
             skill_instances = ExamSubjectSkillInstance.objects.filter(
                 exam_instance=exam_instance, is_active=True
@@ -464,8 +457,8 @@ def compute_section_wise_completion(exam_id, student_id):
 
     SectionWiseExamResultStatus.objects.update_or_create(
         academic_year=exam.academic_year,
-        branch=student.branch,
-        section=student.section,
+        branch=result_student.branch,
+        section=result_student.section,
         exam=exam,
         defaults={
             'marks_completion_percentage': Decimal(round(percentage, 2)),
