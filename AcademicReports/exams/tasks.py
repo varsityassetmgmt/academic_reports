@@ -271,7 +271,7 @@ def create_update_student_exam_summary(section_wise_exam_result_status_id):
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
-def update_exam_result_grade(exam_result_id):
+def update_exam_result_grade(self, exam_result_id):
     try:
         exam_result = ExamResult.objects.get(exam_result_id=exam_result_id)
     except ExamResult.DoesNotExist:
@@ -312,7 +312,7 @@ def update_exam_result_grade(exam_result_id):
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
-def update_exam_skill_result_grade(exam_skill_result_id):
+def update_exam_skill_result_grade(self,exam_skill_result_id):
     try:
         exam_skill_result = ExamSkillResult.objects.get(exam_skill_result_id=exam_skill_result_id)
         exam = exam_skill_result.exam_result.exam_instance.exam
@@ -374,7 +374,7 @@ def update_exam_skill_result_grade(exam_skill_result_id):
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
-def compute_section_wise_completion(exam_id, result_student_id):
+def compute_section_wise_completion(self,exam_id, result_student_id):
     exam = Exam.objects.get(exam_id=exam_id)
     result_student = Student.objects.get(student_id=result_student_id)
     students = Student.objects.filter(
