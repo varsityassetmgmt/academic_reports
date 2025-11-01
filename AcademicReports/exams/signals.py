@@ -422,7 +422,7 @@ def handle_exam_result_post_save(sender, instance, created, **kwargs):
     student = instance.student
 
     # Async grade update
-    tasks.update_exam_result_grade.delay(instance.pk)
+    tasks.update_exam_result_grade.delay(instance.exam_result_id)
 
     # Sync section completion
     compute_section_wise_completion(exam, student)

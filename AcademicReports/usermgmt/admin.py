@@ -47,26 +47,68 @@ class UserAdmin(BaseUserAdmin):
 # ================== Standalone UserProfile Admin ==================
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    def full_name(self, obj):
-        return f"{obj.user.first_name} {obj.user.last_name}".strip()
-    full_name.short_description = "Full Name"
+    list_display = (
+        "user",
+        "phone_number",
+        "varna_user_id",
+        "varna_profile",
+        "varna_user",
+        "must_change_password",
+        "is_varna_user_first_login",
+    )
+    search_fields = (
+        "user__username",
+        "user__first_name",
+        "user__last_name",
+        "phone_number",
+        "varna_user_id",
+        "varna_profile_short_code",
+    )
+    list_filter = (
+        "varna_user",
+        "must_change_password",
+        "is_varna_user_first_login",
+        "branches",
+        "varna_profile",
+    )
+    filter_horizontal = (
+        "states",
+        "zones",
+        "branches",
+        "academic_devisions",
+        "classes",
+        "orientations",
+    )
+    readonly_fields = ("varna_user_id",)
+    ordering = ("user__username",)
 
-    def image_preview(self, obj):
-        if obj.photo and obj.photo.url:
-            return format_html('<img src="{}" style="width:50px; height:50px; border-radius:50%;" />', obj.photo.url)
-        return "No Image"
-    image_preview.short_description = "Profile Photo"
-
-    list_display = ("user", "full_name", "phone_number", "must_change_password", "image_preview")
-    list_filter = ("must_change_password", "states", "zones", "branches", "academic_devisions", "classes", "orientations")
-    search_fields = ("user__username", "user__first_name", "user__last_name", "user__email", "phone_number")
-    filter_horizontal = ("states", "zones", "branches", "academic_devisions", "classes", "orientations")
-
-    def get_search_results(self, request, queryset, search_term):
-        queryset, use_distinct = super().get_search_results(request, queryset, search_term)
-        extra_qs = self.model.objects.filter(user__first_name__icontains=search_term) | \
-                   self.model.objects.filter(user__last_name__icontains=search_term)
-        return queryset | extra_qs, use_distinct
+    fieldsets = (
+        ("Basic Info", {
+            "fields": ("user", "photo", "bio", "phone_number"),
+        }),
+        ("Varna Integration", {
+            "fields": (
+                "varna_user",
+                "varna_user_id",
+                "varna_profile_short_code",
+                "varna_profile",
+                "is_varna_user_first_login",
+            ),
+        }),
+        ("Access & Relations", {
+            "fields": (
+                "states",
+                "zones",
+                "branches",
+                "academic_devisions",
+                "classes",
+                "orientations",
+            ),
+        }),
+        ("Security", {
+            "fields": ("must_change_password",),
+        }),
+    )
 
 
 # Replace default User admin
@@ -78,10 +120,11 @@ class VarnaProfilesAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "varna_profile_short_code",
+        'varna_profile_id',
         "is_active",
     )
     list_filter = ("is_active", "groups")
-    search_fields = ("name", "varna_profile_short_code")
+    search_fields = ("name",'varna_profile_id', "varna_profile_short_code")
     filter_horizontal = ("groups",)
     ordering = ("name",)
 
@@ -90,6 +133,7 @@ class VarnaProfilesAdmin(admin.ModelAdmin):
             "fields": (
                 "name",
                 "varna_profile_short_code",
+                'varna_profile_id',
                 "groups",
                 "is_active",
             ),

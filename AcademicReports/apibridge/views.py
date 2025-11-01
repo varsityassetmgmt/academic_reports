@@ -1724,3 +1724,182 @@ def trigger_process_all_branches_students(request):
 #         "message": f"Score centers sync completed. {updated_count} branches updated.",
 #         "skipped": skipped,
 #     })
+
+
+
+
+#======================================================== collect users from varna  ========================================================================
+import requests
+from django.contrib.auth import get_user_model
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from usermgmt.models import *
+
+User = get_user_model()
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from apibridge.tasks import update_user_profile_task
+import requests
+
+class SyncAllVarnaUsersAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        base_url = "http://192.168.0.6/varna_api/academics_user_management.php"
+        token = "chaitanya"
+
+        total_created = 0
+        total_updated = 0
+        profile_summary = []
+
+        active_profiles = VarnaProfiles.objects.filter(is_active=True)
+
+        for profile in active_profiles:
+            profile_code = profile.varna_profile_short_code
+
+            params = {
+                "token": token,
+                "type": "users",
+                "profile_short_code": profile_code,
+            }
+
+            try:
+                response = requests.get(base_url, params=params, timeout=20)
+                response.raise_for_status()
+                users_data = response.json()
+            except requests.exceptions.RequestException as e:
+                profile_summary.append({
+                    "profile_short_code": profile_code,
+                    "status": "failed",
+                    "error": str(e)
+                })
+                continue
+
+            created_count = 0
+            updated_count = 0
+
+            for item in users_data:
+                varna_user_id = item.get("user_id")
+                username = item.get("login")
+
+                if not username or not varna_user_id:
+                    continue
+
+                # Create or get User
+                user, created_user = User.objects.get_or_create(
+                    username=username,
+                    defaults={"is_active": True}
+                )
+
+                if created_user:
+                    user.set_password("Scts@1234")
+                    user.save()
+                    created_count += 1
+
+                # Offload profile work to Celery
+                update_user_profile_task.delay(varna_user_id, username, profile_code)
+                updated_count += 1  # Counting as "updated" since it's scheduled
+
+            total_created += created_count
+            total_updated += updated_count
+            profile_summary.append({
+                "profile_short_code": profile_code,
+                "created": created_count,
+                "updated_scheduled": updated_count,
+                "status": "success"
+            })
+
+        return Response({
+            "message": "Varna user synchronization completed successfully.",
+            "total_profiles_processed": len(active_profiles),
+            "total_users_created": total_created,
+            "total_user_profiles_scheduled": total_updated,
+            "details": profile_summary
+        }, status=status.HTTP_200_OK)
+
+
+import requests
+from django.db import transaction
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+ 
+from branches.models import Branch
+
+
+class SyncVarnaUserProfileBranchesAPIView(APIView):
+   
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        base_url = "http://192.168.0.6/varna_api/academics_user_management.php"
+        token = "chaitanya"
+
+        params = {
+            "token": token,
+            "type": "userbranches",
+        }
+
+        try:
+            response = requests.get(base_url, params=params, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.RequestException as e:
+            return Response({
+                "status": "error",
+                "message": f"Failed to fetch data from Varna API: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        updated_count = 0
+        skipped_count = 0
+
+        for item in data:
+            varna_user_id = str(item.get("user_id"))
+            user_branches_str = item.get("user_branches")
+
+            if not varna_user_id or not user_branches_str:
+                skipped_count += 1
+                continue
+
+            user_profile = UserProfile.objects.filter(varna_user_id = varna_user_id).first()
+            if not user_profile:
+                continue
+            branch_ids = [int(b) for b in user_branches_str.split(",") if b.strip().isdigit()]
+
+            if not branch_ids:
+                skipped_count += 1
+                continue
+
+            branches = Branch.objects.filter(branch_id__in=branch_ids)
+
+            if not branches.exists():
+                skipped_count += 1
+                continue
+
+            # Set the branches (overwrite old ones)
+            user_profile.branches.add(*branches)
+            updated_count += 1
+            
+        return Response({
+            "status": "success",
+            "message": "Task completed successfully.",
+            "updated_users": updated_count,
+            "skipped_users": skipped_count
+        }, status=status.HTTP_200_OK)
+
+
+
+
+
+
+
+
+
+
+
